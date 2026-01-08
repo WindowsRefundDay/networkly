@@ -1,11 +1,52 @@
+"use client"
+
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { ArrowRight, MessageCircle } from "lucide-react"
+import { ArrowRight, MessageCircle, Loader2 } from "lucide-react"
 import { getMessages } from "@/app/actions/messages"
 
-export async function MessagesPanel() {
-  const messages = await getMessages()
+interface Message {
+  id: string
+  senderName: string
+  senderAvatar: string | null
+  preview: string
+  timestamp: string
+  unread: boolean
+}
+
+export function MessagesPanel() {
+  const [messages, setMessages] = useState<Message[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    getMessages()
+      .then((data) => setMessages(data as Message[]))
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) {
+    return (
+      <Card className="border-border">
+        <CardContent className="flex items-center justify-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (error) {
+    return (
+      <Card className="border-border">
+        <CardContent className="py-8 text-center text-muted-foreground">
+          <p>Could not load messages.</p>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <Card className="border-border">
@@ -51,4 +92,3 @@ export async function MessagesPanel() {
     </Card>
   )
 }
-

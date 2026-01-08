@@ -1,8 +1,19 @@
+"use client"
+
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Activity, Milestone, Sparkles, Code } from "lucide-react"
+import { Activity, Milestone, Sparkles, Code, Loader2 } from "lucide-react"
 import { getProjectUpdates } from "@/app/actions/projects"
 import type React from "react"
+
+interface ProjectUpdate {
+  id: string
+  type: string
+  content: string
+  projectTitle: string
+  timestamp: string
+}
 
 const updateTypeConfig: Record<string, { icon: React.ElementType; color: string }> = {
   milestone: { icon: Milestone, color: "text-secondary bg-secondary/10" },
@@ -10,8 +21,37 @@ const updateTypeConfig: Record<string, { icon: React.ElementType; color: string 
   feature: { icon: Code, color: "text-amber-500 bg-amber-500/10" },
 }
 
-export async function ProjectUpdatesFeed() {
-  const projectUpdates = await getProjectUpdates()
+export function ProjectUpdatesFeed() {
+  const [projectUpdates, setProjectUpdates] = useState<ProjectUpdate[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    getProjectUpdates()
+      .then((data) => setProjectUpdates(data as ProjectUpdate[]))
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) {
+    return (
+      <Card className="border-border">
+        <CardContent className="flex items-center justify-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (error) {
+    return (
+      <Card className="border-border">
+        <CardContent className="py-8 text-center text-muted-foreground">
+          <p>Could not load updates.</p>
+        </CardContent>
+      </Card>
+    )
+  }
 
   return (
     <Card className="border-border">
@@ -53,4 +93,3 @@ export async function ProjectUpdatesFeed() {
     </Card>
   )
 }
-

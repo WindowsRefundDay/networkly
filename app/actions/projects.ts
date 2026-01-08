@@ -25,6 +25,8 @@ export async function getProjects() {
 
     return projects.map((project) => ({
         ...project,
+        createdAt: getRelativeTime(project.createdAt),
+        updatedAt: getRelativeTime(project.updatedAt),
         collaborators: project.collaborators.map((c) => ({
             id: c.user.id,
             name: c.user.name,
@@ -113,7 +115,20 @@ export async function createProject(data: {
     })
 
     revalidatePath("/projects")
-    return project
+    return {
+        success: true,
+        project: {
+            ...project,
+            createdAt: getRelativeTime(project.createdAt),
+            updatedAt: getRelativeTime(project.updatedAt),
+            collaborators: project.collaborators.map((c) => ({
+                id: c.user.id,
+                name: c.user.name,
+                avatar: c.user.avatar,
+                role: c.role,
+            })),
+        }
+    }
 }
 
 // ============================================================================
