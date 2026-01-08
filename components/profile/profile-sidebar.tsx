@@ -5,11 +5,20 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Sparkles, Linkedin, Github, Globe, ExternalLink } from "lucide-react"
-import { suggestedConnections } from "@/lib/mock-data"
 
-export function ProfileSidebar() {
-  const profileStrength = 85
+interface SuggestedPerson {
+  id: string
+  name: string
+  headline?: string | null
+  avatar?: string | null
+}
 
+interface ProfileSidebarProps {
+  suggestedConnections?: SuggestedPerson[]
+  profileStrength?: number
+}
+
+export function ProfileSidebar({ suggestedConnections = [], profileStrength = 85 }: ProfileSidebarProps) {
   return (
     <div className="space-y-6">
       <Card className="border-border">
@@ -22,7 +31,9 @@ export function ProfileSidebar() {
         <CardContent className="space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-2xl font-bold text-foreground">{profileStrength}%</span>
-            <span className="text-sm text-secondary font-medium">Strong</span>
+            <span className="text-sm text-secondary font-medium">
+              {profileStrength >= 80 ? "Strong" : profileStrength >= 50 ? "Good" : "Needs Work"}
+            </span>
           </div>
           <Progress value={profileStrength} className="h-2" />
           <p className="text-xs text-muted-foreground">Add 2 more skills and a project to reach All-Star status</p>
@@ -78,3 +89,4 @@ export function ProfileSidebar() {
     </div>
   )
 }
+

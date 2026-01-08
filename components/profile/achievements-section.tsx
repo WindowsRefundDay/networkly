@@ -3,8 +3,18 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Trophy, Award, Star, Plus } from "lucide-react"
-import { currentUser } from "@/lib/mock-data"
 import type React from "react"
+
+interface Achievement {
+  id: string
+  title: string
+  date: string
+  icon: string
+}
+
+interface AchievementsSectionProps {
+  achievements?: Achievement[]
+}
 
 const iconMap: Record<string, React.ElementType> = {
   trophy: Trophy,
@@ -18,7 +28,7 @@ const iconColors: Record<string, string> = {
   star: "text-secondary bg-secondary/10",
 }
 
-export function AchievementsSection() {
+export function AchievementsSection({ achievements = [] }: AchievementsSectionProps) {
   return (
     <Card className="border-border">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -30,7 +40,7 @@ export function AchievementsSection() {
       </CardHeader>
       <CardContent>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {currentUser.achievements.map((achievement) => {
+          {achievements.map((achievement) => {
             const Icon = iconMap[achievement.icon] || Trophy
             const colors = iconColors[achievement.icon] || iconColors.trophy
             return (
@@ -53,3 +63,4 @@ export function AchievementsSection() {
     </Card>
   )
 }
+

@@ -3,9 +3,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Pencil, Sparkles } from "lucide-react"
-import { currentUser } from "@/lib/mock-data"
 
-export function AboutSection() {
+interface AboutSectionProps {
+  bio?: string | null
+}
+
+export function AboutSection({ bio = "" }: AboutSectionProps) {
   return (
     <Card className="border-border">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -21,8 +24,9 @@ export function AboutSection() {
         </div>
       </CardHeader>
       <CardContent>
-        <p className="text-muted-foreground leading-relaxed">{currentUser.bio}</p>
+        <p className="text-muted-foreground leading-relaxed">{bio || "No bio provided yet."}</p>
       </CardContent>
     </Card>
   )
 }
+

@@ -4,9 +4,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Plus, Sparkles, TrendingUp } from "lucide-react"
-import { currentUser, analyticsData } from "@/lib/mock-data"
 
-export function SkillsSection() {
+interface SkillsSectionProps {
+  skills?: string[]
+  interests?: string[]
+  skillEndorsements?: { skill: string; count: number }[]
+}
+
+export function SkillsSection({
+  skills = [],
+  interests = [],
+  skillEndorsements = []
+}: SkillsSectionProps) {
   return (
     <Card className="border-border">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -24,8 +33,8 @@ export function SkillsSection() {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-wrap gap-2">
-          {currentUser.skills.map((skill) => {
-            const endorsement = analyticsData.skillEndorsements.find((e) => e.skill === skill)
+          {skills.map((skill) => {
+            const endorsement = skillEndorsements.find((e) => e.skill === skill)
             return (
               <div key={skill} className="group relative">
                 <Badge
@@ -47,7 +56,7 @@ export function SkillsSection() {
         <div className="pt-2 border-t border-border">
           <h4 className="text-sm font-medium text-foreground mb-2">Interests</h4>
           <div className="flex flex-wrap gap-2">
-            {currentUser.interests.map((interest) => (
+            {interests.map((interest) => (
               <Badge key={interest} variant="outline" className="text-sm">
                 {interest}
               </Badge>
@@ -58,3 +67,4 @@ export function SkillsSection() {
     </Card>
   )
 }
+

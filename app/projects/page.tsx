@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -9,13 +9,43 @@ import { ProjectCard } from "@/components/projects/project-card"
 import { ProjectDetailModal } from "@/components/projects/project-detail-modal"
 import { CreateProjectModal } from "@/components/projects/create-project-modal"
 import { ProjectUpdatesFeed } from "@/components/projects/project-updates-feed"
-import { allProjects } from "@/lib/mock-data"
+import { getProjects, createProject } from "@/app/actions/projects"
+
+interface Project {
+  id: string
+  title: string
+  description: string
+  image: string | null
+  status: string
+  visibility: string
+  collaborators: { id: string; name: string; avatar: string | null; role: string }[]
+  likes: number
+  views: number
+  comments: number
+  tags: string[]
+  progress: number
+  createdAt: string
+  updatedAt: string
+  github: string | null
+  demo: string | null
+  lookingFor: string[]
+}
 
 export default function ProjectsPage() {
   const [searchQuery, setSearchQuery] = useState("")
-  const [projects, setProjects] = useState(allProjects)
-  const [selectedProject, setSelectedProject] = useState<(typeof allProjects)[0] | null>(null)
+  const [projects, setProjects] = useState<Project[]>([])
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchProjects() {
+      const data = await getProjects()
+      setProjects(data as Project[])
+      setLoading(false)
+    }
+    fetchProjects()
+  }, [])
 
   const myProjects = projects
   const lookingForHelp = projects.filter((p) => p.lookingFor.length > 0)
@@ -28,7 +58,7 @@ export default function ProjectsPage() {
         p.tags.some((tag) => tag.toLowerCase().includes(searchQuery.toLowerCase())),
     )
 
-  const handleCreateProject = (projectData: {
+  const handleCreateProject = async (projectData: {
     title: string
     description: string
     status: string
@@ -36,21 +66,17 @@ export default function ProjectsPage() {
     tags: string[]
     lookingFor: string[]
   }) => {
-    const newProject = {
-      id: (projects.length + 1).toString(),
-      ...projectData,
-      image: "/project-thumbnail.png",
-      collaborators: [{ id: "1", name: "Alex Chen", avatar: "/professional-asian-student.jpg", role: "Creator" }],
-      likes: 0,
-      views: 0,
-      comments: 0,
-      progress: 0,
-      createdAt: "Just now",
-      updatedAt: "Just now",
-      github: null,
-      demo: null,
+    const result = await createProject({
+      title: projectData.title,
+      description: projectData.description,
+      status: projectData.status,
+      visibility: projectData.visibility,
+      tags: projectData.tags,
+      lookingFor: projectData.lookingFor
+    })
+    if (result.success && result.project) {
+      setProjects([result.project as Project, ...projects])
     }
-    setProjects([newProject, ...projects])
   }
 
   const handleLike = (id: string) => {

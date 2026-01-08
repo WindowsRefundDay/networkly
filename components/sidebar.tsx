@@ -15,7 +15,7 @@ import {
   Sparkles,
 } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { currentUser } from "@/lib/mock-data"
+import { useUser } from "@clerk/nextjs"
 
 const navigation = [
   { name: "Home", href: "/dashboard", icon: Home },
@@ -30,6 +30,11 @@ const navigation = [
 
 export function Sidebar() {
   const pathname = usePathname()
+  const { user } = useUser()
+
+  const userName = user?.fullName || user?.firstName || "User"
+  const userAvatar = user?.imageUrl || "/placeholder.svg"
+  const userInitials = userName.split(" ").map(n => n[0]).join("").toUpperCase()
 
   return (
     <aside className="fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-border bg-card">
@@ -73,15 +78,16 @@ export function Sidebar() {
         </Link>
         <div className="mt-4 flex items-center gap-3 rounded-lg bg-muted/50 p-3">
           <Avatar className="h-10 w-10">
-            <AvatarImage src={currentUser.avatar || "/placeholder.svg"} alt={currentUser.name} />
-            <AvatarFallback>AC</AvatarFallback>
+            <AvatarImage src={userAvatar} alt={userName} />
+            <AvatarFallback>{userInitials}</AvatarFallback>
           </Avatar>
           <div className="flex-1 truncate">
-            <p className="text-sm font-medium text-foreground">{currentUser.name}</p>
-            <p className="truncate text-xs text-muted-foreground">{currentUser.university}</p>
+            <p className="text-sm font-medium text-foreground">{userName}</p>
+            <p className="truncate text-xs text-muted-foreground">{user?.primaryEmailAddress?.emailAddress || ""}</p>
           </div>
         </div>
       </div>
     </aside>
   )
 }
+

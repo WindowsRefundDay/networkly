@@ -1,12 +1,12 @@
-"use client"
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { ArrowRight, MessageCircle } from "lucide-react"
-import { messages } from "@/lib/mock-data"
+import { getMessages } from "@/app/actions/messages"
 
-export function MessagesPanel() {
+export async function MessagesPanel() {
+  const messages = await getMessages()
+
   return (
     <Card className="border-border">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -51,3 +51,4 @@ export function MessagesPanel() {
     </Card>
   )
 }
+

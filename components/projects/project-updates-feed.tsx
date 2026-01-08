@@ -1,9 +1,7 @@
-"use client"
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Activity, Milestone, Sparkles, Code } from "lucide-react"
-import { projectUpdates } from "@/lib/mock-data"
+import { getProjectUpdates } from "@/app/actions/projects"
 import type React from "react"
 
 const updateTypeConfig: Record<string, { icon: React.ElementType; color: string }> = {
@@ -12,7 +10,9 @@ const updateTypeConfig: Record<string, { icon: React.ElementType; color: string 
   feature: { icon: Code, color: "text-amber-500 bg-amber-500/10" },
 }
 
-export function ProjectUpdatesFeed() {
+export async function ProjectUpdatesFeed() {
+  const projectUpdates = await getProjectUpdates()
+
   return (
     <Card className="border-border">
       <CardHeader className="pb-2">
@@ -53,3 +53,4 @@ export function ProjectUpdatesFeed() {
     </Card>
   )
 }
+

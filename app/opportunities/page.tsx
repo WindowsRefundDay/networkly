@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -9,16 +9,64 @@ import { OpportunityFilters } from "@/components/opportunities/opportunity-filte
 import { OpportunityList } from "@/components/opportunities/opportunity-list"
 import { OpportunityDetail } from "@/components/opportunities/opportunity-detail"
 import { GoalDashboard } from "@/components/opportunities/goal-dashboard"
-import { allOpportunities } from "@/lib/mock-data"
+import { getOpportunities } from "@/app/actions/opportunities"
+
+interface Opportunity {
+  id: string
+  title: string
+  company: string
+  location: string
+  type: string
+  matchScore: number
+  deadline: string
+  postedDate: string
+  logo: string | null
+  skills: string[]
+  description: string | null
+  salary: string | null
+  duration: string | null
+  remote: boolean
+  applicants: number
+  saved: boolean
+}
 
 export default function OpportunitiesPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedTypes, setSelectedTypes] = useState<string[]>([])
   const [selectedLocations, setSelectedLocations] = useState<string[]>([])
   const [minMatchScore, setMinMatchScore] = useState(0)
-  const [opportunities, setOpportunities] = useState(allOpportunities)
-  const [selectedOpportunity, setSelectedOpportunity] = useState(allOpportunities[0])
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([])
+  const [selectedOpportunity, setSelectedOpportunity] = useState<Opportunity | null>(null)
   const [showFilters, setShowFilters] = useState(true)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchOpportunities() {
+      const data = await getOpportunities()
+      const mapped = data.map((opp: Record<string, unknown>) => ({
+        id: opp.id as string,
+        title: opp.title as string,
+        company: opp.company as string,
+        location: opp.location as string,
+        type: opp.type as string,
+        matchScore: (opp.matchScore as number) || 0,
+        deadline: opp.deadline as string,
+        postedDate: (opp.postedDate as string) || "",
+        logo: opp.logo as string | null,
+        skills: (opp.skills as string[]) || [],
+        description: opp.description as string | null,
+        salary: opp.salary as string | null,
+        duration: opp.duration as string | null,
+        remote: (opp.remote as boolean) || false,
+        applicants: (opp.applicants as number) || 0,
+        saved: false // Will be updated from saved opportunities
+      }))
+      setOpportunities(mapped)
+      if (mapped.length > 0) setSelectedOpportunity(mapped[0])
+      setLoading(false)
+    }
+    fetchOpportunities()
+  }, [])
 
   const filteredOpportunities = useMemo(() => {
     return opportunities.filter((opp) => {

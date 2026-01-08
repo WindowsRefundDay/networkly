@@ -14,10 +14,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
-import { currentUser } from "@/lib/mock-data"
+import { useUser, useClerk } from "@clerk/nextjs"
 
 export function Header() {
   const [searchQuery, setSearchQuery] = useState("")
+  const { user } = useUser()
+  const { signOut } = useClerk()
+
+  const userName = user?.fullName || user?.firstName || "User"
+  const userEmail = user?.primaryEmailAddress?.emailAddress || ""
+  const userAvatar = user?.imageUrl || "/placeholder.svg"
+  const userInitials = userName.split(" ").map(n => n[0]).join("").toUpperCase()
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-border bg-card px-6">
@@ -56,16 +63,16 @@ export function Header() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-9 w-9 rounded-full">
               <Avatar className="h-9 w-9">
-                <AvatarImage src={currentUser.avatar || "/placeholder.svg"} alt={currentUser.name} />
-                <AvatarFallback>AC</AvatarFallback>
+                <AvatarImage src={userAvatar} alt={userName} />
+                <AvatarFallback>{userInitials}</AvatarFallback>
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>
               <div className="flex flex-col">
-                <span>{currentUser.name}</span>
-                <span className="text-xs font-normal text-muted-foreground">{currentUser.email}</span>
+                <span>{userName}</span>
+                <span className="text-xs font-normal text-muted-foreground">{userEmail}</span>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
@@ -75,10 +82,7 @@ export function Header() {
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="text-destructive"
-              onClick={() => {
-                // In a real app we would clear auth state here
-                window.location.href = "/login"
-              }}
+              onClick={() => signOut({ redirectUrl: "/login" })}
             >
               Sign Out
             </DropdownMenuItem>
@@ -88,3 +92,4 @@ export function Header() {
     </header>
   )
 }
+

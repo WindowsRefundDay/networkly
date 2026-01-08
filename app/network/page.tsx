@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -8,7 +8,7 @@ import { Search, Sparkles, SlidersHorizontal } from "lucide-react"
 import { ConnectionCard } from "@/components/network/connection-card"
 import { MessagesPanel } from "@/components/network/messages-panel"
 import { NetworkStats } from "@/components/network/network-stats"
-import { networkConnections } from "@/lib/mock-data"
+import { getConnections } from "@/app/actions/connections"
 
 interface Connection {
   id: string
@@ -23,7 +23,29 @@ interface Connection {
 
 export default function NetworkPage() {
   const [searchQuery, setSearchQuery] = useState("")
-  const [connections, setConnections] = useState<Connection[]>(networkConnections)
+  const [connections, setConnections] = useState<Connection[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchConnections() {
+      const data = await getConnections()
+      // Transform database data to match Connection interface
+      const transformed = data.map((c: Record<string, unknown>) => ({
+        id: c.id as string,
+        name: c.name as string,
+        headline: (c.headline as string) || "",
+        avatar: (c.avatar as string) || "/placeholder.svg",
+        mutualConnections: (c.mutualConnections as number) || 0,
+        matchReason: (c.matchReason as string) || "",
+        status: (c.status as "connected" | "pending" | "suggested") || "suggested",
+        connectedDate: c.connectedDate as string | null
+      }))
+      setConnections(transformed)
+      setLoading(false)
+    }
+    fetchConnections()
+  }, [])
+
 
   const connectedUsers = connections.filter((c) => c.status === "connected")
   const pendingUsers = connections.filter((c) => c.status === "pending")

@@ -2,9 +2,12 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
-import { analyticsData } from "@/lib/mock-data"
 
-export function NetworkGrowthChart() {
+interface NetworkGrowthChartProps {
+  data?: { month: string; connections: number }[]
+}
+
+export function NetworkGrowthChart({ data = [] }: NetworkGrowthChartProps) {
   return (
     <Card className="border-border">
       <CardHeader className="pb-2">
@@ -14,7 +17,7 @@ export function NetworkGrowthChart() {
       <CardContent>
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={analyticsData.networkGrowth}>
+            <LineChart data={data}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis dataKey="month" className="text-xs" stroke="hsl(var(--muted-foreground))" />
               <YAxis className="text-xs" stroke="hsl(var(--muted-foreground))" />
@@ -41,3 +44,4 @@ export function NetworkGrowthChart() {
     </Card>
   )
 }
+

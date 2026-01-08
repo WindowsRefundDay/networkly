@@ -2,7 +2,10 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts"
-import { analyticsData } from "@/lib/mock-data"
+
+interface SkillEndorsementsChartProps {
+  data?: { skill: string; count: number }[]
+}
 
 const colors = [
   "hsl(var(--primary))",
@@ -12,7 +15,7 @@ const colors = [
   "hsl(262, 83%, 58%)",
 ]
 
-export function SkillEndorsementsChart() {
+export function SkillEndorsementsChart({ data = [] }: SkillEndorsementsChartProps) {
   return (
     <Card className="border-border">
       <CardHeader className="pb-2">
@@ -22,7 +25,7 @@ export function SkillEndorsementsChart() {
       <CardContent>
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={analyticsData.skillEndorsements} layout="vertical">
+            <BarChart data={data} layout="vertical">
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
               <XAxis type="number" className="text-xs" stroke="hsl(var(--muted-foreground))" />
               <YAxis
@@ -41,7 +44,7 @@ export function SkillEndorsementsChart() {
                 labelStyle={{ color: "hsl(var(--foreground))" }}
               />
               <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-                {analyticsData.skillEndorsements.map((_, index) => (
+                {data.map((_, index) => (
                   <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
                 ))}
               </Bar>
@@ -52,3 +55,4 @@ export function SkillEndorsementsChart() {
     </Card>
   )
 }
+

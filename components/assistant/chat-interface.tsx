@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Sparkles, Send, User, Loader2 } from "lucide-react"
-import { currentUser } from "@/lib/mock-data"
+import { useUser } from "@clerk/nextjs"
 
 const quickPrompts = [
   "Help me prepare for my Google interview",
@@ -25,6 +25,10 @@ const quickPrompts = [
 export function ChatInterface() {
   const [input, setInput] = useState("")
   const scrollAreaRef = useRef<HTMLDivElement>(null)
+  const { user } = useUser()
+
+  const userName = user?.fullName || user?.firstName || "User"
+  const userAvatar = user?.imageUrl || "/placeholder.svg"
 
   const { messages, sendMessage, status } = useChat({
     transport: new DefaultChatTransport({ api: "/api/chat" }),
@@ -98,9 +102,8 @@ export function ChatInterface() {
                   </div>
                 )}
                 <div
-                  className={`rounded-lg px-4 py-3 max-w-[80%] ${
-                    message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
-                  }`}
+                  className={`rounded-lg px-4 py-3 max-w-[80%] ${message.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted text-foreground"
+                    }`}
                 >
                   {message.parts.map((part, index) => {
                     if (part.type === "text") {
@@ -115,7 +118,7 @@ export function ChatInterface() {
                 </div>
                 {message.role === "user" && (
                   <Avatar className="h-8 w-8 shrink-0">
-                    <AvatarImage src={currentUser.avatar || "/placeholder.svg"} alt={currentUser.name} />
+                    <AvatarImage src={userAvatar} alt={userName} />
                     <AvatarFallback>
                       <User className="h-4 w-4" />
                     </AvatarFallback>

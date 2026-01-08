@@ -5,8 +5,22 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Plus, Pencil, MoreHorizontal } from "lucide-react"
-import { currentUser } from "@/lib/mock-data"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+
+interface Extracurricular {
+  id: string
+  title: string
+  organization: string
+  type: string
+  startDate: string
+  endDate: string
+  description?: string | null
+  logo?: string | null
+}
+
+interface ExtracurricularsSectionProps {
+  extracurriculars?: Extracurricular[]
+}
 
 const typeColors: Record<string, string> = {
   Research: "bg-primary/10 text-primary",
@@ -15,7 +29,7 @@ const typeColors: Record<string, string> = {
   Volunteer: "bg-emerald-500/10 text-emerald-500",
 }
 
-export function ExtracurricularsSection() {
+export function ExtracurricularsSection({ extracurriculars = [] }: ExtracurricularsSectionProps) {
   return (
     <Card className="border-border">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -26,10 +40,10 @@ export function ExtracurricularsSection() {
         </Button>
       </CardHeader>
       <CardContent className="space-y-4">
-        {currentUser.extracurriculars.map((activity, index) => (
+        {extracurriculars.map((activity, index) => (
           <div
             key={activity.id}
-            className={`flex gap-4 ${index !== currentUser.extracurriculars.length - 1 ? "pb-4 border-b border-border" : ""}`}
+            className={`flex gap-4 ${index !== extracurriculars.length - 1 ? "pb-4 border-b border-border" : ""}`}
           >
             <Avatar className="h-12 w-12 rounded-lg">
               <AvatarImage src={activity.logo || "/placeholder.svg"} alt={activity.organization} />
@@ -72,3 +86,4 @@ export function ExtracurricularsSection() {
     </Card>
   )
 }
+

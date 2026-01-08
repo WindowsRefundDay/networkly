@@ -8,9 +8,16 @@ import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { User, Bell, Eye, Sparkles, Trash2 } from "lucide-react"
-import { currentUser } from "@/lib/mock-data"
+import { useUser } from "@clerk/nextjs"
 
 export default function SettingsPage() {
+  const { user } = useUser()
+
+  const userName = user?.fullName || user?.firstName || "User"
+  const userEmail = user?.primaryEmailAddress?.emailAddress || ""
+  const userAvatar = user?.imageUrl || "/placeholder.svg"
+  const userInitials = userName.split(" ").map(n => n[0]).join("").toUpperCase()
+
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
@@ -29,8 +36,8 @@ export default function SettingsPage() {
         <CardContent className="space-y-6">
           <div className="flex items-center gap-4">
             <Avatar className="h-20 w-20">
-              <AvatarImage src={currentUser.avatar || "/placeholder.svg"} alt={currentUser.name} />
-              <AvatarFallback>AC</AvatarFallback>
+              <AvatarImage src={userAvatar} alt={userName} />
+              <AvatarFallback>{userInitials}</AvatarFallback>
             </Avatar>
             <div className="space-y-2">
               <Button variant="outline" size="sm" className="bg-transparent">
@@ -42,19 +49,19 @@ export default function SettingsPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="name">Full Name</Label>
-              <Input id="name" defaultValue={currentUser.name} />
+              <Input id="name" defaultValue={userName} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" defaultValue={currentUser.email} />
+              <Input id="email" type="email" defaultValue={userEmail} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="headline">Headline</Label>
-              <Input id="headline" defaultValue={currentUser.headline} />
+              <Input id="headline" defaultValue="" placeholder="Your professional headline" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="location">Location</Label>
-              <Input id="location" defaultValue={currentUser.location} />
+              <Input id="location" defaultValue="" placeholder="City, Country" />
             </div>
           </div>
           <Button>Save Changes</Button>

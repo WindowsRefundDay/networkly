@@ -2,9 +2,12 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
-import { analyticsData } from "@/lib/mock-data"
 
-export function ProfileViewsChart() {
+interface ProfileViewsChartProps {
+  data?: { date: string; views: number }[]
+}
+
+export function ProfileViewsChart({ data = [] }: ProfileViewsChartProps) {
   return (
     <Card className="border-border">
       <CardHeader className="pb-2">
@@ -14,7 +17,7 @@ export function ProfileViewsChart() {
       <CardContent>
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={analyticsData.profileViews}>
+            <AreaChart data={data}>
               <defs>
                 <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
@@ -47,3 +50,4 @@ export function ProfileViewsChart() {
     </Card>
   )
 }
+
