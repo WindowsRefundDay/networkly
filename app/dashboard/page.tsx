@@ -3,12 +3,16 @@ import { OpportunityCard } from "@/components/dashboard/opportunity-card"
 import { SuggestedConnections } from "@/components/dashboard/suggested-connections"
 import { AIAssistantPreview } from "@/components/dashboard/ai-assistant-preview"
 import { ApplicationTracker } from "@/components/dashboard/application-tracker"
+import { CuratedOpportunitiesWidget } from "@/components/dashboard/curated-opportunities-widget"
 import { getCurrentUser, syncUserFromClerk } from "@/app/actions/user"
+import { getAnalyticsSummary } from "@/app/actions/analytics"
 import { currentUser } from "@clerk/nextjs/server"
 import { redirect } from "next/navigation"
 
 export default async function DashboardPage() {
   let dbUser = await getCurrentUser()
+
+
 
   // If user is authenticated with Clerk but not in our DB, sync them
   if (!dbUser) {
@@ -44,6 +48,9 @@ export default async function DashboardPage() {
     )
   }
 
+  // Fetch stats after ensuring user exists
+  const statsData = await getAnalyticsSummary()
+
   return (
     <div className="space-y-6">
       <div>
@@ -51,15 +58,20 @@ export default async function DashboardPage() {
         <p className="text-muted-foreground">Here is what is happening with your network and opportunities.</p>
       </div>
 
-      <StatsCards user={dbUser} />
+      <StatsCards statsData={statsData} />
+
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
+          {/* @ts-expect-error Server Component */}
           <OpportunityCard />
+          {/* @ts-expect-error Server Component */}
           <ApplicationTracker />
         </div>
         <div className="space-y-6">
+          <CuratedOpportunitiesWidget />
           <AIAssistantPreview />
+          {/* @ts-expect-error Server Component */}
           <SuggestedConnections />
         </div>
       </div>

@@ -9,48 +9,54 @@ interface User {
 }
 
 interface StatsCardsProps {
-  user: User
+  statsData: {
+    connections: { value: number; change: string }
+    profileViews: { value: number; change: string }
+    searchAppearances: { value: number; change: string }
+    projects: { value: number; change: string }
+  }
 }
 
-export function StatsCards({ user }: StatsCardsProps) {
-  const stats = [
+export function StatsCards({ statsData }: StatsCardsProps) {
+  const statsArr = [
     {
       title: "Connections",
-      value: user.connections,
-      change: "+12%",
+      value: statsData.connections.value,
+      change: statsData.connections.change,
       icon: Users,
       color: "text-primary",
       bgColor: "bg-primary/10",
     },
     {
       title: "Profile Views",
-      value: user.profileViews,
-      change: "+8%",
+      value: statsData.profileViews.value,
+      change: statsData.profileViews.change,
       icon: Eye,
       color: "text-secondary",
       bgColor: "bg-secondary/10",
     },
     {
       title: "Search Appearances",
-      value: user.searchAppearances,
-      change: "+15%",
+      value: statsData.searchAppearances.value,
+      change: statsData.searchAppearances.change,
       icon: Search,
       color: "text-amber-500",
       bgColor: "bg-amber-500/10",
     },
     {
       title: "Projects",
-      value: user.completedProjects,
-      change: "+2 new",
+      value: statsData.projects.value,
+      change: statsData.projects.change,
       icon: FolderKanban,
       color: "text-rose-500",
       bgColor: "bg-rose-500/10",
     },
   ]
 
+
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      {stats.map((stat) => (
+      {statsArr.map((stat) => (
         <Card key={stat.title} className="border-border">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">

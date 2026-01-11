@@ -37,13 +37,14 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
+    // @ts-expect-error Server Component
     <ClerkProvider
       signInUrl="/login"
       signUpUrl="/signup"
       signInFallbackRedirectUrl="/dashboard"
       signUpFallbackRedirectUrl="/dashboard"
     >
-      <html lang="en">
+      <html lang="en" suppressHydrationWarning>
         <body className={`font-sans antialiased`}>
           {children}
           <Toaster position="top-center" />

@@ -1,93 +1,88 @@
 "use client"
 
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
+import { useState, useEffect } from "react"
 import { Progress } from "@/components/ui/progress"
-import { Target, Sparkles, Plus, X, TrendingUp } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Target, ChevronRight, Plus, Loader2 } from "lucide-react"
+import { getGoal, getRoadmapProgress } from "@/app/actions/goals"
 
-const defaultGoals = [
-  { id: "1", title: "Get a summer internship in AI/ML", progress: 65, matches: 12 },
-  { id: "2", title: "Win a hackathon", progress: 40, matches: 5 },
-]
+interface Goal {
+  id: string
+  goalText: string
+  roadmap: any[]
+}
 
 export function GoalDashboard() {
-  const [goals, setGoals] = useState(defaultGoals)
-  const [newGoal, setNewGoal] = useState("")
-  const [isAdding, setIsAdding] = useState(false)
+  const [goal, setGoal] = useState<Goal | null>(null)
+  const [progress, setProgress] = useState(0)
+  const [loading, setLoading] = useState(true)
 
-  const handleAddGoal = () => {
-    if (newGoal.trim()) {
-      setGoals([...goals, { id: Date.now().toString(), title: newGoal, progress: 0, matches: 0 }])
-      setNewGoal("")
-      setIsAdding(false)
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const data = await getGoal()
+        if (data) {
+          setGoal({
+            id: data.id,
+            goalText: data.goalText,
+            roadmap: (data.roadmap as any[]) || [],
+          })
+          const prog = await getRoadmapProgress()
+          if (prog) setProgress(prog.progress)
+        }
+      } catch (e) {
+        console.error(e)
+      } finally {
+        setLoading(false)
+      }
     }
-  }
+    fetchData()
+  }, [])
 
-  const handleRemoveGoal = (id: string) => {
-    setGoals(goals.filter((g) => g.id !== id))
+  if (loading) return null
+
+  if (!goal) {
+    return (
+      <div className="rounded-xl border border-dashed border-border p-4 text-center bg-muted/30">
+        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
+          <Target className="h-5 w-5 text-primary" />
+        </div>
+        <h3 className="text-sm font-medium mb-1">No Goal Set</h3>
+        <p className="text-xs text-muted-foreground mb-3">Set a career goal to get personalized matches.</p>
+        <Button variant="outline" size="sm" className="w-full h-8 text-xs">
+          <Plus className="h-3 w-3 mr-1" />
+          Set Goal
+        </Button>
+      </div>
+    )
   }
 
   return (
-    <Card className="border-border">
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-          <Target className="h-5 w-5 text-primary" />
-          Career Goals
-        </CardTitle>
-        {!isAdding && (
-          <Button size="sm" variant="outline" onClick={() => setIsAdding(true)} className="gap-1 bg-transparent">
-            <Plus className="h-4 w-4" />
-            Add Goal
-          </Button>
-        )}
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {isAdding && (
-          <div className="flex gap-2">
-            <Input
-              placeholder="e.g., Get a biotech internship"
-              value={newGoal}
-              onChange={(e) => setNewGoal(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleAddGoal()}
-              autoFocus
-            />
-            <Button size="sm" onClick={handleAddGoal}>
-              Add
-            </Button>
-            <Button size="sm" variant="ghost" onClick={() => setIsAdding(false)}>
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        )}
+    <div className="rounded-xl border border-border bg-card p-4 space-y-4">
+      <div className="flex items-start justify-between">
+        <div>
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Current Goal</h3>
+          <p className="text-sm font-medium text-foreground line-clamp-2 leading-tight">
+            {goal.goalText}
+          </p>
+        </div>
+        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+          <Target className="h-4 w-4 text-primary" />
+        </div>
+      </div>
 
-        {goals.map((goal) => (
-          <div key={goal.id} className="rounded-lg border border-border p-4 space-y-3">
-            <div className="flex items-start justify-between gap-2">
-              <h4 className="font-medium text-foreground">{goal.title}</h4>
-              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleRemoveGoal(goal.id)}>
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="flex items-center gap-2">
-              <Progress value={goal.progress} className="flex-1 h-2" />
-              <span className="text-sm font-medium text-primary">{goal.progress}%</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <Badge variant="secondary" className="gap-1">
-                <TrendingUp className="h-3 w-3" />
-                {goal.matches} matching opportunities
-              </Badge>
-              <Button size="sm" variant="ghost" className="gap-1 text-primary">
-                <Sparkles className="h-4 w-4" />
-                AI Curate
-              </Button>
-            </div>
-          </div>
-        ))}
-      </CardContent>
-    </Card>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-muted-foreground">Progress</span>
+          <span className="font-medium">{progress}%</span>
+        </div>
+        <Progress value={progress} className="h-1.5" />
+      </div>
+
+      <Button variant="ghost" className="w-full justify-between h-8 px-2 text-xs text-muted-foreground hover:text-foreground">
+        View Roadmap
+        <ChevronRight className="h-3 w-3" />
+      </Button>
+    </div>
   )
 }

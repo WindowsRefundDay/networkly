@@ -30,7 +30,8 @@ async function main() {
     await prisma.projectUpdate.deleteMany()
     await prisma.projectCollaborator.deleteMany()
     await prisma.project.deleteMany()
-    await prisma.savedOpportunity.deleteMany()
+    await prisma.userGoal.deleteMany()
+    await prisma.userOpportunity.deleteMany()
     await prisma.opportunity.deleteMany()
     await prisma.user.deleteMany()
 
@@ -133,11 +134,12 @@ async function main() {
         await prisma.opportunity.create({
             data: {
                 id: opp.id,
+                url: `https://example.com/opportunity/${opp.id}`,
                 title: opp.title,
                 company: opp.company,
                 location: opp.location,
                 type: opp.type,
-                matchScore: opp.matchScore,
+                category: "Other",
                 deadline: new Date(opp.deadline),
                 logo: opp.logo,
                 skills: opp.skills,
@@ -146,18 +148,23 @@ async function main() {
                 duration: opp.duration,
                 remote: opp.remote,
                 applicants: opp.applicants,
+                extractionConfidence: 1.0,
+                isActive: true,
             },
         })
     }
     console.log(`  ✓ Created ${allOpportunities.length} opportunities`)
 
-    // Seed saved opportunities
+    // Seed saved opportunities (using new UserOpportunity model)
     const savedOpps = allOpportunities.filter((opp) => opp.saved)
     for (const opp of savedOpps) {
-        await prisma.savedOpportunity.create({
+        await prisma.userOpportunity.create({
             data: {
                 userId: alexUser.id,
                 opportunityId: opp.id,
+                matchScore: opp.matchScore,
+                matchReasons: ["Skill match", "Interest alignment"],
+                status: "saved",
             },
         })
     }

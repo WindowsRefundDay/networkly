@@ -42,51 +42,106 @@ model User {
   extracurriculars    Extracurricular[]
   sentConnections     Connection[]          @relation("ConnectionRequester")
   receivedConnections Connection[]          @relation("ConnectionReceiver")
-  savedOpportunities  SavedOpportunity[]
+  savedOpportunities  UserOpportunity[]
   analyticsData       AnalyticsData?
+  goals               UserGoal[]
+  
+  // Recommendations
+  recommendationsReceived Recommendation[] @relation("ReceivedRecommendations")
+  recommendationsGiven    Recommendation[] @relation("GivenRecommendations")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+// ============================================================================
+// PROFILE EXTRAS
+// ============================================================================
+
+model Recommendation {
+  id          String   @id @default(uuid())
+  content     String
+  authorId    String
+  receiverId  String
+  author      User     @relation("GivenRecommendations", fields: [authorId], references: [id], onDelete: Cascade)
+  receiver    User     @relation("ReceivedRecommendations", fields: [receiverId], references: [id], onDelete: Cascade)
+  authorName  String   // Store name at time of recommendation
+  authorRole  String   // Store role at time of recommendation
+  authorAvatar String?
+  date        String   // e.g., "Nov 2025"
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 
 // ============================================================================
 // OPPORTUNITIES
 // ============================================================================
 
 model Opportunity {
-  id          String   @id @default(uuid())
-  title       String
-  company     String
-  location    String
-  type        String   // Internship, Fellowship, Scholarship, Competition
-  matchScore  Int      @default(0)
-  deadline    DateTime
-  postedDate  DateTime @default(now())
-  logo        String?
-  skills      String[] @default([])
-  description String
-  salary      String?
-  duration    String?
-  remote      Boolean  @default(false)
-  applicants  Int      @default(0)
+  id                    String   @id @default(uuid())
+  url                   String?  // Source URL for deduplication (optional for legacy data)
+  title                 String
+  company               String   // Organization name
+  location              String
+  type                  String   // Internship, Fellowship, Scholarship, Competition, etc.
+  category              String   @default("Other") // STEM, Arts, Business, etc.
+  deadline              DateTime?
+  postedDate            DateTime @default(now())
+  logo                  String?
+  skills                String[] @default([])
+  description           String
+  salary                String?
+  duration              String?
+  remote                Boolean  @default(false)
+  applicants            Int      @default(0)
+  requirements          String?  // Eligibility requirements
+  sourceUrl             String?  // Where it was discovered
+  extractionConfidence  Float    @default(0.0) // 0.0 - 1.0
+  isActive              Boolean  @default(true) // Auto-archive expired
+  
+  // AI-determined revalidation
+  recheckAt             DateTime? // When to re-crawl and validate this opportunity
+  lastVerified          DateTime? // Last time the URL was verified as active
 
   // Relations
-  savedBy SavedOpportunity[]
+  userOpportunities UserOpportunity[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-model SavedOpportunity {
+model UserOpportunity {
   id            String      @id @default(uuid())
   userId        String
   opportunityId String
   user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
 
+  // User-specific matching data
+  matchScore    Int         @default(0)  // 0-100
+  matchReasons  Json        @default("[]") // Array of strings explaining the match
+  status        String      @default("curated") // curated, saved, applied, dismissed
+
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([userId, opportunityId])
+}
+
+model UserGoal {
+  id        String   @id @default(uuid())
+  userId    String
+  goalText  String   // e.g., "Get a summer internship in biotech"
+  roadmap   Json     @default("[]") // AI-generated steps
+  filters   Json?    // AI-suggested opportunity filters
+  isActive  Boolean  @default(true)
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // ============================================================================

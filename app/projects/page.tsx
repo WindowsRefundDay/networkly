@@ -15,10 +15,10 @@ interface Project {
   id: string
   title: string
   description: string
-  image: string | null
+  image: string
   status: string
   visibility: string
-  collaborators: { id: string; name: string; avatar: string | null; role: string }[]
+  collaborators: { id: string; name: string; avatar: string; role: string }[]
   likes: number
   views: number
   comments: number
@@ -41,7 +41,15 @@ export default function ProjectsPage() {
   useEffect(() => {
     async function fetchProjects() {
       const data = await getProjects()
-      setProjects(data as Project[])
+      const mapped = data.map((p: any) => ({
+        ...p,
+        image: p.image || "/placeholder.svg",
+        collaborators: p.collaborators.map((c: any) => ({
+          ...c,
+          avatar: c.avatar || "/placeholder.svg"
+        }))
+      }))
+      setProjects(mapped as Project[])
       setLoading(false)
     }
     fetchProjects()

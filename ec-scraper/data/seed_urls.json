@@ -1,0 +1,104 @@
+{
+    "seed_urls": [
+        {
+            "url": "https://www.scienceolympiad.org/",
+            "priority": 10,
+            "source": "curated:stem"
+        },
+        {
+            "url": "https://artofproblemsolving.com/contests",
+            "priority": 10,
+            "source": "curated:math"
+        },
+        {
+            "url": "https://www.societyforscience.org/regeneron-sts/",
+            "priority": 10,
+            "source": "curated:research"
+        },
+        {
+            "url": "https://www.mathcamp.org/",
+            "priority": 9,
+            "source": "curated:math"
+        },
+        {
+            "url": "https://www.speechanddebate.org/",
+            "priority": 9,
+            "source": "curated:debate"
+        },
+        {
+            "url": "https://usabo.org/",
+            "priority": 9,
+            "source": "curated:biology"
+        },
+        {
+            "url": "https://www.usaco.org/",
+            "priority": 10,
+            "source": "curated:cs"
+        },
+        {
+            "url": "https://www.matholympiad.org/",
+            "priority": 9,
+            "source": "curated:math"
+        },
+        {
+            "url": "https://www.deca.org/",
+            "priority": 8,
+            "source": "curated:business"
+        },
+        {
+            "url": "https://www.fbla.org/",
+            "priority": 8,
+            "source": "curated:business"
+        },
+        {
+            "url": "https://www.thekey.global/",
+            "priority": 7,
+            "source": "curated:leadership"
+        },
+        {
+            "url": "https://www.dosomething.org/",
+            "priority": 7,
+            "source": "curated:volunteer"
+        },
+        {
+            "url": "https://www.rsi.edu/",
+            "priority": 10,
+            "source": "curated:research"
+        },
+        {
+            "url": "https://simr.stanford.edu/",
+            "priority": 10,
+            "source": "curated:research"
+        },
+        {
+            "url": "https://www.mostec.mit.edu/",
+            "priority": 10,
+            "source": "curated:stem"
+        },
+        {
+            "url": "https://www.modelun.org/",
+            "priority": 8,
+            "source": "curated:leadership"
+        },
+        {
+            "url": "https://www.jsa.org/",
+            "priority": 7,
+            "source": "curated:leadership"
+        },
+        {
+            "url": "https://www.tasp.org/",
+            "priority": 10,
+            "source": "curated:humanities"
+        },
+        {
+            "url": "https://www.ssp.org/",
+            "priority": 10,
+            "source": "curated:stem"
+        },
+        {
+            "url": "https://www.hack.club/",
+            "priority": 8,
+            "source": "curated:cs"
+        }
+    ]
+}

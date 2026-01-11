@@ -1,10 +1,11 @@
 "use client"
 
-import { Card, CardContent } from "@/components/ui/card"
+import { useState } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { MapPin, Clock, Sparkles, Bookmark, BookmarkCheck, Users, DollarSign, Calendar } from "lucide-react"
+import { Sparkles, Search, ArrowRight, Globe } from "lucide-react"
+import { OpportunityCard } from "@/components/opportunities/opportunity-card"
+import { InlineDiscovery } from "@/components/discovery/inline-discovery"
 
 interface Opportunity {
   id: string
@@ -13,13 +14,14 @@ interface Opportunity {
   location: string
   type: string
   matchScore: number
-  deadline: string
+  matchReasons?: string[]
+  deadline: string | null
   postedDate: string
-  logo: string
+  logo: string | null
   skills: string[]
-  description: string
-  salary: string
-  duration: string
+  description: string | null
+  salary: string | null
+  duration: string | null
   remote: boolean
   applicants: number
   saved: boolean
@@ -30,127 +32,225 @@ interface OpportunityListProps {
   onToggleSave: (id: string) => void
   onSelect: (opportunity: Opportunity) => void
   selectedId?: string
+  searchQuery?: string
+  onSearchMore?: (query: string) => void
+  isSearching?: boolean
+  onSearchComplete?: () => void
+  onNewOpportunity?: (card: { title: string; organization: string; type: string; location?: string }) => void
 }
 
-export function OpportunityList({ opportunities, onToggleSave, onSelect, selectedId }: OpportunityListProps) {
-  const getMatchColor = (score: number) => {
-    if (score >= 90) return "text-secondary bg-secondary/10"
-    if (score >= 75) return "text-primary bg-primary/10"
-    if (score >= 60) return "text-amber-500 bg-amber-500/10"
-    return "text-muted-foreground bg-muted"
+export function OpportunityList({
+  opportunities,
+  onToggleSave,
+  onSelect,
+  selectedId,
+  searchQuery,
+  onSearchMore,
+  isSearching,
+  onSearchComplete,
+  onNewOpportunity
+}: OpportunityListProps) {
+  const [savingIds, setSavingIds] = useState<Set<string>>(new Set())
+
+  const handleToggleSave = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    setSavingIds(prev => new Set(prev).add(id))
+    await onToggleSave(id)
+    setSavingIds(prev => {
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
   }
 
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case "Internship":
-        return "bg-primary/10 text-primary"
-      case "Fellowship":
-        return "bg-secondary/10 text-secondary"
-      case "Scholarship":
-        return "bg-amber-500/10 text-amber-500"
-      case "Competition":
-        return "bg-rose-500/10 text-rose-500"
-      default:
-        return "bg-muted text-muted-foreground"
+  // Group opportunities
+  const featured = opportunities.filter(o => o.matchScore >= 85).slice(0, 3)
+  const recommended = opportunities.filter(o => o.matchScore >= 60 && o.matchScore < 85 && !featured.find(f => f.id === o.id)).slice(0, 6)
+  const newest = opportunities.filter(o => !featured.find(f => f.id === o.id) && !recommended.find(r => r.id === o.id))
+
+  const container = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1
+      }
     }
   }
 
+  // Empty state with search option
+  if (opportunities.length === 0 && !isSearching) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <div className="h-20 w-20 rounded-full bg-muted/50 flex items-center justify-center mb-6">
+          <Sparkles className="h-10 w-10 text-muted-foreground/50" />
+        </div>
+        <h3 className="text-xl font-semibold text-foreground mb-2">No opportunities found</h3>
+        <p className="text-muted-foreground max-w-sm mx-auto mb-6">
+          {searchQuery 
+            ? `No cached results for "${searchQuery}". Want to search the web for new opportunities?`
+            : "Try adjusting your filters or search query to find relevant opportunities."
+          }
+        </p>
+        
+        {/* Show search button when there's a query */}
+        {searchQuery && searchQuery.length >= 3 && onSearchMore && (
+          <Button 
+            size="lg" 
+            className="gap-2 h-12 px-8"
+            onClick={() => onSearchMore(searchQuery)}
+          >
+            <Globe className="h-4 w-4" />
+            Search Web for "{searchQuery}"
+            <ArrowRight className="h-4 w-4 ml-2" />
+          </Button>
+        )}
+      </div>
+    )
+  }
+
+  // Searching state - show inline discovery
+  if (isSearching && searchQuery) {
+    return (
+      <div className="space-y-6">
+        <section>
+          <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+            <Globe className="h-5 w-5 text-primary animate-pulse" />
+            Live Discovery
+          </h2>
+          <InlineDiscovery
+            isActive={isSearching}
+            query={searchQuery}
+            onComplete={onSearchComplete || (() => {})}
+            onNewOpportunity={onNewOpportunity}
+          />
+        </section>
+        
+        {/* Show existing results below if any */}
+        {opportunities.length > 0 && (
+          <section className="pt-6 border-t border-border">
+            <h2 className="text-lg font-semibold text-foreground mb-4">Cached Results</h2>
+            <motion.div 
+              variants={container}
+              initial="hidden"
+              animate="show"
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+            >
+              {opportunities.map((opp) => (
+                <OpportunityCard
+                  key={opp.id}
+                  opportunity={opp}
+                  isSelected={selectedId === opp.id}
+                  onSelect={onSelect}
+                  onToggleSave={handleToggleSave}
+                  saving={savingIds.has(opp.id)}
+                />
+              ))}
+            </motion.div>
+          </section>
+        )}
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-4">
-      {opportunities.map((opp) => (
-        <Card
-          key={opp.id}
-          className={`border-border cursor-pointer transition-all hover:shadow-md ${selectedId === opp.id ? "ring-2 ring-primary" : ""}`}
-          onClick={() => onSelect(opp)}
-        >
-          <CardContent className="p-5">
-            <div className="flex gap-4">
-              <Avatar className="h-14 w-14 rounded-lg shrink-0">
-                <AvatarImage src={opp.logo || "/placeholder.svg"} alt={opp.company} />
-                <AvatarFallback className="rounded-lg text-lg">{opp.company[0]}</AvatarFallback>
-              </Avatar>
+    <div className="space-y-10 pb-20">
+      
+      {/* Featured Section - Only show if high matches exist */}
+      {featured.length > 0 && (
+        <section>
+          <div className="flex items-center justify-between mb-4">
+             <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
+               <Sparkles className="h-5 w-5 text-amber-500" />
+               Top Matches for You
+             </h2>
+          </div>
+          <motion.div 
+            variants={container}
+            initial="hidden"
+            animate="show"
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+          >
+            {featured.map((opp) => (
+              <OpportunityCard
+                key={opp.id}
+                opportunity={opp}
+                isSelected={selectedId === opp.id}
+                onSelect={onSelect}
+                onToggleSave={handleToggleSave}
+                saving={savingIds.has(opp.id)}
+              />
+            ))}
+          </motion.div>
+        </section>
+      )}
 
-              <div className="flex-1 min-w-0 space-y-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <h3 className="font-semibold text-foreground text-lg">{opp.title}</h3>
-                    <p className="text-muted-foreground">{opp.company}</p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <div className={`flex items-center gap-1 rounded-full px-3 py-1 ${getMatchColor(opp.matchScore)}`}>
-                      <Sparkles className="h-3.5 w-3.5" />
-                      <span className="text-sm font-medium">{opp.matchScore}%</span>
-                    </div>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-9 w-9"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onToggleSave(opp.id)
-                      }}
-                    >
-                      {opp.saved ? (
-                        <BookmarkCheck className="h-5 w-5 text-primary" />
-                      ) : (
-                        <Bookmark className="h-5 w-5" />
-                      )}
-                    </Button>
-                  </div>
-                </div>
+      {/* Recommended Section */}
+      {recommended.length > 0 && (
+        <section>
+          <h2 className="text-lg font-semibold text-foreground mb-4">Recommended for You</h2>
+          <motion.div 
+            variants={container}
+            initial="hidden"
+            animate="show"
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+          >
+            {recommended.map((opp) => (
+              <OpportunityCard
+                key={opp.id}
+                opportunity={opp}
+                isSelected={selectedId === opp.id}
+                onSelect={onSelect}
+                onToggleSave={handleToggleSave}
+                saving={savingIds.has(opp.id)}
+              />
+            ))}
+          </motion.div>
+        </section>
+      )}
 
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <MapPin className="h-4 w-4" />
-                    {opp.location}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <DollarSign className="h-4 w-4" />
-                    {opp.salary}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Calendar className="h-4 w-4" />
-                    {opp.duration}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Users className="h-4 w-4" />
-                    {opp.applicants} applicants
-                  </span>
-                </div>
+      {/* Newest / Remaining */}
+      {newest.length > 0 && (
+        <section>
+          <h2 className="text-lg font-semibold text-foreground mb-4">Newest Opportunities</h2>
+          <motion.div 
+            variants={container}
+            initial="hidden"
+            animate="show"
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+          >
+            {newest.map((opp) => (
+              <OpportunityCard
+                key={opp.id}
+                opportunity={opp}
+                isSelected={selectedId === opp.id}
+                onSelect={onSelect}
+                onToggleSave={handleToggleSave}
+                saving={savingIds.has(opp.id)}
+              />
+            ))}
+          </motion.div>
+        </section>
+      )}
 
-                <p className="text-sm text-muted-foreground line-clamp-2">{opp.description}</p>
-
-                <div className="flex flex-wrap items-center gap-2 pt-1">
-                  <Badge className={`${getTypeColor(opp.type)} border-0`}>{opp.type}</Badge>
-                  {opp.remote && (
-                    <Badge variant="outline" className="text-xs">
-                      Remote
-                    </Badge>
-                  )}
-                  {opp.skills.slice(0, 3).map((skill) => (
-                    <Badge key={skill} variant="secondary" className="text-xs">
-                      {skill}
-                    </Badge>
-                  ))}
-                  {opp.skills.length > 3 && (
-                    <Badge variant="secondary" className="text-xs">
-                      +{opp.skills.length - 3}
-                    </Badge>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between pt-2">
-                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Clock className="h-3.5 w-3.5" />
-                    Deadline: {opp.deadline}
-                  </span>
-                  <span className="text-xs text-muted-foreground">Posted {opp.postedDate}</span>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+      {/* Load More Action - Show when there are results and a search query */}
+      {onSearchMore && searchQuery && searchQuery.length >= 3 && (
+        <div className="flex flex-col items-center justify-center pt-8 border-t border-border">
+          <p className="text-muted-foreground mb-4">
+            Showing {opportunities.length} results from our database
+          </p>
+          <Button 
+            variant="outline" 
+            size="lg" 
+            className="gap-2 h-12 px-8"
+            onClick={() => onSearchMore(searchQuery)}
+          >
+            <Search className="h-4 w-4" />
+            Scan Web for More Matches
+            <ArrowRight className="h-4 w-4 ml-2 opacity-50" />
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
