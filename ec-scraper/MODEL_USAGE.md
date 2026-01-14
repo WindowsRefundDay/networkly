@@ -1,7 +1,7 @@
 # Model Configuration & Usage Guide
 
 ## 🔑 API Key
-**Google API Key**: `AIzaSyAFAx-_UV3lIV9YFWq8wyRBXhoXS_9Gpbw`
+**Google API Key**: Set in `.env` file as `GOOGLE_API_KEY=your_api_key_here`
 
 ## 🤖 Models Configured
 
@@ -62,7 +62,7 @@ GOOGLE_API_KEY: Optional[str] = None  # Set in .env
 
 ### Environment File (`.env`)
 ```bash
-GOOGLE_API_KEY=AIzaSyAFAx-_UV3lIV9YFWq8wyRBXhoXS_9Gpbw
+GOOGLE_API_KEY=your_api_key_here
 GEMINI_PRO_MODEL=gemini-3-flash-preview
 GEMINI_FLASH_MODEL=gemini-2.5-flash-lite
 API_MODE=gemini
@@ -107,5 +107,5 @@ Expected output:
 ```
 Main: gemini-3-flash-preview
 Fast: gemini-2.5-flash-lite
-API Key: AIzaSyAFAx-_UV3lIV9Y...
+API Key: your_api_key_here...
 ```
