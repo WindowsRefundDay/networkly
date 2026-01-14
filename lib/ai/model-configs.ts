@@ -292,22 +292,26 @@ export const GROQ_MODELS: Record<string, ModelConfig> = {
  */
 export const GROQ_USE_CASES: Record<UseCase, UseCaseModelMapping> = {
   chat: {
-    primary: 'openai/gpt-oss-120b',
-    fallbacks: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'],
+    // Use llama-3.3-70b for chat - has reliable tool calling support
+    // gpt-oss models have inconsistent tool calling on Groq
+    primary: 'llama-3.3-70b-versatile',
+    fallbacks: ['groq/compound', 'llama-3.1-8b-instant'],
     temperature: 0.7,
     maxTokens: 2048,
     systemPrompt: 'You are a helpful, friendly AI assistant.',
   },
   analysis: {
-    primary: 'moonshotai/kimi-k2-instruct-0905',
-    fallbacks: ['qwen/qwen3-32b', 'openai/gpt-oss-120b'],
+    // Use llama-3.3-70b for analysis - has reliable tool calling support
+    // Kimi K2 has great context but inconsistent tool calling
+    primary: 'llama-3.3-70b-versatile',
+    fallbacks: ['qwen/qwen3-32b', 'groq/compound'],
     temperature: 0.3,
     maxTokens: 4096,
     systemPrompt: 'You are an expert analyst. Provide thorough, well-structured analysis.',
   },
   'code-generation': {
     primary: 'qwen/qwen3-32b',
-    fallbacks: ['openai/gpt-oss-120b', 'llama-3.3-70b-versatile'],
+    fallbacks: ['llama-3.3-70b-versatile', 'groq/compound'],
     temperature: 0.2,
     maxTokens: 8192,
     systemPrompt: 'You are an expert programmer. Write clean, well-documented, production-ready code.',
@@ -328,7 +332,7 @@ export const GROQ_USE_CASES: Record<UseCase, UseCaseModelMapping> = {
   },
   vision: {
     primary: 'llama-3.3-70b-versatile',
-    fallbacks: ['openai/gpt-oss-120b', 'openai/gpt-oss-20b'],
+    fallbacks: ['groq/compound', 'llama-3.1-8b-instant'],
     temperature: 0.5,
     maxTokens: 2048,
   },
@@ -339,8 +343,10 @@ export const GROQ_USE_CASES: Record<UseCase, UseCaseModelMapping> = {
     maxTokens: 512,
   },
   'high-quality': {
+    // Use llama-4-maverick for high-quality creative work
+    // Falls back to llama-3.3 for reliable tool support
     primary: 'meta-llama/llama-4-maverick-17b-128e-instruct',
-    fallbacks: ['openai/gpt-oss-120b', 'moonshotai/kimi-k2-instruct-0905'],
+    fallbacks: ['llama-3.3-70b-versatile', 'groq/compound'],
     temperature: 0.7,
     maxTokens: 4096,
   },

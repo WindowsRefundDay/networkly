@@ -1,8 +1,9 @@
 "use server"
 
 import { prisma } from "@/lib/prisma"
-import { auth } from "@clerk/nextjs/server"
+import { auth, currentUser } from "@clerk/nextjs/server"
 import { revalidatePath } from "next/cache"
+import { syncUserFromClerk } from "./user"
 
 // ============================================================================
 // GET USER GOAL
@@ -12,7 +13,7 @@ export async function getGoal() {
     const { userId } = await auth()
     if (!userId) throw new Error("Unauthorized")
 
-    const user = await prisma.user.findUnique({
+    let user = await prisma.user.findUnique({
         where: { clerkId: userId },
         include: {
             goals: {
@@ -23,7 +24,33 @@ export async function getGoal() {
         },
     })
 
-    if (!user) throw new Error("User not found")
+    // If user doesn't exist in database, sync from Clerk
+    if (!user) {
+        const clerkUser = await currentUser()
+        if (clerkUser) {
+            await syncUserFromClerk({
+                id: clerkUser.id,
+                emailAddresses: clerkUser.emailAddresses,
+                firstName: clerkUser.firstName,
+                lastName: clerkUser.lastName,
+                imageUrl: clerkUser.imageUrl,
+            })
+            
+            // Fetch user again after sync
+            user = await prisma.user.findUnique({
+                where: { clerkId: userId },
+                include: {
+                    goals: {
+                        where: { isActive: true },
+                        orderBy: { createdAt: "desc" },
+                        take: 1,
+                    },
+                },
+            })
+        }
+    }
+
+    if (!user) return null
 
     const goal = user.goals[0]
     if (!goal) return null

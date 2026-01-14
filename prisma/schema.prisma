@@ -50,6 +50,13 @@ model User {
   goals                   UserGoal[]
   savedOpportunities      UserOpportunity[]
   socialLinks             SocialLink[]
+  activities              UserActivity[]
+  endorsementsGiven       SkillEndorsement[]    @relation("EndorsementGiver")
+  endorsementsReceived    SkillEndorsement[]    @relation("EndorsementReceiver")
+  eventRegistrations      EventRegistration[]
+  preferences             UserPreferences?
+  userProfile             UserProfile?
+  chatSession             ChatSession?
 
   @@index([email])
   @@index([visibility])
@@ -147,6 +154,7 @@ model Project {
   title         String
   description   String
   image         String?
+  category      String                @default("Other")
   status        String                @default("Planning")
   visibility    String                @default("public")
   likes         Int                   @default(0)
@@ -154,8 +162,7 @@ model Project {
   comments      Int                   @default(0)
   tags          String[]              @default([])
   progress      Int                   @default(0)
-  github        String?
-  demo          String?
+  links         Json                  @default("[]")
   lookingFor    String[]              @default([])
   ownerId       String
   createdAt     DateTime              @default(now())
@@ -163,6 +170,10 @@ model Project {
   owner         User                  @relation("ProjectOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   collaborators ProjectCollaborator[]
   updates       ProjectUpdate[]
+
+  @@index([category])
+  @@index([ownerId])
+  @@index([visibility])
 }
 
 model ProjectCollaborator {
@@ -227,15 +238,18 @@ model Application {
 }
 
 model Event {
-  id        String   @id @default(uuid())
-  title     String
-  date      String
-  location  String
-  type      String
-  attendees Int      @default(0)
-  image     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String              @id @default(uuid())
+  title         String
+  date          String
+  location      String
+  type          String
+  attendees     Int                 @default(0)
+  image         String?
+  description   String?
+  matchScore    Int                 @default(0)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  registrations EventRegistration[]
 }
 
 model Achievement {
@@ -272,10 +286,92 @@ model AnalyticsData {
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+model UserActivity {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String
+  metadata  Json?
+  date      DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+}
+
+model SkillEndorsement {
+  id          String   @id @default(uuid())
+  skill       String
+  endorserId  String
+  endorseeId  String
+  createdAt   DateTime @default(now())
+  endorser    User     @relation("EndorsementGiver", fields: [endorserId], references: [id], onDelete: Cascade)
+  endorsee    User     @relation("EndorsementReceiver", fields: [endorseeId], references: [id], onDelete: Cascade)
+
+  @@unique([endorserId, endorseeId, skill])
+  @@index([endorseeId, skill])
+}
+
+model EventRegistration {
+  id        String   @id @default(uuid())
+  userId    String
+  eventId   String
+  status    String   @default("registered")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventId])
+  @@index([userId])
+  @@index([eventId])
+}
+
+model UserPreferences {
+  id                  String   @id @default(uuid())
+  userId              String   @unique
+  notifyOpportunities Boolean  @default(true)
+  notifyConnections   Boolean  @default(true)
+  notifyMessages      Boolean  @default(true)
+  weeklyDigest        Boolean  @default(false)
+  publicProfile       Boolean  @default(true)
+  showActivityStatus  Boolean  @default(false)
+  showProfileViews    Boolean  @default(true)
+  aiSuggestions       Boolean  @default(true)
+  autoIcebreakers     Boolean  @default(true)
+  careerNudges        Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
 model ChatLog {
   id        String   @id @default(uuid())
   userId    String
   message   String
   role      String
   createdAt DateTime @default(now())
+}
+
+model UserProfile {
+  id                          String   @id @default(uuid())
+  userId                      String   @unique
+  interests                   String[] @default([])
+  location                    String?
+  grade_level                 Int?
+  career_goals                String?
+  preferred_opportunity_types String[] @default([])
+  academic_strengths          String[] @default([])
+  availability                String?
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+  user                        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ChatSession {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  title     String?
+  messages  Json     @default("[]")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

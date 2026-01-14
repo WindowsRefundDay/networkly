@@ -1,19 +1,83 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
-import { Users, UserPlus, MessageCircle, TrendingUp } from "lucide-react"
-
-const stats = [
-  { label: "Total Connections", value: "847", change: "+12", icon: Users, color: "text-primary bg-primary/10" },
-  { label: "Pending Requests", value: "5", change: "+2", icon: UserPlus, color: "text-amber-500 bg-amber-500/10" },
-  { label: "Unread Messages", value: "3", change: "", icon: MessageCircle, color: "text-secondary bg-secondary/10" },
-  { label: "Profile Views", value: "234", change: "+15%", icon: TrendingUp, color: "text-rose-500 bg-rose-500/10" },
-]
+import { Users, UserPlus, MessageCircle, TrendingUp, Loader2 } from "lucide-react"
+import { getNetworkStats } from "@/app/actions/connections"
 
 export function NetworkStats() {
+  const [stats, setStats] = useState({
+    totalConnections: 0,
+    pendingRequests: 0,
+    unreadMessages: 0,
+    profileViews: 0,
+  })
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchStats() {
+      try {
+        const data = await getNetworkStats()
+        setStats(data)
+      } catch (error) {
+        console.error("Failed to fetch network stats:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchStats()
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {[1, 2, 3, 4].map((i) => (
+          <Card key={i} className="border-border">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-center h-16">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    )
+  }
+
+  const statsArr = [
+    {
+      label: "Total Connections",
+      value: stats.totalConnections.toString(),
+      change: "",
+      icon: Users,
+      color: "text-primary bg-primary/10",
+    },
+    {
+      label: "Pending Requests",
+      value: stats.pendingRequests.toString(),
+      change: "",
+      icon: UserPlus,
+      color: "text-amber-500 bg-amber-500/10",
+    },
+    {
+      label: "Unread Messages",
+      value: stats.unreadMessages.toString(),
+      change: "",
+      icon: MessageCircle,
+      color: "text-secondary bg-secondary/10",
+    },
+    {
+      label: "Profile Views",
+      value: stats.profileViews.toString(),
+      change: "",
+      icon: TrendingUp,
+      color: "text-rose-500 bg-rose-500/10",
+    },
+  ]
+
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      {stats.map((stat) => (
+      {statsArr.map((stat) => (
         <Card key={stat.label} className="border-border">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">

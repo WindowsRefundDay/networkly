@@ -87,20 +87,24 @@ _groq_embeddings_instance = None
 
 
 def get_embeddings():
-    """Get embeddings singleton based on api_mode setting."""
+    """Get embeddings singleton based on api_mode setting.
+    
+    Defaults to Google Gemini embeddings (api_mode="gemini").
+    """
     global _gemini_embeddings_instance, _groq_embeddings_instance
-
+    
     settings = get_settings()
-
+    
+    # Default to Google Gemini embeddings
     if settings.api_mode == "groq":
         if _groq_embeddings_instance is None:
             _groq_embeddings_instance = GroqEmbeddings()
         return _groq_embeddings_instance
     else:
-        # Use Gemini embeddings when api_mode="gemini"
+        # Default: Use Google Gemini embeddings
         if not GEMINI_AVAILABLE:
             raise ImportError("Google GenAI SDK not installed. Install with: pip install google-generativeai")
-
+        
         if _gemini_embeddings_instance is None:
             _gemini_embeddings_instance = GeminiEmbeddings()
         return _gemini_embeddings_instance

@@ -1,4 +1,4 @@
-"""Configuration management for EC Scraper."""
+"""Configuration management for Opportunity Crawler."""
 
 from functools import lru_cache
 from pathlib import Path
@@ -15,28 +15,31 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # API Mode: "gemini" uses Gemini for everything, "groq" uses Groq for LLM
-    api_mode: Literal["gemini", "groq"] = "gemini"
+    # API Mode: "gemini" uses Google Gemini for everything (default), "groq" uses Groq for LLM
+    api_mode: Literal["gemini", "groq"] = "gemini"  # Default: Google Gemini
 
     # API Keys (both optional - use whichever matches api_mode)
     GOOGLE_API_KEY: Optional[str] = None
     GROQ_API_KEY: Optional[str] = None
 
     # Gemini Model Configuration
-    gemini_pro_model: str = "gemini-2.5-pro"
-    gemini_flash_model: str = "gemini-2.0-flash-lite"
+    # Main model: Used for discovery, planning, and complex reasoning tasks
+    gemini_pro_model: str = "gemini-3-flash-preview"
+    # Fast model: Used for extraction, matching, profiling (when use_fast_model=True)
+    gemini_flash_model: str = "gemini-2.5-flash-lite"
 
     # Groq Model Configuration (used when api_mode="groq")
     groq_model: str = "llama-3.3-70b-versatile"
     groq_fast_model: str = "llama-3.1-8b-instant"
 
-    # Embedding Configuration (uses Gemini - disabled by default to avoid rate limits)
-    embedding_model: str = "gemini-embedding-001"
-    embedding_dimension: int = 768  # 768 for performance, 3072 for max quality
-    use_embeddings: bool = False  # Disabled by default - Gemini embeddings hit rate limits
+    # Embedding Configuration - text-embedding-004 for vectorization (latest available)
+    # Available models: text-embedding-004, gemini-embedding-001, gemini-embedding-exp
+    embedding_model: str = "text-embedding-004"
+    embedding_dimension: int = 256  # 256 for speed, 768 for balance, 3072 for max quality
+    use_embeddings: bool = True  # Enable embeddings for personalized curation
 
     # Database Paths
-    sqlite_db_path: str = "./data/ec_database.db"
+    sqlite_db_path: str = "./data/opportunity_database.db"
     chroma_db_path: str = "./data/chroma"
 
     # Scraping Configuration

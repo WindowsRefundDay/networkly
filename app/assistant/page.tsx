@@ -1,21 +1,31 @@
-import { ChatInterface } from "@/components/assistant/chat-interface"
-import { AIToolsSidebar } from "@/components/assistant/ai-tools-sidebar"
+'use client'
+
+import { useRef } from 'react'
+import { ChatInterface, type ChatInterfaceRef } from '@/components/assistant/chat-interface'
+import { AIToolsSidebar } from '@/components/assistant/ai-tools-sidebar'
+import type { ChatSession } from '@/app/actions/chat'
 
 export default function AssistantPage() {
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">AI Career Assistant</h1>
-        <p className="text-muted-foreground">Get personalized career advice and networking help</p>
-      </div>
+  const chatRef = useRef<ChatInterfaceRef>(null)
 
-      <div className="grid gap-6 lg:grid-cols-4">
-        <div className="lg:col-span-3">
-          <ChatInterface />
-        </div>
-        <div>
-          <AIToolsSidebar />
-        </div>
+  const handleToolClick = (prompt: string) => {
+    chatRef.current?.sendMessage(prompt)
+  }
+
+  const handleLoadSession = (session: ChatSession) => {
+    chatRef.current?.loadSession(session)
+  }
+
+  return (
+    <div className="h-full overflow-hidden flex gap-6">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <ChatInterface ref={chatRef} />
+      </div>
+      <div className="hidden xl:block w-80 h-full overflow-hidden">
+        <AIToolsSidebar 
+          onToolClick={handleToolClick}
+          onLoadSession={handleLoadSession}
+        />
       </div>
     </div>
   )

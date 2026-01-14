@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Activity, Milestone, Sparkles, Code, Loader2 } from "lucide-react"
-import { getProjectUpdates } from "@/app/actions/projects"
+import { Activity, Milestone, Sparkles, Code, Loader2, FolderOpen } from "lucide-react"
+import { getMyProjectUpdates } from "@/app/actions/projects"
 import type React from "react"
 
 interface ProjectUpdate {
@@ -27,9 +27,9 @@ export function ProjectUpdatesFeed() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    getProjectUpdates()
-      .then((data) => setProjectUpdates(data as ProjectUpdate[]))
-      .catch((err) => setError(err.message))
+    getMyProjectUpdates()
+      .then((data: ProjectUpdate[]) => setProjectUpdates(data))
+      .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false))
   }, [])
 
@@ -48,6 +48,28 @@ export function ProjectUpdatesFeed() {
       <Card className="border-border">
         <CardContent className="py-8 text-center text-muted-foreground">
           <p>Could not load updates.</p>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (projectUpdates.length === 0) {
+    return (
+      <Card className="border-border">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+            <Activity className="h-5 w-5 text-primary" />
+            Recent Updates
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="py-8 text-center">
+          <div className="flex flex-col items-center gap-2">
+            <div className="rounded-full bg-muted p-3">
+              <FolderOpen className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <p className="text-sm text-muted-foreground">No updates yet</p>
+            <p className="text-xs text-muted-foreground">Create a project to see updates here</p>
+          </div>
         </CardContent>
       </Card>
     )

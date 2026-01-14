@@ -1,63 +1,27 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Calendar, MapPin, Users, Search, Sparkles, ExternalLink } from "lucide-react"
+import { Calendar, MapPin, Users, Search, Sparkles, ExternalLink, Loader2 } from "lucide-react"
 import Image from "next/image"
+import { getEvents, registerForEvent, unregisterFromEvent } from "@/app/actions/events"
 
-const allEvents = [
-  {
-    id: "1",
-    title: "AI Summit 2026",
-    date: "Feb 15-17, 2026",
-    location: "San Francisco, CA",
-    type: "Conference",
-    attendees: 5000,
-    image: "/tech-conference.png",
-    description: "The largest AI conference on the West Coast featuring industry leaders and cutting-edge research.",
-    matchScore: 95,
-    registered: false,
-  },
-  {
-    id: "2",
-    title: "TreeHacks 2026",
-    date: "Feb 21-23, 2026",
-    location: "Stanford University",
-    type: "Hackathon",
-    attendees: 1500,
-    image: "/hackathon-event.png",
-    description: "Stanford's premier hackathon bringing together the brightest minds in tech.",
-    matchScore: 92,
-    registered: true,
-  },
-  {
-    id: "3",
-    title: "Women in Tech Networking",
-    date: "Jan 25, 2026",
-    location: "Virtual",
-    type: "Networking",
-    attendees: 300,
-    image: "/networking-event.png",
-    description: "Connect with inspiring women leaders in the tech industry.",
-    matchScore: 78,
-    registered: false,
-  },
-  {
-    id: "4",
-    title: "ML Research Workshop",
-    date: "Mar 5, 2026",
-    location: "Berkeley, CA",
-    type: "Workshop",
-    attendees: 150,
-    image: "/workshop-event.png",
-    description: "Hands-on workshop covering the latest advances in machine learning research.",
-    matchScore: 88,
-    registered: false,
-  },
-]
+interface Event {
+  id: string
+  title: string
+  date: string
+  location: string
+  type: string
+  attendees: number
+  image: string | null
+  description: string | null
+  matchScore: number
+  registered: boolean
+  registrationStatus: string | null
+}
 
 const typeColors: Record<string, string> = {
   Conference: "bg-primary/10 text-primary",
@@ -68,7 +32,23 @@ const typeColors: Record<string, string> = {
 
 export default function EventsPage() {
   const [searchQuery, setSearchQuery] = useState("")
-  const [events, setEvents] = useState(allEvents)
+  const [events, setEvents] = useState<Event[]>([])
+  const [loading, setLoading] = useState(true)
+  const [registering, setRegistering] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function fetchEvents() {
+      try {
+        const data = await getEvents()
+        setEvents(data as Event[])
+      } catch (error) {
+        console.error("Failed to fetch events:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchEvents()
+  }, [])
 
   const filteredEvents = events.filter(
     (event) =>
@@ -77,8 +57,32 @@ export default function EventsPage() {
       event.type.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
-  const handleRegister = (id: string) => {
-    setEvents(events.map((e) => (e.id === id ? { ...e, registered: !e.registered } : e)))
+  const handleRegister = async (id: string) => {
+    const event = events.find((e) => e.id === id)
+    if (!event) return
+
+    setRegistering(id)
+    try {
+      if (event.registered) {
+        await unregisterFromEvent(id)
+        setEvents(events.map((e) => (e.id === id ? { ...e, registered: false } : e)))
+      } else {
+        await registerForEvent(id)
+        setEvents(events.map((e) => (e.id === id ? { ...e, registered: true } : e)))
+      }
+    } catch (error) {
+      console.error("Failed to update registration:", error)
+    } finally {
+      setRegistering(null)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
   }
 
   return (
@@ -135,8 +139,18 @@ export default function EventsPage() {
                 <Button
                   className={`flex-1 ${event.registered ? "bg-secondary hover:bg-secondary/90" : ""}`}
                   onClick={() => handleRegister(event.id)}
+                  disabled={registering === event.id}
                 >
-                  {event.registered ? "Registered" : "Register"}
+                  {registering === event.id ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      {event.registered ? "Unregistering..." : "Registering..."}
+                    </>
+                  ) : event.registered ? (
+                    "Registered"
+                  ) : (
+                    "Register"
+                  )}
                 </Button>
                 <Button variant="outline" size="icon" className="bg-transparent">
                   <ExternalLink className="h-4 w-4" />

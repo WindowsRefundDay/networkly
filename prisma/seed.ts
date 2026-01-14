@@ -20,6 +20,10 @@ async function main() {
     // Clean up existing data (in reverse order of dependencies)
     console.log("🧹 Cleaning up existing data...")
     await prisma.chatLog.deleteMany()
+    await prisma.userActivity.deleteMany()
+    await prisma.skillEndorsement.deleteMany()
+    await prisma.eventRegistration.deleteMany()
+    await prisma.userPreferences.deleteMany()
     await prisma.analyticsData.deleteMany()
     await prisma.extracurricular.deleteMany()
     await prisma.achievement.deleteMany()
@@ -182,6 +186,7 @@ async function main() {
                 title: project.title,
                 description: project.description,
                 image: project.image,
+                category: project.category,
                 status: project.status,
                 visibility: project.visibility,
                 likes: project.likes,
@@ -189,8 +194,7 @@ async function main() {
                 comments: project.comments,
                 tags: project.tags,
                 progress: project.progress,
-                github: project.github,
-                demo: project.demo,
+                links: project.links,
                 lookingFor: project.lookingFor,
                 ownerId: alexUser.id,
             },
@@ -304,10 +308,114 @@ async function main() {
                 type: event.type,
                 attendees: event.attendees,
                 image: event.image,
+                description: "An exciting event for networking and learning.",
+                matchScore: Math.floor(Math.random() * 30) + 70, // 70-100 match score
             },
         })
     }
     console.log(`  ✓ Created ${events.length} events`)
+
+    // ============================================================================
+    // SEED EVENT REGISTRATIONS
+    // ============================================================================
+    console.log("🎫 Creating event registrations...")
+
+    // Register Alex for the first 2 events
+    const registeredEvents = events.slice(0, 2)
+    for (const event of registeredEvents) {
+        await prisma.eventRegistration.create({
+            data: {
+                userId: alexUser.id,
+                eventId: event.id,
+                status: "registered",
+            },
+        })
+    }
+    console.log(`  ✓ Created ${registeredEvents.length} event registrations`)
+
+    // ============================================================================
+    // SEED USER ACTIVITIES
+    // ============================================================================
+    console.log("📈 Creating user activities...")
+
+    const activityTypes = [
+        "profile_view",
+        "connection",
+        "message",
+        "application",
+        "profile_update",
+        "opportunity_save",
+    ]
+
+    // Create activities for the past 30 days
+    const activityCount = 50
+    for (let i = 0; i < activityCount; i++) {
+        const daysAgo = Math.floor(Math.random() * 30)
+        const activityDate = new Date()
+        activityDate.setDate(activityDate.getDate() - daysAgo)
+
+        await prisma.userActivity.create({
+            data: {
+                userId: alexUser.id,
+                type: activityTypes[Math.floor(Math.random() * activityTypes.length)],
+                date: activityDate,
+                metadata: {
+                    source: "seed",
+                },
+            },
+        })
+    }
+    console.log(`  ✓ Created ${activityCount} user activities`)
+
+    // ============================================================================
+    // SEED SKILL ENDORSEMENTS
+    // ============================================================================
+    console.log("👍 Creating skill endorsements...")
+
+    // Other users endorse Alex's skills
+    const alexSkills = currentUser.skills.slice(0, 5) // Top 5 skills
+    let endorsementCount = 0
+
+    for (const skill of alexSkills) {
+        // Have 2-4 random users endorse each skill
+        const endorsersCount = Math.floor(Math.random() * 3) + 2
+        const shuffledUsers = otherUsers.sort(() => 0.5 - Math.random())
+        const endorsers = shuffledUsers.slice(0, endorsersCount)
+
+        for (const endorser of endorsers) {
+            await prisma.skillEndorsement.create({
+                data: {
+                    endorserId: endorser.id,
+                    endorseeId: alexUser.id,
+                    skill,
+                },
+            })
+            endorsementCount++
+        }
+    }
+    console.log(`  ✓ Created ${endorsementCount} skill endorsements`)
+
+    // ============================================================================
+    // SEED USER PREFERENCES
+    // ============================================================================
+    console.log("⚙️ Creating user preferences...")
+
+    await prisma.userPreferences.create({
+        data: {
+            userId: alexUser.id,
+            notifyOpportunities: true,
+            notifyConnections: true,
+            notifyMessages: true,
+            weeklyDigest: false,
+            publicProfile: true,
+            showActivityStatus: false,
+            showProfileViews: true,
+            aiSuggestions: true,
+            autoIcebreakers: true,
+            careerNudges: true,
+        },
+    })
+    console.log(`  ✓ Created user preferences for ${alexUser.name}`)
 
     // ============================================================================
     // SEED ANALYTICS DATA

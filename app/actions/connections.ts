@@ -149,3 +149,53 @@ export async function removeConnection(connectionId: string) {
 
     revalidatePath("/network")
 }
+
+// ============================================================================
+// GET NETWORK STATS
+// ============================================================================
+
+export async function getNetworkStats() {
+    const { userId } = await auth()
+    if (!userId) throw new Error("Unauthorized")
+
+    const user = await prisma.user.findUnique({
+        where: { clerkId: userId },
+        select: { id: true, profileViews: true },
+    })
+
+    if (!user) throw new Error("User not found")
+
+    // Count total connections (accepted)
+    const totalConnections = await prisma.connection.count({
+        where: {
+            OR: [{ requesterId: user.id }, { receiverId: user.id }],
+            status: "accepted",
+        },
+    })
+
+    // Count pending requests (where user is the receiver)
+    const pendingRequests = await prisma.connection.count({
+        where: {
+            receiverId: user.id,
+            status: "pending",
+        },
+    })
+
+    // Count unread messages
+    const unreadMessages = await prisma.message.count({
+        where: {
+            receiverId: user.id,
+            unread: true,
+        },
+    })
+
+    // Get profile views from user record
+    const profileViews = user.profileViews
+
+    return {
+        totalConnections,
+        pendingRequests,
+        unreadMessages,
+        profileViews,
+    }
+}

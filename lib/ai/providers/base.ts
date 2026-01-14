@@ -15,6 +15,7 @@ import { AIProviderError, AuthenticationError } from '../types'
 import { logger } from '../utils/logger'
 import { rateLimiter } from '../utils/rate-limiter'
 import { withRetry, circuitBreaker } from '../utils/retry'
+import { getCostTracker } from '../utils/cost-tracker'
 
 export abstract class BaseProvider {
   protected config: ProviderConfig
@@ -135,6 +136,18 @@ export abstract class BaseProvider {
       circuitBreaker.recordSuccess(this.providerName, model)
       rateLimiter.recordTokenUsage(this.providerName, result.usage.totalTokens)
 
+      // Record cost
+      const costTracker = getCostTracker()
+      costTracker.recordCost({
+        provider: this.providerName,
+        model,
+        inputTokens: result.usage.promptTokens,
+        outputTokens: result.usage.completionTokens,
+        latencyMs,
+      }).catch(err => {
+        logger.warn('BaseProvider', 'Failed to record cost', { error: String(err) })
+      })
+
       logger.response(this.providerName, model, latencyMs, {
         tokens: result.usage.totalTokens,
         finishReason: result.finishReason,
@@ -226,6 +239,20 @@ export abstract class BaseProvider {
       rateLimiter.recordTokenUsage(this.providerName, totalTokens)
 
       const latencyMs = Date.now() - startTime
+
+      // Record cost (estimate input tokens from request)
+      const estimatedInputTokens = this.estimateTokens(options) - (options.maxTokens || 500)
+      const costTracker = getCostTracker()
+      costTracker.recordCost({
+        provider: this.providerName,
+        model,
+        inputTokens: Math.max(estimatedInputTokens, 0),
+        outputTokens: totalTokens,
+        latencyMs,
+      }).catch(err => {
+        logger.warn('BaseProvider', 'Failed to record stream cost', { error: String(err) })
+      })
+
       logger.response(this.providerName, model, latencyMs, { streaming: true, tokens: totalTokens })
     } catch (error) {
       circuitBreaker.recordFailure(this.providerName, model)

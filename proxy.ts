@@ -1,6 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server"
 import { NextResponse } from "next/server"
-import type { NextRequest } from "next/server"
 
 // Define public routes that don't require authentication
 const isPublicRoute = createRouteMatcher([
@@ -10,13 +9,35 @@ const isPublicRoute = createRouteMatcher([
     "/api/(.*)",
 ])
 
+// Generate cryptographically secure nonce for CSP
+function generateNonce(): string {
+    const array = new Uint8Array(16)
+    crypto.getRandomValues(array)
+    return btoa(String.fromCharCode(...array))
+}
+
 export default clerkMiddleware(async (auth, request) => {
     const response = NextResponse.next()
+    const nonce = generateNonce()
 
-    response.headers.set(
-        "Content-Security-Policy",
-        "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: blob:; font-src 'self' data:; connect-src 'self' https:; frame-ancestors 'none';"
-    )
+    // Build CSP with nonce and Clerk domains
+    // Using 'strict-dynamic' allows scripts loaded by trusted scripts to execute
+    const csp = [
+        "default-src 'self'",
+        `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://*.clerk.accounts.dev https://challenges.cloudflare.com`,
+        `style-src 'self' 'nonce-${nonce}' 'unsafe-inline'`, // unsafe-inline fallback for dynamic styles
+        "img-src 'self' data: https: blob:",
+        "font-src 'self' data: https://fonts.gstatic.com",
+        "connect-src 'self' https:",
+        "worker-src 'self' blob:",
+        "frame-src https://*.clerk.accounts.dev https://challenges.cloudflare.com",
+        "frame-ancestors 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+    ].join("; ")
+
+    response.headers.set("Content-Security-Policy", csp)
+    response.headers.set("X-Nonce", nonce)
     response.headers.set("X-Frame-Options", "DENY")
     response.headers.set("X-Content-Type-Options", "nosniff")
     response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")

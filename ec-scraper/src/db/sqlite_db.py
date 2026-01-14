@@ -1,4 +1,4 @@
-"""SQLite database operations for structured EC data storage."""
+"""SQLite database operations for structured opportunity data storage."""
 
 import json
 import sqlite3
@@ -8,11 +8,11 @@ from pathlib import Path
 from typing import Generator, List, Optional
 
 from ..config import get_settings
-from .models import ECCard, PendingURL
+from .models import OpportunityCard, PendingURL
 
 
 class SQLiteDB:
-    """SQLite database manager for EC data."""
+    """SQLite database manager for opportunity data."""
 
     def __init__(self, db_path: Optional[Path] = None):
         """Initialize SQLite database."""
@@ -125,14 +125,14 @@ class SQLiteDB:
         finally:
             conn.close()
 
-    def upsert_opportunity(self, ec: ECCard) -> bool:
-        """Insert or update an EC opportunity."""
+    def upsert_opportunity(self, opportunity: OpportunityCard) -> bool:
+        """Insert or update an opportunity."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO opportunities (
                     id, url, source_url, title, summary, organization,
-                    category, suggested_category, ec_type, tags, grade_levels, location_type,
+                    category, suggested_category, opportunity_type, tags, grade_levels, location_type,
                     location, deadline, start_date, end_date, cost,
                     time_commitment, requirements, prizes, contact_email,
                     application_url, date_discovered, date_updated, extraction_confidence
@@ -143,7 +143,7 @@ class SQLiteDB:
                     organization = excluded.organization,
                     category = excluded.category,
                     suggested_category = excluded.suggested_category,
-                    ec_type = excluded.ec_type,
+                    opportunity_type = excluded.opportunity_type,
                     tags = excluded.tags,
                     grade_levels = excluded.grade_levels,
                     location_type = excluded.location_type,
@@ -160,46 +160,46 @@ class SQLiteDB:
                     date_updated = excluded.date_updated,
                     extraction_confidence = excluded.extraction_confidence
             """, (
-                ec.id,
-                ec.url,
-                ec.source_url,
-                ec.title,
-                ec.summary,
-                ec.organization,
-                ec.category.value,
-                ec.suggested_category,
-                ec.ec_type.value,
-                json.dumps(ec.tags),
-                json.dumps(ec.grade_levels),
-                ec.location_type.value,
-                ec.location,
-                ec.deadline.isoformat() if ec.deadline else None,
-                ec.start_date.isoformat() if ec.start_date else None,
-                ec.end_date.isoformat() if ec.end_date else None,
-                ec.cost,
-                ec.time_commitment,
-                ec.requirements,
-                ec.prizes,
-                ec.contact_email,
-                ec.application_url,
-                ec.date_discovered.isoformat(),
-                ec.date_updated.isoformat(),
-                ec.extraction_confidence,
+                opportunity.id,
+                opportunity.url,
+                opportunity.source_url,
+                opportunity.title,
+                opportunity.summary,
+                opportunity.organization,
+                opportunity.category.value,
+                opportunity.suggested_category,
+                opportunity.opportunity_type.value,
+                json.dumps(opportunity.tags),
+                json.dumps(opportunity.grade_levels),
+                opportunity.location_type.value,
+                opportunity.location,
+                opportunity.deadline.isoformat() if opportunity.deadline else None,
+                opportunity.start_date.isoformat() if opportunity.start_date else None,
+                opportunity.end_date.isoformat() if opportunity.end_date else None,
+                opportunity.cost,
+                opportunity.time_commitment,
+                opportunity.requirements,
+                opportunity.prizes,
+                opportunity.contact_email,
+                opportunity.application_url,
+                opportunity.date_discovered.isoformat(),
+                opportunity.date_updated.isoformat(),
+                opportunity.extraction_confidence,
             ))
             conn.commit()
             return cursor.rowcount > 0
 
-    def get_opportunity(self, url: str) -> Optional[ECCard]:
+    def get_opportunity(self, url: str) -> Optional[OpportunityCard]:
         """Get an opportunity by URL."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM opportunities WHERE url = ?", (url,))
             row = cursor.fetchone()
             if row:
-                return self._row_to_ec_card(row)
+                return self._row_to_opportunity_card(row)
             return None
 
-    def get_all_opportunities(self, limit: int = 100, offset: int = 0) -> List[ECCard]:
+    def get_all_opportunities(self, limit: int = 100, offset: int = 0) -> List[OpportunityCard]:
         """Get all opportunities with pagination."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -207,9 +207,9 @@ class SQLiteDB:
                 "SELECT * FROM opportunities ORDER BY date_updated DESC LIMIT ? OFFSET ?",
                 (limit, offset)
             )
-            return [self._row_to_ec_card(row) for row in cursor.fetchall()]
+            return [self._row_to_opportunity_card(row) for row in cursor.fetchall()]
 
-    def search_by_text(self, query: str, limit: int = 20) -> List[ECCard]:
+    def search_by_text(self, query: str, limit: int = 20) -> List[OpportunityCard]:
         """Full-text search for opportunities."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -220,7 +220,7 @@ class SQLiteDB:
                 ORDER BY rank
                 LIMIT ?
             """, (query, limit))
-            return [self._row_to_ec_card(row) for row in cursor.fetchall()]
+            return [self._row_to_opportunity_card(row) for row in cursor.fetchall()]
 
     def count_opportunities(self) -> int:
         """Count total opportunities."""
@@ -229,9 +229,9 @@ class SQLiteDB:
             cursor.execute("SELECT COUNT(*) FROM opportunities")
             return cursor.fetchone()[0]
 
-    def _row_to_ec_card(self, row: sqlite3.Row) -> ECCard:
-        """Convert a database row to an ECCard."""
-        from .models import ECCategory, ECType, LocationType
+    def _row_to_opportunity_card(self, row: sqlite3.Row) -> OpportunityCard:
+        """Convert a database row to an OpportunityCard."""
+        from .models import OpportunityCategory, OpportunityType, LocationType
 
         # Handle suggested_category which may not exist in older databases
         suggested_category = None
@@ -240,16 +240,19 @@ class SQLiteDB:
         except (IndexError, KeyError):
             pass
 
-        return ECCard(
+        # Handle ec_type or opportunity_type column (migration support)
+        opp_type_value = row.get("opportunity_type") or row.get("ec_type") or "Other"
+        
+        return OpportunityCard(
             id=row["id"],
             url=row["url"],
             source_url=row["source_url"],
             title=row["title"],
             summary=row["summary"],
             organization=row["organization"],
-            category=ECCategory(row["category"]),
+            category=OpportunityCategory(row["category"]),
             suggested_category=suggested_category,
-            ec_type=ECType(row["ec_type"]),
+            opportunity_type=OpportunityType(opp_type_value),
             tags=json.loads(row["tags"]) if row["tags"] else [],
             grade_levels=json.loads(row["grade_levels"]) if row["grade_levels"] else [],
             location_type=LocationType(row["location_type"]),

@@ -9,11 +9,14 @@ import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Textarea } from "@/components/ui/textarea"
-import { User, Bell, Eye, Sparkles, Trash2, Loader2, Link2, Check } from "lucide-react"
+import { User, Bell, Eye, Sparkles, Trash2, Loader2, Link2, Check, Search } from "lucide-react"
 import { useUser } from "@clerk/nextjs"
 import { getCurrentUser } from "@/app/actions/user"
 import { updateProfile } from "@/app/actions/profile"
+import { getPreferences, updatePreferences } from "@/app/actions/preferences"
 import { toast } from "sonner"
+import { BatchDiscoveryPanel } from "@/components/discovery/batch-discovery-panel"
+import { CacheStatistics } from "@/components/discovery/cache-statistics"
 
 interface UserData {
   id: string
@@ -54,10 +57,24 @@ export default function SettingsPage() {
     interests: "",
   })
 
+  // Preferences state
+  const [preferences, setPreferences] = useState({
+    notifyOpportunities: true,
+    notifyConnections: true,
+    notifyMessages: true,
+    weeklyDigest: false,
+    publicProfile: true,
+    showActivityStatus: false,
+    showProfileViews: true,
+    aiSuggestions: true,
+    autoIcebreakers: true,
+    careerNudges: true,
+  })
+
   useEffect(() => {
-    async function loadUser() {
+    async function loadData() {
       try {
-        const user = await getCurrentUser()
+        const [user, prefs] = await Promise.all([getCurrentUser(), getPreferences()])
         if (user) {
           setDbUser(user)
           setFormData({
@@ -74,18 +91,47 @@ export default function SettingsPage() {
             interests: user.interests?.join(", ") || "",
           })
         }
+        if (prefs) {
+          setPreferences({
+            notifyOpportunities: prefs.notifyOpportunities,
+            notifyConnections: prefs.notifyConnections,
+            notifyMessages: prefs.notifyMessages,
+            weeklyDigest: prefs.weeklyDigest,
+            publicProfile: prefs.publicProfile,
+            showActivityStatus: prefs.showActivityStatus,
+            showProfileViews: prefs.showProfileViews,
+            aiSuggestions: prefs.aiSuggestions,
+            autoIcebreakers: prefs.autoIcebreakers,
+            careerNudges: prefs.careerNudges,
+          })
+        }
       } catch (error) {
-        console.error("[Settings] Failed to load user", error)
+        console.error("[Settings] Failed to load data", error)
       } finally {
         setLoading(false)
       }
     }
-    loadUser()
+    loadData()
   }, [])
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }))
     setSaved(false)
+  }
+
+  const handlePreferenceChange = async (field: keyof typeof preferences, value: boolean) => {
+    const newPreferences = { ...preferences, [field]: value }
+    setPreferences(newPreferences)
+    
+    try {
+      await updatePreferences(newPreferences)
+      toast.success("Preferences updated")
+    } catch (error) {
+      console.error("[Settings] Failed to update preferences", error)
+      toast.error("Failed to update preferences")
+      // Revert on error
+      setPreferences(preferences)
+    }
   }
 
   const handleSave = () => {
@@ -336,7 +382,10 @@ export default function SettingsPage() {
                 Get notified when matching opportunities are found
               </p>
             </div>
-            <Switch defaultChecked />
+            <Switch
+              checked={preferences.notifyOpportunities}
+              onCheckedChange={(checked) => handlePreferenceChange("notifyOpportunities", checked)}
+            />
           </div>
           <Separator />
           <div className="flex items-center justify-between">
@@ -346,7 +395,10 @@ export default function SettingsPage() {
                 Get notified of new connection requests
               </p>
             </div>
-            <Switch defaultChecked />
+            <Switch
+              checked={preferences.notifyConnections}
+              onCheckedChange={(checked) => handlePreferenceChange("notifyConnections", checked)}
+            />
           </div>
           <Separator />
           <div className="flex items-center justify-between">
@@ -354,7 +406,10 @@ export default function SettingsPage() {
               <p className="font-medium text-foreground">Messages</p>
               <p className="text-sm text-muted-foreground">Get notified of new messages</p>
             </div>
-            <Switch defaultChecked />
+            <Switch
+              checked={preferences.notifyMessages}
+              onCheckedChange={(checked) => handlePreferenceChange("notifyMessages", checked)}
+            />
           </div>
           <Separator />
           <div className="flex items-center justify-between">
@@ -364,7 +419,10 @@ export default function SettingsPage() {
                 Receive a weekly summary of your activity
               </p>
             </div>
-            <Switch />
+            <Switch
+              checked={preferences.weeklyDigest}
+              onCheckedChange={(checked) => handlePreferenceChange("weeklyDigest", checked)}
+            />
           </div>
         </CardContent>
       </Card>
@@ -385,7 +443,10 @@ export default function SettingsPage() {
                 Allow others to find and view your profile
               </p>
             </div>
-            <Switch defaultChecked />
+            <Switch
+              checked={preferences.publicProfile}
+              onCheckedChange={(checked) => handlePreferenceChange("publicProfile", checked)}
+            />
           </div>
           <Separator />
           <div className="flex items-center justify-between">
@@ -393,7 +454,10 @@ export default function SettingsPage() {
               <p className="font-medium text-foreground">Show Activity Status</p>
               <p className="text-sm text-muted-foreground">Let others see when you are online</p>
             </div>
-            <Switch />
+            <Switch
+              checked={preferences.showActivityStatus}
+              onCheckedChange={(checked) => handlePreferenceChange("showActivityStatus", checked)}
+            />
           </div>
           <Separator />
           <div className="flex items-center justify-between">
@@ -401,7 +465,10 @@ export default function SettingsPage() {
               <p className="font-medium text-foreground">Show Profile Views</p>
               <p className="text-sm text-muted-foreground">Display who viewed your profile</p>
             </div>
-            <Switch defaultChecked />
+            <Switch
+              checked={preferences.showProfileViews}
+              onCheckedChange={(checked) => handlePreferenceChange("showProfileViews", checked)}
+            />
           </div>
         </CardContent>
       </Card>
@@ -420,7 +487,10 @@ export default function SettingsPage() {
               <p className="font-medium text-foreground">AI Suggestions</p>
               <p className="text-sm text-muted-foreground">Receive AI-powered recommendations</p>
             </div>
-            <Switch defaultChecked />
+            <Switch
+              checked={preferences.aiSuggestions}
+              onCheckedChange={(checked) => handlePreferenceChange("aiSuggestions", checked)}
+            />
           </div>
           <Separator />
           <div className="flex items-center justify-between">
@@ -428,7 +498,10 @@ export default function SettingsPage() {
               <p className="font-medium text-foreground">Auto-generate Icebreakers</p>
               <p className="text-sm text-muted-foreground">Let AI create conversation starters</p>
             </div>
-            <Switch defaultChecked />
+            <Switch
+              checked={preferences.autoIcebreakers}
+              onCheckedChange={(checked) => handlePreferenceChange("autoIcebreakers", checked)}
+            />
           </div>
           <Separator />
           <div className="flex items-center justify-between">
@@ -436,7 +509,39 @@ export default function SettingsPage() {
               <p className="font-medium text-foreground">Career Nudges</p>
               <p className="text-sm text-muted-foreground">Get reminders to achieve your goals</p>
             </div>
-            <Switch defaultChecked />
+            <Switch
+              checked={preferences.careerNudges}
+              onCheckedChange={(checked) => handlePreferenceChange("careerNudges", checked)}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Search className="h-5 w-5 text-primary" />
+            Discovery Management
+          </CardTitle>
+          <CardDescription>
+            Configure and monitor the opportunity discovery system
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-4">
+            <h4 className="text-sm font-semibold">Batch Discovery</h4>
+            <BatchDiscoveryPanel 
+              onComplete={() => {
+                toast.success("Discovery completed! New opportunities added.")
+              }}
+            />
+          </div>
+          
+          <Separator />
+          
+          <div className="space-y-4">
+            <h4 className="text-sm font-semibold">URL Cache Statistics</h4>
+            <CacheStatistics />
           </div>
         </CardContent>
       </Card>

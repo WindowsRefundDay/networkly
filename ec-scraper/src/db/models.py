@@ -1,4 +1,4 @@
-"""Pydantic models for EC Cards and related data structures."""
+"""Pydantic models for Opportunity Cards and related data structures."""
 
 from datetime import datetime
 from enum import Enum
@@ -19,8 +19,8 @@ class OpportunityTiming(str, Enum):
     SEASONAL = "seasonal"       # Seasonal pattern (summer programs)
 
 
-class ECCategory(str, Enum):
-    """Categories for extracurricular activities."""
+class OpportunityCategory(str, Enum):
+    """Categories for opportunities."""
 
     STEM = "STEM"
     ARTS = "Arts"
@@ -35,8 +35,8 @@ class ECCategory(str, Enum):
     OTHER = "Other"
 
 
-class ECType(str, Enum):
-    """Types of extracurricular opportunities."""
+class OpportunityType(str, Enum):
+    """Types of opportunities."""
 
     COMPETITION = "Competition"
     INTERNSHIP = "Internship"
@@ -60,8 +60,8 @@ class LocationType(str, Enum):
     HYBRID = "Hybrid"
 
 
-class ECCard(BaseModel):
-    """Schema for an extracurricular opportunity card."""
+class OpportunityCard(BaseModel):
+    """Schema for an opportunity card."""
 
     # Identifiers
     id: str = Field(default_factory=lambda: str(uuid4()))
@@ -74,9 +74,9 @@ class ECCard(BaseModel):
     organization: Optional[str] = None
 
     # Classification
-    category: ECCategory = ECCategory.OTHER
+    category: OpportunityCategory = OpportunityCategory.OTHER
     suggested_category: Optional[str] = None  # AI-suggested category when 'Other' is used
-    ec_type: ECType = ECType.OTHER
+    opportunity_type: OpportunityType = OpportunityType.OTHER
     tags: List[str] = Field(default_factory=list)
 
     # Eligibility
@@ -117,7 +117,7 @@ class ECCard(BaseModel):
             self.title,
             self.summary,
             self.category.value,
-            self.ec_type.value,
+            self.opportunity_type.value,
             " ".join(self.tags),
         ]
         if self.organization:
@@ -144,7 +144,7 @@ class ExtractionResult(BaseModel):
     """Result from the extraction agent."""
 
     success: bool
-    ec_card: Optional[ECCard] = None
+    opportunity_card: Optional[OpportunityCard] = None
     error: Optional[str] = None
     raw_content: Optional[str] = None
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
@@ -154,7 +154,7 @@ class ExtractionResponse(BaseModel):
     """Schema for LLM extraction response - used with Gemini structured output."""
     
     # Validation flag
-    valid: bool = Field(description="Whether this is a valid extracurricular opportunity")
+    valid: bool = Field(description="Whether this is a valid opportunity")
     reason: Optional[str] = Field(default=None, description="Reason for rejection if valid=false")
     
     # Main content (only required when valid=true)
@@ -165,7 +165,7 @@ class ExtractionResponse(BaseModel):
     # Classification
     category: Optional[str] = Field(default=None, description="Category: STEM, Arts, Business, Leadership, Community Service, Sports, Humanities, Language, Music, Debate, or Other")
     suggested_category: Optional[str] = Field(default=None, description="If category is 'Other', suggest a new category name (e.g., 'Entrepreneurship', 'Environmental', 'Healthcare')")
-    ec_type: Optional[str] = Field(default=None, description="Type: Competition, Internship, Summer Program, Camp, Volunteer, Research, Club, Scholarship, Course, Workshop, Conference, or Other")
+    opportunity_type: Optional[str] = Field(default=None, description="Type: Competition, Internship, Summer Program, Camp, Volunteer, Research, Club, Scholarship, Course, Workshop, Conference, or Other")
     tags: Optional[List[str]] = Field(default=None, description="Relevant tags")
     
     # Eligibility

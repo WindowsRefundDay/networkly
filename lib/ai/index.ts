@@ -45,6 +45,7 @@ export { AIModelManager, getAIManager, createAIManager } from './manager'
 // Providers
 export { OpenRouterProvider, createOpenRouterProvider } from './providers/openrouter'
 export { GroqProvider, createGroqProvider } from './providers/groq'
+export { GeminiProvider, createGeminiProvider } from './providers/gemini'
 export { BaseProvider } from './providers/base'
 
 // Model Configurations (Modular)
@@ -92,6 +93,9 @@ export type {
   RateLimitConfig,
   AIManagerConfig,
   UseCaseConfig,
+  CostRecord,
+  CostSummary,
+  ModelPricing,
 } from './types'
 
 // Errors
@@ -109,7 +113,11 @@ export {
   AIManagerConfigSchema,
 } from './types'
 
+// Model Pricing
+export { MODEL_PRICING } from './types'
+
 // Utilities
 export { logger } from './utils/logger'
 export { rateLimiter, RateLimiter } from './utils/rate-limiter'
 export { withRetry, circuitBreaker, CircuitBreaker } from './utils/retry'
+export { getCostTracker, CostTracker } from './utils/cost-tracker'

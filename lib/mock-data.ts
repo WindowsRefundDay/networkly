@@ -169,6 +169,7 @@ export const allProjects = [
     description:
       "AI-powered medical image analysis tool for early disease detection using convolutional neural networks and transfer learning techniques.",
     image: "/medical-ai-dashboard.jpg",
+    category: "software",
     status: "In Progress",
     visibility: "public",
     collaborators: [
@@ -183,8 +184,10 @@ export const allProjects = [
     progress: 75,
     createdAt: "Oct 2025",
     updatedAt: "2 days ago",
-    github: "https://github.com/alexchen/mediscan-ai",
-    demo: "https://mediscan-ai.demo.com",
+    links: [
+      { type: "github", label: "GitHub Repository", url: "https://github.com/alexchen/mediscan-ai" },
+      { type: "demo", label: "Live Demo", url: "https://mediscan-ai.demo.com" },
+    ],
     lookingFor: ["Backend Developer", "Data Scientist"],
   },
   {
@@ -193,6 +196,7 @@ export const allProjects = [
     description:
       "Carbon footprint tracker using IoT sensors and machine learning to help individuals and organizations reduce their environmental impact.",
     image: "/sustainability-app-dashboard.png",
+    category: "environment",
     status: "Completed",
     visibility: "public",
     collaborators: [
@@ -208,8 +212,11 @@ export const allProjects = [
     progress: 100,
     createdAt: "Jun 2025",
     updatedAt: "1 month ago",
-    github: "https://github.com/alexchen/ecotrack",
-    demo: "https://ecotrack.app",
+    links: [
+      { type: "github", label: "GitHub Repository", url: "https://github.com/alexchen/ecotrack" },
+      { type: "demo", label: "Live App", url: "https://ecotrack.app" },
+      { type: "impact", label: "Impact Report", url: "https://ecotrack.app/impact" },
+    ],
     lookingFor: [],
   },
   {
@@ -218,6 +225,7 @@ export const allProjects = [
     description:
       "An AI-powered study assistant that creates personalized learning paths, generates practice questions, and provides real-time tutoring.",
     image: "/study-ai-app.png",
+    category: "education",
     status: "In Progress",
     visibility: "public",
     collaborators: [
@@ -231,8 +239,9 @@ export const allProjects = [
     progress: 45,
     createdAt: "Dec 2025",
     updatedAt: "1 day ago",
-    github: "https://github.com/alexchen/studybuddy",
-    demo: null,
+    links: [
+      { type: "github", label: "GitHub Repository", url: "https://github.com/alexchen/studybuddy" },
+    ],
     lookingFor: ["UI/UX Designer", "Educational Content Creator"],
   },
   {
@@ -241,6 +250,7 @@ export const allProjects = [
     description:
       "Personal finance management app with AI-powered insights, budget tracking, and investment recommendations for young professionals.",
     image: "/finance-app.png",
+    category: "business",
     status: "Planning",
     visibility: "private",
     collaborators: [{ id: "1", name: "Alex Chen", avatar: "/professional-asian-student.jpg", role: "Founder" }],
@@ -251,9 +261,109 @@ export const allProjects = [
     progress: 15,
     createdAt: "Jan 2026",
     updatedAt: "5 hours ago",
-    github: null,
-    demo: null,
+    links: [],
     lookingFor: ["Mobile Developer", "Finance Expert", "UI Designer"],
+  },
+  {
+    id: "5",
+    title: "Campus Art Collective",
+    description:
+      "A student-led art collective showcasing diverse creative works from painters, sculptors, digital artists, and photographers across campus.",
+    image: "/art-collective.jpg",
+    category: "creative",
+    status: "In Progress",
+    visibility: "public",
+    collaborators: [
+      { id: "1", name: "Alex Chen", avatar: "/professional-asian-student.jpg", role: "Curator" },
+    ],
+    likes: 67,
+    views: 320,
+    comments: 15,
+    tags: ["Art", "Community", "Exhibition", "Photography", "Digital Art"],
+    progress: 60,
+    createdAt: "Sep 2025",
+    updatedAt: "3 days ago",
+    links: [
+      { type: "portfolio", label: "Gallery", url: "https://campusartcollective.com" },
+      { type: "instagram", label: "Instagram", url: "https://instagram.com/campusartcollective" },
+    ],
+    lookingFor: ["Graphic Designer", "Event Coordinator"],
+  },
+  {
+    id: "6",
+    title: "Undergraduate Research: Climate Modeling",
+    description:
+      "Research project analyzing regional climate patterns using machine learning to predict extreme weather events with improved accuracy.",
+    image: "/research-climate.jpg",
+    category: "research",
+    status: "In Progress",
+    visibility: "public",
+    collaborators: [
+      { id: "1", name: "Alex Chen", avatar: "/professional-asian-student.jpg", role: "Research Lead" },
+    ],
+    likes: 28,
+    views: 156,
+    comments: 7,
+    tags: ["Climate Science", "Research", "Machine Learning", "Data Analysis"],
+    progress: 40,
+    createdAt: "Nov 2025",
+    updatedAt: "1 week ago",
+    links: [
+      { type: "paper", label: "Draft Paper", url: "https://arxiv.org/example" },
+      { type: "data", label: "Dataset", url: "https://kaggle.com/example" },
+    ],
+    lookingFor: ["Data Scientist", "Climate Science Student"],
+  },
+  {
+    id: "7",
+    title: "TEDx University Event",
+    description:
+      "Organizing the annual TEDx event featuring student speakers, industry leaders, and interactive workshops on innovation and social change.",
+    image: "/tedx-event.jpg",
+    category: "event",
+    status: "Planning",
+    visibility: "public",
+    collaborators: [
+      { id: "1", name: "Alex Chen", avatar: "/professional-asian-student.jpg", role: "Event Director" },
+    ],
+    likes: 94,
+    views: 445,
+    comments: 22,
+    tags: ["TEDx", "Public Speaking", "Event Planning", "Leadership"],
+    progress: 25,
+    createdAt: "Dec 2025",
+    updatedAt: "2 days ago",
+    links: [
+      { type: "website", label: "Event Website", url: "https://tedxuniversity.com" },
+      { type: "registration", label: "Register", url: "https://tedxuniversity.com/register" },
+    ],
+    lookingFor: ["Marketing Lead", "Speaker Coordinator", "Volunteers"],
+  },
+  {
+    id: "8",
+    title: "Community Garden Initiative",
+    description:
+      "Building sustainable community gardens across underserved neighborhoods to promote food security, environmental education, and community bonding.",
+    image: "/community-garden.jpg",
+    category: "community",
+    status: "In Progress",
+    visibility: "public",
+    collaborators: [
+      { id: "1", name: "Alex Chen", avatar: "/professional-asian-student.jpg", role: "Project Lead" },
+    ],
+    likes: 112,
+    views: 678,
+    comments: 35,
+    tags: ["Community Service", "Sustainability", "Food Security", "Volunteering"],
+    progress: 55,
+    createdAt: "Aug 2025",
+    updatedAt: "4 days ago",
+    links: [
+      { type: "website", label: "Website", url: "https://communitygarden.org" },
+      { type: "donation", label: "Donate", url: "https://communitygarden.org/donate" },
+      { type: "social", label: "Facebook", url: "https://facebook.com/communitygarden" },
+    ],
+    lookingFor: ["Volunteer Coordinator", "Grant Writer"],
   },
 ]
 

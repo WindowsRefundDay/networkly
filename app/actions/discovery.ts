@@ -2,7 +2,7 @@
 
 import { spawn } from "child_process";
 import path from "path";
-import { readFileSync } from "fs";
+import fs from "fs";
 
 interface DiscoveryResult {
     success: boolean;
@@ -10,18 +10,32 @@ interface DiscoveryResult {
     newOpportunities?: number;
 }
 
+interface BatchDiscoveryOptions {
+    sources?: string[];
+    focusAreas?: string[];
+    limit?: number;
+}
+
+interface CacheStats {
+    total_urls: number;
+    by_status: Record<string, number>;
+    pending_rechecks: number;
+    top_domains: Array<{ domain: string; count: number }>;
+}
+
 function loadEnvFromFile(envPath: string): Record<string, string> {
     try {
-        const content = readFileSync(envPath, "utf-8");
+        const content = fs.readFileSync(envPath, "utf-8");
         const env: Record<string, string> = {};
-        for (const line of content.split("\n")) {
+
+        content.split("\n").forEach((line) => {
             const trimmed = line.trim();
-            if (trimmed && !trimmed.startsWith("#") && trimmed.includes("=")) {
+            if (!trimmed || trimmed.startsWith("#")) return;
                 const [key, ...valueParts] = trimmed.split("=");
                 const value = valueParts.join("=").replace(/^["']|["']$/g, "");
-                env[key.trim()] = value.trim();
-            }
-        }
+            env[key] = value;
+        });
+
         return env;
     } catch {
         return {};
@@ -58,6 +72,7 @@ export async function triggerDiscovery(
                 ...scraperEnv,
                 DATABASE_URL: process.env.DATABASE_URL || mainEnv.DATABASE_URL,
                 GOOGLE_API_KEY: scraperEnv.GOOGLE_API_KEY || process.env.GOOGLE_API_KEY,
+                GROQ_API_KEY: scraperEnv.GROQ_API_KEY || process.env.GROQ_API_KEY,
             },
         });
 
@@ -115,6 +130,199 @@ export async function triggerDiscovery(
                 success: false,
                 message: "Failed to start discovery process.",
             });
+        });
+    });
+}
+
+/**
+ * Trigger batch discovery using multiple sources.
+ */
+export async function triggerBatchDiscovery(
+    options: BatchDiscoveryOptions = {}
+): Promise<DiscoveryResult> {
+    const {
+        sources = ["all"],
+        focusAreas = ["STEM competitions", "internships", "summer programs", "scholarships"],
+        limit = 50,
+    } = options;
+
+    return new Promise((resolve) => {
+        const scraperPath = path.join(process.cwd(), "ec-scraper");
+        const scriptPath = path.join(scraperPath, "scripts", "batch_discovery.py");
+
+        const scraperEnv = loadEnvFromFile(path.join(scraperPath, ".env"));
+        const mainEnv = loadEnvFromFile(path.join(process.cwd(), ".env"));
+
+        // Build command arguments
+        const args = [scriptPath];
+        
+        if (sources.length === 1 && sources[0] !== "all") {
+            args.push("--source", sources[0]);
+        }
+        
+        if (focusAreas.length > 0) {
+            args.push("--focus", ...focusAreas);
+        }
+        
+        args.push("--limit", limit.toString());
+
+        const pythonProcess = spawn("python", args, {
+            cwd: scraperPath,
+            env: {
+                ...process.env,
+                ...mainEnv,
+                ...scraperEnv,
+                DATABASE_URL: process.env.DATABASE_URL || mainEnv.DATABASE_URL,
+                GOOGLE_API_KEY: scraperEnv.GOOGLE_API_KEY || process.env.GOOGLE_API_KEY,
+                GROQ_API_KEY: scraperEnv.GROQ_API_KEY || process.env.GROQ_API_KEY,
+            },
+        });
+
+        let stdout = "";
+        let stderr = "";
+
+        pythonProcess.stdout.on("data", (data) => {
+            stdout += data.toString();
+            console.log("[BatchDiscovery]", data.toString());
+        });
+
+        pythonProcess.stderr.on("data", (data) => {
+            stderr += data.toString();
+        });
+
+        // Timeout after 5 minutes
+        const timeout = setTimeout(() => {
+            pythonProcess.kill();
+            resolve({
+                success: false,
+                message: "Batch discovery timed out.",
+            });
+        }, 300000);
+
+        pythonProcess.on("close", (code) => {
+            clearTimeout(timeout);
+
+            if (code === 0) {
+                // Parse successful count from output
+                const successMatch = stdout.match(/✅ Successful:\s+(\d+)/);
+                const successCount = successMatch ? parseInt(successMatch[1], 10) : 0;
+
+                resolve({
+                    success: true,
+                    message: `Batch discovery complete! Found ${successCount} new opportunities.`,
+                    newOpportunities: successCount,
+                });
+            } else {
+                console.error("Batch discovery stderr:", stderr);
+                resolve({
+                    success: false,
+                    message: "Batch discovery encountered errors.",
+                });
+            }
+        });
+
+        pythonProcess.on("error", (error) => {
+            clearTimeout(timeout);
+            console.error("Batch discovery process error:", error);
+            resolve({
+                success: false,
+                message: "Failed to start batch discovery.",
+            });
+        });
+    });
+}
+
+/**
+ * Get URL cache statistics.
+ */
+export async function getCacheStats(): Promise<CacheStats | null> {
+    return new Promise((resolve) => {
+        const scraperPath = path.join(process.cwd(), "ec-scraper");
+
+        const pythonScript = `
+import sys
+sys.path.insert(0, '${scraperPath}')
+from src.db.url_cache import get_url_cache
+import json
+
+cache = get_url_cache()
+stats = cache.get_stats()
+print(json.dumps(stats))
+`;
+
+        const pythonProcess = spawn("python", ["-c", pythonScript], {
+            cwd: scraperPath,
+        });
+
+        let stdout = "";
+
+        pythonProcess.stdout.on("data", (data) => {
+            stdout += data.toString();
+        });
+
+        pythonProcess.on("close", (code) => {
+            if (code === 0) {
+                try {
+                    const stats = JSON.parse(stdout.trim());
+                    resolve(stats);
+                } catch (e) {
+                    console.error("Failed to parse cache stats:", e);
+                    resolve(null);
+                }
+            } else {
+                resolve(null);
+            }
+        });
+
+        pythonProcess.on("error", () => {
+            resolve(null);
+        });
+    });
+}
+
+/**
+ * Clear old cache entries.
+ */
+export async function clearOldCacheEntries(days: number = 90): Promise<{ success: boolean; deleted: number }> {
+    return new Promise((resolve) => {
+        const scraperPath = path.join(process.cwd(), "ec-scraper");
+
+        const pythonScript = `
+import sys
+sys.path.insert(0, '${scraperPath}')
+from src.db.url_cache import get_url_cache
+import json
+
+cache = get_url_cache()
+deleted = cache.clear_old_entries(${days})
+print(json.dumps({"deleted": deleted}))
+`;
+
+        const pythonProcess = spawn("python", ["-c", pythonScript], {
+            cwd: scraperPath,
+        });
+
+        let stdout = "";
+
+        pythonProcess.stdout.on("data", (data) => {
+            stdout += data.toString();
+        });
+
+        pythonProcess.on("close", (code) => {
+            if (code === 0) {
+                try {
+                    const result = JSON.parse(stdout.trim());
+                    resolve({ success: true, deleted: result.deleted });
+                } catch (e) {
+                    resolve({ success: false, deleted: 0 });
+                }
+            } else {
+                resolve({ success: false, deleted: 0 });
+            }
+        });
+
+        pythonProcess.on("error", () => {
+            resolve({ success: false, deleted: 0 });
         });
     });
 }

@@ -1,5 +1,6 @@
 import type React from "react"
 import type { Metadata } from "next"
+import { headers } from "next/headers"
 import { Inter, Plus_Jakarta_Sans } from "next/font/google"
 import { ClerkProvider } from "@clerk/nextjs"
 import { Toaster } from "sonner"
@@ -31,18 +32,21 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const headersList = await headers()
+  const nonce = headersList.get("x-nonce") ?? undefined
+
   return (
-    // @ts-expect-error Server Component
     <ClerkProvider
       signInUrl="/login"
       signUpUrl="/signup"
       signInFallbackRedirectUrl="/dashboard"
       signUpFallbackRedirectUrl="/dashboard"
+      nonce={nonce}
     >
       <html lang="en" suppressHydrationWarning>
         <body className={`font-sans antialiased`}>

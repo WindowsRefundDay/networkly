@@ -7,13 +7,13 @@ import chromadb
 from chromadb.config import Settings as ChromaSettings
 
 from ..config import get_settings
-from .models import ECCard
+from .models import OpportunityCard
 
 
 class VectorDB:
     """ChromaDB manager for vector similarity search."""
 
-    COLLECTION_NAME = "ec_opportunities"
+    COLLECTION_NAME = "opportunities"
 
     def __init__(self, db_path: Optional[Path] = None):
         """Initialize ChromaDB."""
@@ -32,30 +32,30 @@ class VectorDB:
 
     def add_embedding(
         self,
-        ec_id: str,
+        opportunity_id: str,
         embedding: List[float],
         metadata: Optional[dict] = None,
     ) -> None:
-        """Add or update an embedding for an EC."""
+        """Add or update an embedding for an opportunity."""
         self._collection.upsert(
-            ids=[ec_id],
+            ids=[opportunity_id],
             embeddings=[embedding],
             metadatas=[metadata] if metadata else None,
         )
 
-    def add_ec_with_embedding(
+    def add_opportunity_with_embedding(
         self,
-        ec: ECCard,
+        opportunity: OpportunityCard,
         embedding: List[float],
     ) -> None:
-        """Add an EC card with its embedding."""
+        """Add an opportunity card with its embedding."""
         metadata = {
-            "title": ec.title,
-            "category": ec.category.value,
-            "ec_type": ec.ec_type.value,
-            "url": ec.url,
+            "title": opportunity.title,
+            "category": opportunity.category.value,
+            "opportunity_type": opportunity.opportunity_type.value,
+            "url": opportunity.url,
         }
-        self.add_embedding(ec.id, embedding, metadata)
+        self.add_embedding(opportunity.id, embedding, metadata)
 
     def search_similar(
         self,
@@ -64,7 +64,7 @@ class VectorDB:
         category_filter: Optional[str] = None,
     ) -> List[Tuple[str, float, dict]]:
         """
-        Search for similar ECs by embedding.
+        Search for similar opportunities by embedding.
         
         Returns list of (id, distance, metadata) tuples.
         """
@@ -86,18 +86,18 @@ class VectorDB:
             distances = results["distances"][0] if results["distances"] else [0] * len(ids)
             metadatas = results["metadatas"][0] if results["metadatas"] else [{}] * len(ids)
             
-            for i, ec_id in enumerate(ids):
+            for i, opp_id in enumerate(ids):
                 output.append((
-                    ec_id,
+                    opp_id,
                     1.0 - distances[i],  # Convert distance to similarity
                     metadatas[i] if metadatas else {},
                 ))
 
         return output
 
-    def delete_by_id(self, ec_id: str) -> None:
-        """Delete an embedding by EC ID."""
-        self._collection.delete(ids=[ec_id])
+    def delete_by_id(self, opportunity_id: str) -> None:
+        """Delete an embedding by opportunity ID."""
+        self._collection.delete(ids=[opportunity_id])
 
     def count(self) -> int:
         """Count total embeddings."""

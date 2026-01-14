@@ -29,24 +29,28 @@ import { AIProviderError, AIManagerConfigSchema } from './types'
 import { BaseProvider } from './providers/base'
 import { OpenRouterProvider } from './providers/openrouter'
 import { GroqProvider } from './providers/groq'
+import { GeminiProvider } from './providers/gemini'
 import { logger } from './utils/logger'
 import { DEFAULT_USE_CASE_MODELS } from './model-configs'
 
 // Use case to model mapping defaults - Prioritize Groq (FREE)
 // Based on benchmarks: GPT-OSS 120B (90% MMLU), Llama 3.3 (86% MMLU)
 // Preview models marked with (Preview) suffix may be discontinued without notice
+// NOTE: For chat with tool calling, use llama-3.3-70b which has reliable tool support
 const DEFAULT_USE_CASE_MODELS_INTERNAL: Record<UseCase, { primary: string; fallbacks: string[] }> = {
   'chat': {
-    primary: 'openai/gpt-oss-120b',
-    fallbacks: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'],
+    // llama-3.3-70b has reliable tool calling support on Groq
+    primary: 'llama-3.3-70b-versatile',
+    fallbacks: ['groq/compound', 'llama-3.1-8b-instant'],
   },
   'analysis': {
-    primary: 'moonshotai/kimi-k2-instruct-0905',
-    fallbacks: ['qwen/qwen3-32b', 'openai/gpt-oss-120b'],
+    // llama-3.3-70b for reliable tool calling, Kimi has inconsistent tool support
+    primary: 'llama-3.3-70b-versatile',
+    fallbacks: ['qwen/qwen3-32b', 'groq/compound'],
   },
   'code-generation': {
     primary: 'qwen/qwen3-32b',
-    fallbacks: ['openai/gpt-oss-120b', 'llama-3.3-70b-versatile'],
+    fallbacks: ['llama-3.3-70b-versatile', 'groq/compound'],
   },
   'summarization': {
     primary: 'llama-3.1-8b-instant',
@@ -58,15 +62,15 @@ const DEFAULT_USE_CASE_MODELS_INTERNAL: Record<UseCase, { primary: string; fallb
   },
   'vision': {
     primary: 'llama-3.3-70b-versatile',
-    fallbacks: ['openai/gpt-oss-120b', 'openai/gpt-oss-20b'],
+    fallbacks: ['groq/compound', 'llama-3.1-8b-instant'],
   },
   'fast-response': {
     primary: 'llama-3.1-8b-instant',
     fallbacks: ['openai/gpt-oss-20b', 'groq/compound'],
   },
   'high-quality': {
-    primary: 'openai/gpt-oss-120b',
-    fallbacks: ['moonshotai/kimi-k2-instruct-0905', 'llama-3.3-70b-versatile'],
+    primary: 'meta-llama/llama-4-maverick-17b-128e-instruct',
+    fallbacks: ['llama-3.3-70b-versatile', 'groq/compound'],
   },
   'cost-effective': {
     primary: 'llama-3.1-8b-instant',
@@ -76,6 +80,7 @@ const DEFAULT_USE_CASE_MODELS_INTERNAL: Record<UseCase, { primary: string; fallb
 
   export class AIModelManager {
   private providers: Map<ProviderName, BaseProvider> = new Map()
+  private geminiProvider: GeminiProvider | null = null
   private useCaseConfigs: Map<UseCase, UseCaseConfig> = new Map()
   private healthCheckInterval?: ReturnType<typeof setInterval>
   private providerStatuses: Map<ProviderName, ProviderStatus> = new Map()
@@ -117,6 +122,22 @@ const DEFAULT_USE_CASE_MODELS_INTERNAL: Record<UseCase, { primary: string; fallb
         case 'groq':
           provider = new GroqProvider(providerConfig)
           break
+        case 'gemini':
+          // Gemini uses a different provider class
+          this.geminiProvider = new GeminiProvider(providerConfig)
+          this.providerStatuses.set('gemini', {
+            name: 'gemini',
+            healthy: true,
+            lastCheck: new Date(),
+            consecutiveFailures: 0,
+            averageLatencyMs: 0,
+            modelsHealthy: this.geminiProvider.getModels().length,
+            modelsUnhealthy: 0,
+          })
+          logger.info('AIManager', 'Initialized provider: gemini', {
+            models: this.geminiProvider.getModels().length,
+          })
+          continue // Skip the BaseProvider handling below
         default:
           logger.warn('AIManager', `Unknown provider: ${providerConfig.name}`)
           continue
@@ -191,8 +212,22 @@ const DEFAULT_USE_CASE_MODELS_INTERNAL: Record<UseCase, { primary: string; fallb
       })
     }
 
+    // Gemini (Google AI)
+    const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY
+    if (geminiKey) {
+      providers.push({
+        name: 'gemini',
+        apiKey: geminiKey,
+        baseUrl: 'https://generativelanguage.googleapis.com',
+        defaultModel: process.env.GEMINI_DEFAULT_MODEL || 'gemini-2.0-flash',
+        enabled: true,
+        timeout: parseInt(process.env.AI_TIMEOUT || '60000', 10),
+        maxRetries: parseInt(process.env.AI_MAX_RETRIES || '3', 10),
+      })
+    }
+
     if (providers.length === 0) {
-      throw new Error('No AI providers configured. Set OPENROUTER_API_KEY or GROQ_API_KEY.')
+      throw new Error('No AI providers configured. Set OPENROUTER_API_KEY, GROQ_API_KEY, or GEMINI_API_KEY.')
     }
 
     this.initialize({
@@ -214,6 +249,10 @@ const DEFAULT_USE_CASE_MODELS_INTERNAL: Record<UseCase, { primary: string; fallb
     for (const provider of this.providers.values()) {
       models.push(...provider.getModels())
     }
+    // Include Gemini models
+    if (this.geminiProvider) {
+      models.push(...this.geminiProvider.getModels())
+    }
     return models
   }
 
@@ -221,6 +260,9 @@ const DEFAULT_USE_CASE_MODELS_INTERNAL: Record<UseCase, { primary: string; fallb
    * Get models from a specific provider
    */
   getProviderModels(providerName: ProviderName): ModelInfo[] {
+    if (providerName === 'gemini' && this.geminiProvider) {
+      return this.geminiProvider.getModels()
+    }
     const provider = this.providers.get(providerName)
     return provider ? provider.getModels() : []
   }
@@ -230,6 +272,9 @@ const DEFAULT_USE_CASE_MODELS_INTERNAL: Record<UseCase, { primary: string; fallb
    */
   getModel(fullModelId: string): ModelInfo | undefined {
     const [providerName, modelId] = this.parseModelId(fullModelId)
+    if (providerName === 'gemini' && this.geminiProvider) {
+      return this.geminiProvider.getModel(modelId)
+    }
     const provider = this.providers.get(providerName)
     return provider?.getModel(modelId)
   }
@@ -259,12 +304,6 @@ const DEFAULT_USE_CASE_MODELS_INTERNAL: Record<UseCase, { primary: string; fallb
 
     for (const fullModelId of modelsToTry) {
       const [providerName, modelId] = this.parseModelId(fullModelId)
-      const provider = this.providers.get(providerName)
-
-      if (!provider) {
-        logger.warn('AIManager', `Provider not found: ${providerName}`)
-        continue
-      }
 
       // Check provider health
       const status = this.providerStatuses.get(providerName)
@@ -274,10 +313,25 @@ const DEFAULT_USE_CASE_MODELS_INTERNAL: Record<UseCase, { primary: string; fallb
       }
 
       try {
-        const result = await provider.complete({
-          ...options,
-          model: modelId,
-        })
+        let result: CompletionResult
+
+        // Handle Gemini provider separately
+        if (providerName === 'gemini' && this.geminiProvider) {
+          result = await this.geminiProvider.complete({
+            ...options,
+            model: modelId,
+          })
+        } else {
+          const provider = this.providers.get(providerName)
+          if (!provider) {
+            logger.warn('AIManager', `Provider not found: ${providerName}`)
+            continue
+          }
+          result = await provider.complete({
+            ...options,
+            model: modelId,
+          })
+        }
 
         // Update provider status on success
         if (status) {
@@ -320,19 +374,29 @@ const DEFAULT_USE_CASE_MODELS_INTERNAL: Record<UseCase, { primary: string; fallb
 
     for (const fullModelId of modelsToTry) {
       const [providerName, modelId] = this.parseModelId(fullModelId)
-      const provider = this.providers.get(providerName)
-
-      if (!provider) continue
 
       const status = this.providerStatuses.get(providerName)
       if (status && status.consecutiveFailures >= 5) continue
 
       try {
-        for await (const chunk of provider.stream({
-          ...options,
-          model: modelId,
-        })) {
-          yield chunk
+        // Handle Gemini provider separately
+        if (providerName === 'gemini' && this.geminiProvider) {
+          for await (const chunk of this.geminiProvider.stream({
+            ...options,
+            model: modelId,
+          })) {
+            yield chunk
+          }
+        } else {
+          const provider = this.providers.get(providerName)
+          if (!provider) continue
+
+          for await (const chunk of provider.stream({
+            ...options,
+            model: modelId,
+          })) {
+            yield chunk
+          }
         }
 
         // Update provider status on success
@@ -536,4 +600,4 @@ export function createAIManager(config: AIManagerConfig): AIModelManager {
 }
 
 // Re-export providers for direct use if needed
-export { OpenRouterProvider, GroqProvider }
+export { OpenRouterProvider, GroqProvider, GeminiProvider }

@@ -184,58 +184,62 @@ export class GroqProvider extends BaseProvider {
     })
 
     // OpenAI GPT OSS 20B
+    // NOTE: Tool calling support is inconsistent - prefer llama-3.3 for agentic use
     this.addModel({
       id: 'openai/gpt-oss-20b',
       name: 'GPT OSS 20B',
       provider: 'groq',
       contextLength: 131072,
       maxOutputTokens: 65536,
-      capabilities: ['chat', 'function-calling', 'streaming'],
+      capabilities: ['chat', 'streaming'],
       supportsStreaming: true,
       supportsVision: false,
-      supportsFunctionCalling: true,
+      supportsFunctionCalling: false, // Inconsistent tool calling
       tier: 'free',
     })
 
     // OpenAI GPT OSS 120B - High quality
+    // NOTE: Tool calling support is inconsistent - prefer llama-3.3 for agentic use
     this.addModel({
       id: 'openai/gpt-oss-120b',
       name: 'GPT OSS 120B',
       provider: 'groq',
       contextLength: 131072,
       maxOutputTokens: 65536,
-      capabilities: ['chat', 'function-calling', 'streaming'],
+      capabilities: ['chat', 'streaming'],
       supportsStreaming: true,
       supportsVision: false,
-      supportsFunctionCalling: true,
+      supportsFunctionCalling: false, // Inconsistent tool calling
       tier: 'free',
     })
 
     // Kimi K2 - Long context (262K!)
+    // NOTE: Tool calling support may be inconsistent
     this.addModel({
       id: 'moonshotai/kimi-k2-instruct',
       name: 'Kimi K2 Instruct',
       provider: 'groq',
       contextLength: 131072,
       maxOutputTokens: 16384,
-      capabilities: ['chat', 'function-calling', 'streaming'],
+      capabilities: ['chat', 'streaming'],
       supportsStreaming: true,
       supportsVision: false,
-      supportsFunctionCalling: true,
+      supportsFunctionCalling: false, // Inconsistent tool calling
       tier: 'free',
     })
 
     // Kimi K2 Latest - 262K context
+    // NOTE: Tool calling support may be inconsistent
     this.addModel({
       id: 'moonshotai/kimi-k2-instruct-0905',
       name: 'Kimi K2 Instruct (Latest)',
       provider: 'groq',
       contextLength: 262144,
       maxOutputTokens: 16384,
-      capabilities: ['chat', 'function-calling', 'streaming'],
+      capabilities: ['chat', 'streaming'],
       supportsStreaming: true,
       supportsVision: false,
-      supportsFunctionCalling: true,
+      supportsFunctionCalling: false, // Inconsistent tool calling
       tier: 'free',
     })
 

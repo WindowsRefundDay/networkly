@@ -63,15 +63,12 @@ export default async function DashboardPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
-          {/* @ts-expect-error Server Component */}
           <OpportunityCard />
-          {/* @ts-expect-error Server Component */}
           <ApplicationTracker />
         </div>
         <div className="space-y-6">
           <CuratedOpportunitiesWidget />
           <AIAssistantPreview />
-          {/* @ts-expect-error Server Component */}
           <SuggestedConnections />
         </div>
       </div>

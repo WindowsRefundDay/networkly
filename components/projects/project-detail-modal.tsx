@@ -10,7 +10,6 @@ import {
   Heart,
   Eye,
   MessageCircle,
-  Github,
   ExternalLink,
   Lock,
   Globe,
@@ -18,35 +17,10 @@ import {
   Sparkles,
   Calendar,
   UserPlus,
+  Link as LinkIcon,
 } from "lucide-react"
 import Image from "next/image"
-
-interface Collaborator {
-  id: string
-  name: string
-  avatar: string
-  role: string
-}
-
-interface Project {
-  id: string
-  title: string
-  description: string
-  image: string
-  status: string
-  visibility: string
-  collaborators: Collaborator[]
-  likes: number
-  views: number
-  comments: number
-  tags: string[]
-  progress: number
-  createdAt: string
-  updatedAt: string
-  github: string | null
-  demo: string | null
-  lookingFor: string[]
-}
+import { type Project, PROJECT_CATEGORIES } from "@/lib/projects"
 
 interface ProjectDetailModalProps {
   project: Project | null
@@ -64,6 +38,8 @@ export function ProjectDetailModal({ project, open, onOpenChange }: ProjectDetai
     "On Hold": "bg-muted text-muted-foreground",
   }
 
+  const categoryInfo = PROJECT_CATEGORIES.find((c) => c.value === project.category)
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
@@ -74,8 +50,9 @@ export function ProjectDetailModal({ project, open, onOpenChange }: ProjectDetai
             </div>
             <div className="flex-1">
               <DialogTitle className="text-xl">{project.title}</DialogTitle>
-              <div className="flex items-center gap-2 mt-2">
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
                 <Badge className={`${statusColors[project.status]} border-0`}>{project.status}</Badge>
+                <Badge variant="outline">{categoryInfo?.label || project.category}</Badge>
                 {project.visibility === "private" ? (
                   <Badge variant="secondary" className="gap-1">
                     <Lock className="h-3 w-3" />
@@ -117,7 +94,7 @@ export function ProjectDetailModal({ project, open, onOpenChange }: ProjectDetai
           </div>
 
           <div>
-            <h4 className="font-medium text-foreground mb-2">Technologies</h4>
+            <h4 className="font-medium text-foreground mb-2">Tags & Skills</h4>
             <div className="flex flex-wrap gap-2">
               {project.tags.map((tag) => (
                 <Badge key={tag} variant="secondary">
@@ -134,6 +111,25 @@ export function ProjectDetailModal({ project, open, onOpenChange }: ProjectDetai
             </div>
             <Progress value={project.progress} className="h-3" />
           </div>
+
+          {project.links && project.links.length > 0 && (
+            <div>
+              <h4 className="font-medium text-foreground mb-2 flex items-center gap-2">
+                <LinkIcon className="h-4 w-4" />
+                Links
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {project.links.map((link, index) => (
+                  <Button key={index} variant="outline" size="sm" className="gap-2 bg-transparent" asChild>
+                    <a href={link.url} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="h-3 w-3" />
+                      {link.label}
+                    </a>
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <Card className="border-border">
             <CardHeader className="pb-2">
@@ -180,19 +176,11 @@ export function ProjectDetailModal({ project, open, onOpenChange }: ProjectDetai
           )}
 
           <div className="flex gap-3">
-            {project.github && (
-              <Button variant="outline" className="flex-1 gap-2 bg-transparent" asChild>
-                <a href={project.github} target="_blank" rel="noopener noreferrer">
-                  <Github className="h-4 w-4" />
-                  View Code
-                </a>
-              </Button>
-            )}
-            {project.demo && (
+            {project.links && project.links.length > 0 && (
               <Button className="flex-1 gap-2" asChild>
-                <a href={project.demo} target="_blank" rel="noopener noreferrer">
+                <a href={project.links[0].url} target="_blank" rel="noopener noreferrer">
                   <ExternalLink className="h-4 w-4" />
-                  Live Demo
+                  {project.links[0].label}
                 </a>
               </Button>
             )}

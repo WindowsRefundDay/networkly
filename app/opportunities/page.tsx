@@ -1,14 +1,17 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { OpportunityFilters } from "@/components/opportunities/opportunity-filters"
 import { OpportunityList } from "@/components/opportunities/opportunity-list"
 import { OpportunityDetailPanel } from "@/components/opportunities/opportunity-detail-panel"
 import { GoalDashboard } from "@/components/opportunities/goal-dashboard"
 import { SearchWithDiscovery } from "@/components/opportunities/search-with-discovery"
+import { LiveOpportunitiesFeed } from "@/components/discovery/live-opportunities-feed"
 import { getOpportunities } from "@/app/actions/opportunities"
 import { useHasMounted } from "@/hooks/use-has-mounted"
+import { toast } from "sonner"
 
 interface Opportunity {
   id: string
@@ -40,7 +43,9 @@ export default function OpportunitiesPage() {
   const [loading, setLoading] = useState(true)
   const [isSearching, setIsSearching] = useState(false)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
+  const [liveOpportunities, setLiveOpportunities] = useState<any[]>([])
   const hasMounted = useHasMounted()
+  const searchParams = useSearchParams()
 
   useEffect(() => {
     async function fetchOpportunities() {
@@ -66,9 +71,19 @@ export default function OpportunitiesPage() {
       }))
       setOpportunities(mapped)
       setLoading(false)
+
+      // Handle highlight param from AI assistant "View" button
+      const highlightId = searchParams.get('highlight')
+      if (highlightId && mapped.length > 0) {
+        const found = mapped.find((o: Opportunity) => o.id === highlightId)
+        if (found) {
+          setSelectedOpportunity(found)
+          setIsDetailOpen(true)
+        }
+      }
     }
     fetchOpportunities()
-  }, [])
+  }, [searchParams])
 
   const filteredOpportunities = useMemo(() => {
     return opportunities.filter((opp) => {
@@ -182,6 +197,13 @@ export default function OpportunitiesPage() {
                   <TabsTrigger value="saved" className="px-6">Saved ({opportunities.filter(o => o.saved).length})</TabsTrigger>
                   <TabsTrigger value="applied" className="px-6">Applied (3)</TabsTrigger>
                 </TabsList>
+
+                {/* ✨ Live Opportunities Feed */}
+                {liveOpportunities.length > 0 && (
+                  <div className="mt-6">
+                    <LiveOpportunitiesFeed opportunities={liveOpportunities} />
+                  </div>
+                )}
 
                 <TabsContent value="all" className="mt-6">
                   <OpportunityList

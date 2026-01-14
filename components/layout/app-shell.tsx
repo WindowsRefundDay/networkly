@@ -28,32 +28,32 @@ export function AppShell({ children }: AppShellProps) {
   }
 
   if (!isMounted) {
-     // Render default state (expanded) during SSR/hydration to match server
-     return (
-      <div className="min-h-screen bg-background">
-        <Sidebar isCollapsed={false} toggleCollapse={toggleCollapse} />
-        <div className="pl-64">
-          <Header />
-          <main className="p-6">{children}</main>
-        </div>
-      </div>
-    )
-  }
+      // Render default state (expanded) during SSR/hydration to match server
+      return (
+       <div className="h-screen overflow-hidden bg-background">
+         <Sidebar isCollapsed={false} toggleCollapse={toggleCollapse} />
+         <div className="pl-64 h-screen flex flex-col">
+           <Header />
+           <main className="flex-1 p-6 overflow-hidden">{children}</main>
+         </div>
+       </div>
+      )
+   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="h-screen overflow-hidden bg-background">
       <Sidebar 
         isCollapsed={isCollapsed} 
         toggleCollapse={toggleCollapse} 
       />
       <div
         className={cn(
-          "transition-[padding] duration-300 ease-in-out",
+          "transition-[padding] duration-300 ease-in-out h-screen flex flex-col",
           isCollapsed ? "pl-[80px]" : "pl-64"
         )}
       >
         <Header />
-        <main className="p-6">{children}</main>
+        <main className="flex-1 p-6 overflow-hidden">{children}</main>
       </div>
     </div>
   )

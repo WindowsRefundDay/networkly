@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 
 import asyncpg
 
-from ..db.models import ECCard, OpportunityTiming
+from ..db.models import OpportunityCard, OpportunityTiming
 
 
 class PostgresSync:
@@ -47,12 +47,12 @@ class PostgresSync:
             await self._pool.close()
             self._pool = None
     
-    async def upsert_opportunity(self, ec_card: ECCard) -> str:
+    async def upsert_opportunity(self, opportunity_card: OpportunityCard) -> str:
         """
-        Insert or update an opportunity from an ECCard.
+        Insert or update an opportunity from an OpportunityCard.
         
         Args:
-            ec_card: The extracted ECCard to sync
+            opportunity_card: The extracted OpportunityCard to sync
             
         Returns:
             The opportunity ID
@@ -63,7 +63,7 @@ class PostgresSync:
             # Check if URL already exists
             existing = await conn.fetchrow(
                 'SELECT id FROM "Opportunity" WHERE url = $1',
-                ec_card.url
+                opportunity_card.url
             )
             
             if existing:
@@ -90,22 +90,22 @@ class PostgresSync:
                     WHERE id = $1
                 ''',
                     existing['id'],
-                    ec_card.title,
-                    ec_card.organization or 'Unknown',
-                    ec_card.location or 'Remote',
-                    ec_card.ec_type.value,
-                    ec_card.category.value,
-                    ec_card.deadline,
-                    ec_card.tags,
-                    ec_card.summary,
-                    ec_card.requirements,
-                    ec_card.source_url,
-                    ec_card.extraction_confidence,
+                    opportunity_card.title,
+                    opportunity_card.organization or 'Unknown',
+                    opportunity_card.location or 'Remote',
+                    opportunity_card.opportunity_type.value,
+                    opportunity_card.category.value,
+                    opportunity_card.deadline,
+                    opportunity_card.tags,
+                    opportunity_card.summary,
+                    opportunity_card.requirements,
+                    opportunity_card.source_url,
+                    opportunity_card.extraction_confidence,
                     datetime.utcnow(),
-                    ec_card.timing_type.value,
-                    ec_card.is_expired,
-                    ec_card.next_cycle_expected,
-                    datetime.utcnow() + timedelta(days=ec_card.recheck_days),
+                    opportunity_card.timing_type.value,
+                    opportunity_card.is_expired,
+                    opportunity_card.next_cycle_expected,
+                    datetime.utcnow() + timedelta(days=opportunity_card.recheck_days),
                     datetime.utcnow(),
                 )
                 return existing['id']
@@ -115,7 +115,7 @@ class PostgresSync:
                 new_id = str(uuid.uuid4())
                 
                 # Calculate recheckAt based on AI-determined recheck_days
-                recheck_days = getattr(ec_card, 'recheck_days', 14)
+                recheck_days = getattr(opportunity_card, 'recheck_days', 14)
                 recheck_at = datetime.utcnow() + timedelta(days=recheck_days)
                 
                 await conn.execute('''
@@ -130,44 +130,44 @@ class PostgresSync:
                     )
                 ''',
                     new_id,
-                    ec_card.url,
-                    ec_card.title,
-                    ec_card.organization or 'Unknown',
-                    ec_card.location or 'Remote',
-                    ec_card.ec_type.value,
-                    ec_card.category.value,
-                    ec_card.deadline,
+                    opportunity_card.url,
+                    opportunity_card.title,
+                    opportunity_card.organization or 'Unknown',
+                    opportunity_card.location or 'Remote',
+                    opportunity_card.opportunity_type.value,
+                    opportunity_card.category.value,
+                    opportunity_card.deadline,
                     datetime.utcnow(),
-                    ec_card.tags,
-                    ec_card.summary,
-                    ec_card.requirements,
-                    ec_card.source_url,
-                    ec_card.extraction_confidence,
+                    opportunity_card.tags,
+                    opportunity_card.summary,
+                    opportunity_card.requirements,
+                    opportunity_card.source_url,
+                    opportunity_card.extraction_confidence,
                     True,  # isActive
-                    ec_card.location_type.value == 'Online',  # remote
+                    opportunity_card.location_type.value == 'Online',  # remote
                     0,  # applicants
                     recheck_at,  # AI-determined recheck date
                     datetime.utcnow(),  # lastVerified
                     datetime.utcnow(),
                     datetime.utcnow(),
-                    ec_card.timing_type.value,
-                    ec_card.is_expired,
-                    ec_card.next_cycle_expected,
+                    opportunity_card.timing_type.value,
+                    opportunity_card.is_expired,
+                    opportunity_card.next_cycle_expected,
                 )
                 return new_id
     
-    async def sync_batch(self, ec_cards: List[ECCard]) -> List[str]:
+    async def sync_batch(self, opportunity_cards: List[OpportunityCard]) -> List[str]:
         """
-        Sync multiple ECCards to PostgreSQL.
+        Sync multiple OpportunityCards to PostgreSQL.
         
         Args:
-            ec_cards: List of ECCards to sync
+            opportunity_cards: List of OpportunityCards to sync
             
         Returns:
             List of synced opportunity IDs
         """
         ids = []
-        for card in ec_cards:
+        for card in opportunity_cards:
             try:
                 opp_id = await self.upsert_opportunity(card)
                 ids.append(opp_id)

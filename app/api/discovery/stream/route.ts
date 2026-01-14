@@ -25,6 +25,7 @@ function loadEnvFromFile(envPath: string): Record<string, string> {
 export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const query = searchParams.get("query");
+    const userProfileId = searchParams.get("userProfileId"); // Optional: for personalized discovery
 
     if (!query) {
         return NextResponse.json({ error: "Query parameter required" }, { status: 400 });
@@ -70,9 +71,17 @@ export async function GET(req: NextRequest) {
     const scraperEnv = loadEnvFromFile(path.join(scraperPath, ".env"));
     const mainEnv = loadEnvFromFile(path.join(process.cwd(), ".env"));
 
+    // Build Python command arguments
+    const pythonArgs = ["-u", scriptPath, query];
+    
+    // Add user profile ID if provided for personalized discovery
+    if (userProfileId) {
+        pythonArgs.push("--user-profile-id", userProfileId);
+    }
+
     // Spawn Python process
     // -u forces unbuffered output so we get events immediately
-    const pythonProcess = spawn("python", ["-u", scriptPath, query], {
+    const pythonProcess = spawn("python", pythonArgs, {
         cwd: scraperPath,
         env: {
             ...process.env,
@@ -81,7 +90,7 @@ export async function GET(req: NextRequest) {
             DATABASE_URL: process.env.DATABASE_URL || mainEnv.DATABASE_URL,
             GROQ_API_KEY: scraperEnv.GROQ_API_KEY || process.env.GROQ_API_KEY || mainEnv.GROQ_API_KEY,
             GOOGLE_API_KEY: scraperEnv.GOOGLE_API_KEY || process.env.GOOGLE_API_KEY || mainEnv.GOOGLE_API_KEY,
-            API_MODE: "groq",
+            API_MODE: scraperEnv.API_MODE || process.env.API_MODE || "gemini", // Default to Google Gemini
         },
     });
 

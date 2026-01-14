@@ -1,4 +1,4 @@
-"""Gemini-powered EC extraction agent with structured JSON output."""
+"""Gemini-powered opportunity extraction agent with structured JSON output."""
 
 import asyncio
 from datetime import datetime
@@ -6,9 +6,9 @@ from typing import Optional
 
 from ..config import get_settings
 from ..db.models import (
-    ECCard,
-    ECCategory,
-    ECType,
+    OpportunityCard,
+    OpportunityCategory,
+    OpportunityType,
     ExtractionResponse,
     ExtractionResult,
     LocationType,
@@ -17,11 +17,11 @@ from ..db.models import (
 from ..llm import get_llm_provider, GenerationConfig
 
 
-EXTRACTION_PROMPT = """You are an expert at extracting information about extracurricular opportunities for high school students.
+EXTRACTION_PROMPT = """You are an expert at extracting information about opportunities for high school students.
 
 Current date: January 2026
 
-Given the following webpage content, extract structured information about the extracurricular opportunity.
+Given the following webpage content, extract structured information about the opportunity.
 
 VALIDATION RULES (Set valid=false only if):
 - This is a ranking article listing MULTIPLE different programs (e.g. "Top 10 Internships")
@@ -59,7 +59,7 @@ WEBPAGE CONTENT:
 
 
 class ExtractorAgent:
-    """Agent that extracts EC information from webpage content using LLM provider."""
+    """Agent that extracts opportunity information from webpage content using LLM provider."""
 
     def __init__(self):
         """Initialize the extractor."""
@@ -73,7 +73,7 @@ class ExtractorAgent:
         max_retries: int = 3,
     ) -> ExtractionResult:
         """
-        Extract EC information from webpage content.
+        Extract opportunity information from webpage content.
         
         Args:
             content: Markdown content from the webpage
@@ -82,7 +82,7 @@ class ExtractorAgent:
             max_retries: Maximum retry attempts for rate limiting
             
         Returns:
-            ExtractionResult with extracted EC card or error
+            ExtractionResult with extracted opportunity card or error
         """
         if not content or len(content.strip()) < 100:
             return ExtractionResult(
@@ -174,42 +174,42 @@ class ExtractorAgent:
                 raw_content=truncated_content[:500],
             )
 
-        # Build EC Card from the extracted data
-        ec_card = self._build_ec_card(data, url, source_url)
+        # Build Opportunity Card from the extracted data
+        opportunity_card = self._build_opportunity_card(data, url, source_url)
         
         return ExtractionResult(
             success=True,
-            ec_card=ec_card,
+            opportunity_card=opportunity_card,
             confidence=data.get("confidence", 0.5),
             raw_content=truncated_content,
         )
 
-    def _build_ec_card(
+    def _build_opportunity_card(
         self,
         data: dict,
         url: str,
         source_url: Optional[str],
-    ) -> ECCard:
-        """Build an ECCard from extracted data."""
+    ) -> OpportunityCard:
+        """Build an OpportunityCard from extracted data."""
         
         # Parse category
         category_str = data.get("category") or "Other"
         suggested_category = None
         try:
-            category = ECCategory(category_str)
+            category = OpportunityCategory(category_str)
         except ValueError:
-            category = ECCategory.OTHER
+            category = OpportunityCategory.OTHER
         
         # If category is Other, capture the suggested category name
-        if category == ECCategory.OTHER:
+        if category == OpportunityCategory.OTHER:
             suggested_category = data.get("suggested_category")
 
-        # Parse EC type
-        ec_type_str = data.get("ec_type") or "Other"
+        # Parse opportunity type
+        opportunity_type_str = data.get("opportunity_type") or data.get("ec_type") or "Other"
         try:
-            ec_type = ECType(ec_type_str)
+            opportunity_type = OpportunityType(opportunity_type_str)
         except ValueError:
-            ec_type = ECType.OTHER
+            opportunity_type = OpportunityType.OTHER
 
         # Parse location type
         location_type_str = data.get("location_type") or "Online"
@@ -265,7 +265,7 @@ class ExtractorAgent:
         # Ensure all grade levels are integers
         grade_levels = [int(g) for g in grade_levels if isinstance(g, (int, float)) or (isinstance(g, str) and g.isdigit())]
 
-        return ECCard(
+        return OpportunityCard(
             url=url,
             source_url=source_url,
             title=data.get("title") or "Unknown Opportunity",
@@ -273,7 +273,7 @@ class ExtractorAgent:
             organization=data.get("organization"),
             category=category,
             suggested_category=suggested_category,
-            ec_type=ec_type,
+            opportunity_type=opportunity_type,
             tags=tags,
             grade_levels=grade_levels,
             location_type=location_type,
