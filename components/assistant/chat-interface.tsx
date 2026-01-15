@@ -422,7 +422,7 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
   }
 
   return (
-    <div className="flex flex-col h-full bg-background rounded-2xl border border-border shadow-sm overflow-hidden">
+    <div className="flex flex-col h-full bg-background rounded-2xl border border-border shadow-sm">
       <div className="flex-none border-b border-border p-6 bg-card rounded-t-2xl">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -473,7 +473,7 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden bg-background min-h-0">
+      <div className="flex-1 overflow-hidden bg-background">
         <div className="h-full overflow-y-auto p-6" ref={scrollAreaRef}>
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full min-h-[400px]">

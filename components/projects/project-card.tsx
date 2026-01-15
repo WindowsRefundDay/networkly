@@ -25,7 +25,6 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Heart, Eye, MessageCircle, Lock, Globe, Users, MoreVertical, Pencil, Trash2, ExternalLink } from "lucide-react"
 import Image from "next/image"
-import Link from "next/link"
 import { type Project, PROJECT_CATEGORIES } from "@/lib/projects"
 
 interface ProjectCardProps {
@@ -221,10 +220,10 @@ export function ProjectCard({ project, isOwner = false, onLike, onEdit, onDelete
           <div className="flex gap-2">
             {primaryLink && (
               <Button size="sm" variant="ghost" className="h-8 px-2 gap-1" asChild>
-                <Link href={primaryLink.url} target="_blank">
+                <a href={primaryLink.url} target="_blank" rel="noopener noreferrer">
                   <ExternalLink className="h-4 w-4" />
                   <span className="text-xs">{primaryLink.label}</span>
-                </Link>
+                </a>
               </Button>
             )}
           </div>

@@ -1,29 +1,26 @@
-import { StatsCards } from "@/components/dashboard/stats-cards"
-import { OpportunityCard } from "@/components/dashboard/opportunity-card"
-import { SuggestedConnections } from "@/components/dashboard/suggested-connections"
-import { AIAssistantPreview } from "@/components/dashboard/ai-assistant-preview"
-import { ApplicationTracker } from "@/components/dashboard/application-tracker"
-import { CuratedOpportunitiesWidget } from "@/components/dashboard/curated-opportunities-widget"
-import { getCurrentUser, syncUserFromClerk } from "@/app/actions/user"
-import { getAnalyticsSummary } from "@/app/actions/analytics"
-import { currentUser } from "@clerk/nextjs/server"
+import { BentoGrid, BentoItem } from "@/components/dashboard/new/bento-grid"
+import { HeroSection } from "@/components/dashboard/new/hero-section"
+import { StatsWidget } from "@/components/dashboard/new/stats-widget"
+import { QuickActionsWidget } from "@/components/dashboard/new/quick-actions"
+import { ActivityFeed } from "@/components/dashboard/new/activity-feed"
+import { OpportunitySpotlight } from "@/components/dashboard/new/opportunity-spotlight"
+import { getDashboardData } from "@/app/actions/dashboard"
 import { redirect } from "next/navigation"
+import { syncUserFromClerk } from "@/app/actions/user"
+import { currentUser } from "@clerk/nextjs/server"
 
 export default async function DashboardPage() {
-  let dbUser = await getCurrentUser()
-
-
-
-  // If user is authenticated with Clerk but not in our DB, sync them
-  if (!dbUser) {
+  let data = await getDashboardData()
+  
+  if (!data) {
+    // If no user data, try to sync from Clerk
     const clerkUser = await currentUser()
-
+    
     if (!clerkUser) {
-      // Not logged in at all, redirect to login
       redirect("/login")
     }
 
-    // Sync the Clerk user to our database
+    // Sync user
     await syncUserFromClerk({
       id: clerkUser.id,
       emailAddresses: clerkUser.emailAddresses,
@@ -32,46 +29,71 @@ export default async function DashboardPage() {
       imageUrl: clerkUser.imageUrl,
     })
 
-    // Fetch the newly created user
-    dbUser = await getCurrentUser()
+    // Retry fetching dashboard data
+    data = await getDashboardData()
+
+    // If still failing, show error state
+    if (!data) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
+          <h2 className="text-xl font-semibold text-destructive">Failed to set up account</h2>
+          <p className="text-muted-foreground text-center max-w-xs">
+            Please try refreshing the page or contact support.
+          </p>
+        </div>
+      )
+    }
   }
 
-  // If still no user after sync attempt, show error
-  if (!dbUser) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
-        <h2 className="text-xl font-semibold text-destructive">Failed to set up account</h2>
-        <p className="text-muted-foreground text-center max-w-xs">
-          Please try refreshing the page or contact support.
-        </p>
-      </div>
-    )
+  // Extend analytics stats with mock trend data until implemented in backend
+  const extendedStats = {
+    profileViews: data.stats.profileViews.value,
+    networkGrowth: data.stats.connections.value,
+    searchAppearances: data.stats.searchAppearances.value,
+    viewsTrend: 15,
+    growthTrend: 8,
+    searchTrend: -2,
+    sparklineData: data.stats.sparklineData
   }
-
-  // Fetch stats after ensuring user exists
-  const statsData = await getAnalyticsSummary()
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Welcome back, {dbUser.name.split(" ")[0]}</h1>
-        <p className="text-muted-foreground">Here is what is happening with your network and opportunities.</p>
-      </div>
+      <BentoGrid>
+        {/* Hero Section - Top Left Priority */}
+        <BentoItem colSpan={{ md: 4, lg: 8 }} className="min-h-[300px]">
+          <HeroSection 
+            user={data.user} 
+            dailyDigest={data.dailyDigest} 
+          />
+        </BentoItem>
 
-      <StatsCards statsData={statsData} />
+        {/* Quick Actions & Stats - Top Right Split */}
+        <BentoItem colSpan={{ md: 2, lg: 4 }} className="min-h-[300px] bg-background border-0 shadow-none hover:shadow-none hover:border-0">
+          <div className="grid grid-rows-2 h-full gap-6">
+            <div className="bg-card rounded-xl border border-border/50 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+               <QuickActionsWidget />
+            </div>
+            <div className="bg-card rounded-xl border border-border/50 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+               <StatsWidget stats={extendedStats} />
+            </div>
+          </div>
+        </BentoItem>
 
+        {/* Opportunity Spotlight - Middle Full Width */}
+        <BentoItem colSpan={{ md: 6, lg: 12 }} className="min-h-[250px] bg-card/50">
+           <OpportunitySpotlight opportunity={data.spotlightOpportunity} />
+        </BentoItem>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-6">
-          <OpportunityCard />
-          <ApplicationTracker />
-        </div>
-        <div className="space-y-6">
-          <CuratedOpportunitiesWidget />
-          <AIAssistantPreview />
-          <SuggestedConnections />
-        </div>
-      </div>
+        {/* Activity Feed - Bottom Left */}
+        <BentoItem colSpan={{ md: 3, lg: 8 }} className="min-h-[400px]">
+           <ActivityFeed activities={data.recentActivities} />
+        </BentoItem>
+
+        {/* Applications - Bottom Right */}
+        <BentoItem colSpan={{ md: 3, lg: 4 }} className="min-h-[400px] flex items-center justify-center bg-card/50">
+           <p className="text-muted-foreground">Application Tracker Coming Soon</p>
+        </BentoItem>
+      </BentoGrid>
     </div>
   )
 }

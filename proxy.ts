@@ -9,58 +9,45 @@ const isPublicRoute = createRouteMatcher([
     "/api/(.*)",
 ])
 
-// Generate cryptographically secure nonce for CSP
-function generateNonce(): string {
-    const array = new Uint8Array(16)
-    crypto.getRandomValues(array)
-    return btoa(String.fromCharCode(...array))
-}
+export default clerkMiddleware(
+    async (auth, request) => {
+        const response = NextResponse.next()
 
-export default clerkMiddleware(async (auth, request) => {
-    const response = NextResponse.next()
-    const nonce = generateNonce()
+        // Add security headers (non-CSP)
+        response.headers.set("X-Frame-Options", "DENY")
+        response.headers.set("X-Content-Type-Options", "nosniff")
+        response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
 
-    // Build CSP with nonce and Clerk domains
-    // Using 'strict-dynamic' allows scripts loaded by trusted scripts to execute
-    const csp = [
-        "default-src 'self'",
-        `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://*.clerk.accounts.dev https://challenges.cloudflare.com`,
-        `style-src 'self' 'nonce-${nonce}' 'unsafe-inline'`, // unsafe-inline fallback for dynamic styles
-        "img-src 'self' data: https: blob:",
-        "font-src 'self' data: https://fonts.gstatic.com",
-        "connect-src 'self' https:",
-        "worker-src 'self' blob:",
-        "frame-src https://*.clerk.accounts.dev https://challenges.cloudflare.com",
-        "frame-ancestors 'none'",
-        "base-uri 'self'",
-        "form-action 'self'",
-    ].join("; ")
+        const url = request.nextUrl
 
-    response.headers.set("Content-Security-Policy", csp)
-    response.headers.set("X-Nonce", nonce)
-    response.headers.set("X-Frame-Options", "DENY")
-    response.headers.set("X-Content-Type-Options", "nosniff")
-    response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
-    response.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
-
-    const url = request.nextUrl
-
-    if (url.pathname.startsWith("/profile/") && url.pathname !== "/profile") {
-        const profileId = url.pathname.split("/")[2]
-        if (profileId && profileId.length === 36) {
-            const ipAddress = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "unknown"
-            const rateLimitKey = `profile_view:${ipAddress}:${profileId}`
-            response.headers.set("X-Rate-Limit-Key", rateLimitKey)
+        // Rate limit tracking for profile views
+        if (url.pathname.startsWith("/profile/") && url.pathname !== "/profile") {
+            const profileId = url.pathname.split("/")[2]
+            if (profileId && profileId.length === 36) {
+                const ipAddress = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "unknown"
+                const rateLimitKey = `profile_view:${ipAddress}:${profileId}`
+                response.headers.set("X-Rate-Limit-Key", rateLimitKey)
+            }
         }
-    }
 
-    // Protect all routes except public ones
-    if (!isPublicRoute(request)) {
-        await auth.protect()
-    }
+        // Protect all routes except public ones
+        if (!isPublicRoute(request)) {
+            await auth.protect()
+        }
 
-    return response
-})
+        return response
+    },
+    {
+        // Use Clerk's automatic CSP configuration for proper inline styles support
+        contentSecurityPolicy: {
+            // Additional directives beyond Clerk's defaults
+            "img-src": ["'self'", "data:", "https:", "blob:"],
+            "font-src": ["'self'", "data:", "https://fonts.gstatic.com", "https://r2cdn.perplexity.ai"],
+            "connect-src": ["'self'", "https:"],
+        },
+    }
+)
 
 export const config = {
     matcher: [

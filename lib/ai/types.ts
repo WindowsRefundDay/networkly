@@ -333,16 +333,19 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   'playai-tts': { inputPer1kTokens: 0, outputPer1kTokens: 0 },
   'playai-tts-arabic': { inputPer1kTokens: 0, outputPer1kTokens: 0 },
 
-  // Gemini models (Google pricing as of 2024)
+  // Gemini models (Google pricing as of January 2025)
   // Prices in USD per 1K tokens
+  // Gemini 2.5 (Latest)
+  'gemini-2.5-pro-preview-06-05': { inputPer1kTokens: 0.00125, outputPer1kTokens: 0.01 },
+  'gemini-2.5-flash-preview-05-20': { inputPer1kTokens: 0.00015, outputPer1kTokens: 0.0006 },
+  'gemini-2.5-flash-lite-preview-06-17': { inputPer1kTokens: 0.000075, outputPer1kTokens: 0.0003 },
+  // Gemini 2.0
   'gemini-2.0-flash': { inputPer1kTokens: 0.0001, outputPer1kTokens: 0.0004 },
   'gemini-2.0-flash-lite': { inputPer1kTokens: 0.000075, outputPer1kTokens: 0.0003 },
+  // Gemini 1.5 (Legacy)
   'gemini-1.5-pro': { inputPer1kTokens: 0.00125, outputPer1kTokens: 0.005 },
   'gemini-1.5-flash': { inputPer1kTokens: 0.000075, outputPer1kTokens: 0.0003 },
   'gemini-1.5-flash-8b': { inputPer1kTokens: 0.0000375, outputPer1kTokens: 0.00015 },
-  'gemini-2.5-pro-preview': { inputPer1kTokens: 0.00125, outputPer1kTokens: 0.01 },
-  'gemini-2.5-flash-preview': { inputPer1kTokens: 0.00015, outputPer1kTokens: 0.0006 },
-  'gemini-pro': { inputPer1kTokens: 0.0005, outputPer1kTokens: 0.0015 },
 
   // OpenRouter models (various pricing)
   'openai/gpt-4o': { inputPer1kTokens: 0.005, outputPer1kTokens: 0.015 },

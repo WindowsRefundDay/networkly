@@ -17,11 +17,11 @@ export default function AssistantPage() {
   }
 
   return (
-    <div className="h-full overflow-hidden flex gap-6">
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+    <div className="h-full flex gap-6">
+      <div className="flex-1 flex flex-col min-w-0">
         <ChatInterface ref={chatRef} />
       </div>
-      <div className="hidden xl:block w-80 h-full overflow-hidden">
+      <div className="hidden xl:block w-80 h-full overflow-y-auto pr-1">
         <AIToolsSidebar 
           onToolClick={handleToolClick}
           onLoadSession={handleLoadSession}

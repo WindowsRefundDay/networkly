@@ -9,7 +9,9 @@ import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Textarea } from "@/components/ui/textarea"
-import { User, Bell, Eye, Sparkles, Trash2, Loader2, Link2, Check, Search } from "lucide-react"
+import { User, Moon, Bell, Eye, Sparkles, Trash2, Loader2, Link2, Check, Search } from "lucide-react"
+import { useTheme } from "next-themes"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useUser } from "@clerk/nextjs"
 import { getCurrentUser } from "@/app/actions/user"
 import { updateProfile } from "@/app/actions/profile"
@@ -36,6 +38,7 @@ interface UserData {
 }
 
 export default function SettingsPage() {
+  const { setTheme, theme } = useTheme()
   const { user: clerkUser } = useUser()
   const [isPending, startTransition] = useTransition()
   const [dbUser, setDbUser] = useState<UserData | null>(null)
@@ -542,6 +545,34 @@ export default function SettingsPage() {
           <div className="space-y-4">
             <h4 className="text-sm font-semibold">URL Cache Statistics</h4>
             <CacheStatistics />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Moon className="h-5 w-5" />
+            Appearance
+          </CardTitle>
+          <CardDescription>Customize the look and feel of the application</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium text-foreground">Theme</p>
+              <p className="text-sm text-muted-foreground">Select your preferred theme</p>
+            </div>
+            <Select value={theme} onValueChange={setTheme}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Select theme" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="light">Light</SelectItem>
+                <SelectItem value="dark">Dark</SelectItem>
+                <SelectItem value="system">System</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>

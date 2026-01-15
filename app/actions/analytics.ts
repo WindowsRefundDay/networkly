@@ -5,7 +5,7 @@ import { auth } from "@clerk/nextjs/server"
 
 export async function getAnalyticsSummary() {
     const { userId } = await auth()
-    if (!userId) throw new Error("Unauthorized")
+    if (!userId) return null
 
     const user = await prisma.user.findUnique({
         where: { clerkId: userId },
@@ -15,13 +15,22 @@ export async function getAnalyticsSummary() {
         }
     })
 
-    if (!user) throw new Error("User not found")
+    if (!user) return null
 
-    // Mock trend logic for now, but use real counts
+    const profileViewsData = user.analyticsData?.profileViews
+        ? (user.analyticsData.profileViews as { value: number }[])
+        : generateDefaultSparklineData()
+
+    const networkGrowthData = user.analyticsData?.networkGrowth
+        ? (user.analyticsData.networkGrowth as { value: number }[])
+        : generateDefaultSparklineData()
+
+    const searchAppearancesData = generateDefaultSparklineData()
+
     return {
         profileViews: {
             value: user.profileViews,
-            change: "+0%", // Default to 0 since we don't have historical comparison yet
+            change: "+0%",
             trend: "up"
         },
         searchAppearances: {
@@ -43,8 +52,17 @@ export async function getAnalyticsSummary() {
             value: user.completedProjects,
             change: "+0",
             trend: "up"
+        },
+        sparklineData: {
+            profileViews: profileViewsData,
+            networkGrowth: networkGrowthData,
+            searchAppearances: searchAppearancesData
         }
     }
+}
+
+function generateDefaultSparklineData(): { value: number }[] {
+    return Array.from({ length: 7 }, () => ({ value: 0 }))
 }
 
 export async function getProfileViewsData() {

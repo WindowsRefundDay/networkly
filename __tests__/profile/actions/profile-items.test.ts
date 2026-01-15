@@ -38,7 +38,7 @@ describe("Profile Items Actions", () => {
         const { addAchievement } = await import("@/app/actions/profile-items")
 
         await expect(
-          addAchievement({ title: "Award", date: "2024", icon: "trophy" })
+          addAchievement({ title: "Award", category: "Academic", date: "2024-01-15", icon: "trophy" })
         ).rejects.toThrow("Unauthorized")
       })
 
@@ -49,7 +49,7 @@ describe("Profile Items Actions", () => {
         const { addAchievement } = await import("@/app/actions/profile-items")
 
         await expect(
-          addAchievement({ title: "Award", date: "2024", icon: "trophy" })
+          addAchievement({ title: "Award", category: "Academic", date: "2024-01-15", icon: "trophy" })
         ).rejects.toThrow("User not found")
       })
 
@@ -61,7 +61,9 @@ describe("Profile Items Actions", () => {
         vi.mocked(prisma.achievement.create).mockResolvedValueOnce({
           id: "achievement-1",
           title: "Dean's List",
-          date: "Fall 2024",
+          category: "Academic",
+          description: null,
+          date: "2024-01-15",
           icon: "trophy",
           userId: "user-1",
         } as any)
@@ -70,14 +72,17 @@ describe("Profile Items Actions", () => {
 
         const result = await addAchievement({
           title: "Dean's List",
-          date: "Fall 2024",
+          category: "Academic",
+          date: "2024-01-15",
           icon: "trophy",
         })
 
         expect(prisma.achievement.create).toHaveBeenCalledWith({
           data: {
             title: "Dean's List",
-            date: "Fall 2024",
+            category: "Academic",
+            description: null,
+            date: "2024-01-15",
             icon: "trophy",
             userId: "user-1",
           },

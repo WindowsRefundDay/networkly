@@ -1,10 +1,10 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { headers } from "next/headers"
 import { Inter, Plus_Jakarta_Sans } from "next/font/google"
 import { ClerkProvider } from "@clerk/nextjs"
 import { Toaster } from "sonner"
 import "./globals.css"
+import { ThemeProvider } from "@/components/theme-provider"
 
 const _inter = Inter({ subsets: ["latin"] })
 const _plusJakartaSans = Plus_Jakarta_Sans({ subsets: ["latin"] })
@@ -37,24 +37,48 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const headersList = await headers()
-  const nonce = headersList.get("x-nonce") ?? undefined
-
   return (
     <ClerkProvider
       signInUrl="/login"
       signUpUrl="/signup"
       signInFallbackRedirectUrl="/dashboard"
       signUpFallbackRedirectUrl="/dashboard"
-      nonce={nonce}
     >
       <html lang="en" suppressHydrationWarning>
+        <head>
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `
+                try {
+                  if (localStorage.getItem('theme') === 'dark' || ((!('theme' in localStorage) || localStorage.getItem('theme') === 'system') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                    document.documentElement.classList.add('dark');
+                  } else {
+                    document.documentElement.classList.remove('dark');
+                  }
+                } catch (_) {}
+              `,
+            }}
+          />
+        </head>
         <body className={`font-sans antialiased`}>
-          {children}
-          <Toaster position="top-center" />
+          <div className="fixed inset-0 -z-0 bg-gradient-to-br from-primary/10 via-background to-secondary/10">
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/20 via-transparent to-transparent" />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-secondary/20 via-transparent to-transparent" />
+          </div>
+
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange={false}
+          >
+            <div className="relative z-10">
+              {children}
+            </div>
+            <Toaster position="top-center" />
+          </ThemeProvider>
         </body>
       </html>
     </ClerkProvider>
   )
 }
-
