@@ -2,16 +2,16 @@
 
 import { useState, useMemo, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { OpportunityFilters } from "@/components/opportunities/opportunity-filters"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Search, Sparkles, Bookmark, Send, Filter, Loader2, Briefcase, Target } from "lucide-react"
 import { OpportunityList } from "@/components/opportunities/opportunity-list"
 import { OpportunityDetailPanel } from "@/components/opportunities/opportunity-detail-panel"
 import { GoalDashboard } from "@/components/opportunities/goal-dashboard"
-import { SearchWithDiscovery } from "@/components/opportunities/search-with-discovery"
-import { LiveOpportunitiesFeed } from "@/components/discovery/live-opportunities-feed"
 import { getOpportunities } from "@/app/actions/opportunities"
 import { useHasMounted } from "@/hooks/use-has-mounted"
-import { toast } from "sonner"
 
 interface Opportunity {
   id: string
@@ -33,17 +33,22 @@ interface Opportunity {
   saved: boolean
 }
 
+const OPPORTUNITY_TYPES = [
+  { value: "internship", label: "Internship" },
+  { value: "research", label: "Research" },
+  { value: "competition", label: "Competition" },
+  { value: "fellowship", label: "Fellowship" },
+  { value: "program", label: "Program" },
+]
+
 export default function OpportunitiesPage() {
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedTypes, setSelectedTypes] = useState<string[]>([])
-  const [selectedLocations, setSelectedLocations] = useState<string[]>([])
-  const [minMatchScore, setMinMatchScore] = useState(0)
+  const [typeFilter, setTypeFilter] = useState("all")
   const [opportunities, setOpportunities] = useState<Opportunity[]>([])
   const [selectedOpportunity, setSelectedOpportunity] = useState<Opportunity | null>(null)
   const [loading, setLoading] = useState(true)
-  const [isSearching, setIsSearching] = useState(false)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
-  const [liveOpportunities, setLiveOpportunities] = useState<any[]>([])
+  const [activeTab, setActiveTab] = useState("all")
   const hasMounted = useHasMounted()
   const searchParams = useSearchParams()
 
@@ -93,57 +98,19 @@ export default function OpportunitiesPage() {
         opp.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
         opp.skills.some((skill) => skill.toLowerCase().includes(searchQuery.toLowerCase()))
 
-      const matchesType = selectedTypes.length === 0 || selectedTypes.includes(opp.type)
-      const matchesLocation =
-        selectedLocations.length === 0 ||
-        selectedLocations.includes(opp.location) ||
-        (selectedLocations.includes("Remote") && opp.remote)
-      const matchesScore = opp.matchScore >= minMatchScore
+      const matchesType = typeFilter === "all" || opp.type.toLowerCase() === typeFilter.toLowerCase()
 
-      return matchesSearch && matchesType && matchesLocation && matchesScore
+      return matchesSearch && matchesType
     })
-  }, [opportunities, searchQuery, selectedTypes, selectedLocations, minMatchScore])
+  }, [opportunities, searchQuery, typeFilter])
+
+  const savedOpportunities = useMemo(() => opportunities.filter(o => o.saved), [opportunities])
 
   const handleToggleSave = async (id: string) => {
-    // Optimistic
     setOpportunities(opportunities.map((opp) => (opp.id === id ? { ...opp, saved: !opp.saved } : opp)))
     if (selectedOpportunity?.id === id) {
       setSelectedOpportunity(prev => prev ? { ...prev, saved: !prev.saved } : null)
     }
-  }
-
-  const handleSearchMore = (query: string) => {
-    if (!query || query.length < 3) return
-    setIsSearching(true)
-  }
-
-  const handleSearchComplete = async () => {
-    setIsSearching(false)
-    // Refresh data logic would go here
-  }
-
-  const handleNewOpportunity = (card: { title: string; organization: string; type: string; location?: string }) => {
-    // Logic to add new opp
-    const newOpp: Opportunity = {
-      id: `temp-${Date.now()}`,
-      title: card.title,
-      company: card.organization,
-      type: card.type,
-      location: card.location || "Remote",
-      matchScore: 0,
-      skills: [],
-      matchReasons: [],
-      deadline: null,
-      postedDate: "Just now",
-      logo: null,
-      description: "Newly discovered opportunity.",
-      salary: null,
-      duration: null,
-      remote: false,
-      applicants: 0,
-      saved: false
-    }
-    setOpportunities(prev => [newOpp, ...prev])
   }
 
   const handleSelectOpportunity = (opp: Opportunity) => {
@@ -151,155 +118,205 @@ export default function OpportunitiesPage() {
     setIsDetailOpen(true)
   }
 
-  return (
-    <div className="min-h-screen bg-background pb-10">
-      <div className="container mx-auto px-4 lg:px-8 py-6 max-w-[1600px]">
+  const EmptyState = ({ type }: { type: "all" | "saved" | "applied" }) => {
+    const configs = {
+      all: {
+        icon: Briefcase,
+        title: "No opportunities found",
+        description: "Try adjusting your search or filters to find more opportunities.",
+        action: null,
+      },
+      saved: {
+        icon: Bookmark,
+        title: "No saved opportunities",
+        description: "Save opportunities you're interested in to review them later.",
+        action: null,
+      },
+      applied: {
+        icon: Send,
+        title: "No applications yet",
+        description: "Start applying to opportunities to track your progress.",
+        action: null,
+      },
+    }
 
-        {/* Header */}
-        <div className="flex flex-col gap-6 mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight text-foreground">Opportunities</h1>
-              <p className="text-muted-foreground mt-1 text-lg">
-                Discover {filteredOpportunities.length} opportunities curated for you
-              </p>
-            </div>
+    const config = configs[type]
+    const Icon = config.icon
 
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              <SearchWithDiscovery
-                value={searchQuery}
-                onChange={setSearchQuery}
-                onTriggerSearch={handleSearchMore}
-                isSearching={isSearching}
-                className="flex-1 sm:w-[320px]"
-              />
-              <OpportunityFilters
-                selectedTypes={selectedTypes}
-                onTypesChange={setSelectedTypes}
-                selectedLocations={selectedLocations}
-                onLocationsChange={setSelectedLocations}
-                minMatchScore={minMatchScore}
-                onMatchScoreChange={setMinMatchScore}
-              />
-            </div>
-          </div>
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="rounded-full bg-muted p-4 mb-4">
+          <Icon className="h-8 w-8 text-muted-foreground" />
         </div>
+        <h3 className="text-lg font-medium text-foreground mb-1">{config.title}</h3>
+        <p className="text-sm text-muted-foreground max-w-sm">{config.description}</p>
+        {config.action}
+      </div>
+    )
+  }
 
-        {/* Main Layout */}
-        <div className="flex items-start gap-8 relative">
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
 
-          {/* Main Grid Content */}
-          <div className="flex-1 min-w-0">
-            {hasMounted ? (
-              <Tabs defaultValue="all" className="space-y-6">
-                <TabsList className="bg-muted/50 p-1">
-                  <TabsTrigger value="all" className="px-6">All ({filteredOpportunities.length})</TabsTrigger>
-                  <TabsTrigger value="saved" className="px-6">Saved ({opportunities.filter(o => o.saved).length})</TabsTrigger>
-                  <TabsTrigger value="applied" className="px-6">Applied (3)</TabsTrigger>
-                </TabsList>
+  return (
+    <div className="space-y-6">
+      {/* Header - Matches Projects page layout */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Opportunities</h1>
+          <p className="text-muted-foreground">Discover {filteredOpportunities.length} opportunities curated for you</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 sm:w-64">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search opportunities..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-[180px]">
+              <Filter className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="All Types" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              {OPPORTUNITY_TYPES.map((type) => (
+                <SelectItem key={type.value} value={type.value}>
+                  {type.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
 
-                {/* ✨ Live Opportunities Feed */}
-                {liveOpportunities.length > 0 && (
-                  <div className="mt-6">
-                    <LiveOpportunitiesFeed opportunities={liveOpportunities} />
-                  </div>
-                )}
+      {/* Main Grid Layout - Matches Projects page */}
+      <div className="grid gap-6 lg:grid-cols-4">
+        <div className="lg:col-span-3 space-y-6">
+          {hasMounted ? (
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList>
+                <TabsTrigger value="all">
+                  <Sparkles className="h-4 w-4 mr-1" />
+                  All ({filteredOpportunities.length})
+                </TabsTrigger>
+                <TabsTrigger value="saved">
+                  <Bookmark className="h-4 w-4 mr-1" />
+                  Saved ({savedOpportunities.length})
+                </TabsTrigger>
+                <TabsTrigger value="applied">
+                  <Send className="h-4 w-4 mr-1" />
+                  Applied (3)
+                </TabsTrigger>
+              </TabsList>
 
-                <TabsContent value="all" className="mt-6">
+              <TabsContent value="all" className="mt-6">
+                {filteredOpportunities.length === 0 ? (
+                  searchQuery || typeFilter !== "all" ? (
+                    <div className="text-center py-8 text-muted-foreground">No opportunities match your search.</div>
+                  ) : (
+                    <EmptyState type="all" />
+                  )
+                ) : (
                   <OpportunityList
                     opportunities={filteredOpportunities}
                     onToggleSave={handleToggleSave}
                     onSelect={handleSelectOpportunity}
                     selectedId={selectedOpportunity?.id}
-                    searchQuery={searchQuery}
-                    onSearchMore={handleSearchMore}
-                    isSearching={isSearching}
-                    onSearchComplete={handleSearchComplete}
-                    onNewOpportunity={handleNewOpportunity}
                   />
-                </TabsContent>
+                )}
+              </TabsContent>
 
-                <TabsContent value="saved" className="mt-6">
+              <TabsContent value="saved" className="mt-6">
+                {savedOpportunities.length === 0 ? (
+                  <EmptyState type="saved" />
+                ) : (
                   <OpportunityList
-                    opportunities={opportunities.filter(o => o.saved)}
+                    opportunities={savedOpportunities}
                     onToggleSave={handleToggleSave}
                     onSelect={handleSelectOpportunity}
                     selectedId={selectedOpportunity?.id}
                   />
-                </TabsContent>
+                )}
+              </TabsContent>
 
-                <TabsContent value="applied" className="mt-6">
-                  {/* Placeholder for applied */}
-                  <div className="text-center py-20 text-muted-foreground">
-                    No applications yet. Start applying!
-                  </div>
-                </TabsContent>
-              </Tabs>
-            ) : (
-              /* Skeleton or Loader to prevent layout shift */
-              <div className="space-y-6">
-                <div className="h-10 w-full max-w-md bg-muted animate-pulse rounded-lg" />
-                <div className="space-y-4">
-                  {[1, 2, 3].map(i => (
-                    <div key={i} className="h-40 w-full bg-muted animate-pulse rounded-xl" />
-                  ))}
-                </div>
+              <TabsContent value="applied" className="mt-6">
+                <EmptyState type="applied" />
+              </TabsContent>
+            </Tabs>
+          ) : (
+            <div className="space-y-6">
+              <div className="h-10 w-full max-w-md bg-muted animate-pulse rounded-lg" />
+              <div className="space-y-4">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="h-40 w-full bg-muted animate-pulse rounded-xl" />
+                ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
+        </div>
 
-          {/* Right Sidebar (Detail Panel or Dashboard) */}
-          <div className="hidden xl:block w-[420px] shrink-0 sticky top-6 space-y-6">
-            {/* If an opportunity is selected, show detail panel */}
-            {selectedOpportunity ? (
-              <div className="border border-border rounded-xl bg-card shadow-sm overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300 max-h-[calc(100vh-6rem)]">
-                {/* We reuse the panel content here logic or just render the component slightly differently */}
-                <OpportunityDetailPanel
-                  opportunity={selectedOpportunity}
-                  isOpen={true} // Always open in desktop sidebar mode
-                  onClose={() => setSelectedOpportunity(null)}
-                  onToggleSave={handleToggleSave}
-                  embedded={true}
-                />
-              </div>
-            ) : (
-              /* Default Dashboard View when no selection */
-              <div className="space-y-6 animate-in fade-in duration-500">
+        {/* Right Sidebar - Matches Projects page */}
+        <div className="space-y-6">
+          {selectedOpportunity ? (
+            <div className="border border-border rounded-xl bg-card shadow-sm overflow-hidden animate-in fade-in slide-in-from-right-4 duration-300 max-h-[calc(100vh-12rem)]">
+              <OpportunityDetailPanel
+                opportunity={selectedOpportunity}
+                isOpen={true}
+                onClose={() => setSelectedOpportunity(null)}
+                onToggleSave={handleToggleSave}
+                embedded={true}
+              />
+            </div>
+          ) : (
+            <div className="space-y-6 animate-in fade-in duration-500">
+              {/* Goals Dashboard */}
+              <div className="rounded-xl border border-border bg-card overflow-hidden">
                 <GoalDashboard />
+              </div>
 
-                {/* Stats Widget */}
-                <div className="rounded-xl border border-border bg-card p-5">
-                  <h3 className="font-semibold mb-4">Your Activity</h3>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Applications Sent</span>
-                      <span className="font-bold">12</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Profile Views</span>
-                      <span className="font-bold">48</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Response Rate</span>
-                      <span className="font-bold text-emerald-500">15%</span>
-                    </div>
+              {/* Activity Stats */}
+              <div className="rounded-xl border border-border bg-card p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <Target className="h-5 w-5 text-primary" />
+                  <h3 className="font-semibold">Your Activity</h3>
+                </div>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Applications Sent</span>
+                    <span className="font-bold">12</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Profile Views</span>
+                    <span className="font-bold">48</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Response Rate</span>
+                    <span className="font-bold text-emerald-500">15%</span>
                   </div>
                 </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
+      </div>
 
-        {/* Mobile/Tablet Detail Drawer */}
-        <div className="xl:hidden">
-          <OpportunityDetailPanel
-            opportunity={selectedOpportunity}
-            isOpen={isDetailOpen}
-            onClose={() => setIsDetailOpen(false)}
-            onToggleSave={handleToggleSave}
-          />
-        </div>
-
+      {/* Mobile/Tablet Detail Drawer */}
+      <div className="lg:hidden">
+        <OpportunityDetailPanel
+          opportunity={selectedOpportunity}
+          isOpen={isDetailOpen}
+          onClose={() => setIsDetailOpen(false)}
+          onToggleSave={handleToggleSave}
+        />
       </div>
     </div>
   )

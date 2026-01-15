@@ -1,59 +1,37 @@
 "use client"
 
-import * as React from "react"
-import { Sidebar } from "@/components/sidebar"
+import { useState } from "react"
 import { Header } from "@/components/header"
-import { cn } from "@/lib/utils"
+import { Sidebar } from "@/components/sidebar"
+import type React from "react"
 
 interface AppShellProps {
   children: React.ReactNode
 }
 
 export function AppShell({ children }: AppShellProps) {
-  const [isCollapsed, setIsCollapsed] = React.useState(false)
-  const [isMounted, setIsMounted] = React.useState(false)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
 
-  React.useEffect(() => {
-    setIsMounted(true)
-    const saved = localStorage.getItem("sidebar-collapsed")
-    if (saved) {
-      setIsCollapsed(saved === "true")
-    }
-  }, [])
-
-  const toggleCollapse = () => {
-    const newState = !isCollapsed
-    setIsCollapsed(newState)
-    localStorage.setItem("sidebar-collapsed", String(newState))
+  const toggleSidebar = () => {
+    setIsSidebarCollapsed(!isSidebarCollapsed)
   }
 
-  if (!isMounted) {
-      // Render default state (expanded) during SSR/hydration to match server
-      return (
-       <div className="h-screen overflow-hidden bg-background">
-         <Sidebar isCollapsed={false} toggleCollapse={toggleCollapse} />
-         <div className="pl-64 h-screen flex flex-col">
-           <Header />
-           <main className="flex-1 p-6 overflow-hidden">{children}</main>
-         </div>
-       </div>
-      )
-   }
-
   return (
-    <div className="h-screen overflow-hidden bg-background">
-      <Sidebar 
-        isCollapsed={isCollapsed} 
-        toggleCollapse={toggleCollapse} 
+    <div className="flex h-screen w-full overflow-hidden bg-background">
+      <Sidebar
+        isCollapsed={isSidebarCollapsed}
+        toggleCollapse={toggleSidebar}
       />
       <div
-        className={cn(
-          "transition-[padding] duration-300 ease-in-out h-screen flex flex-col",
-          isCollapsed ? "pl-[80px]" : "pl-64"
-        )}
+        className="flex-1 flex flex-col overflow-hidden transition-all duration-300"
+        style={{
+          marginLeft: isSidebarCollapsed ? "80px" : "256px",
+        }}
       >
         <Header />
-        <main className="flex-1 p-6 overflow-hidden">{children}</main>
+        <main className="flex-1 overflow-y-auto">
+          {children}
+        </main>
       </div>
     </div>
   )

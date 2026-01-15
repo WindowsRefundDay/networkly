@@ -14,7 +14,9 @@
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "costs": "npx tsx scripts/calculate-costs.ts",
+    "costs:clear": "echo '{\"records\":[],\"lastUpdated\":\"\"}' > data/ai-costs.json && echo 'Cost data cleared!'"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"

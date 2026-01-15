@@ -245,3 +245,187 @@ export async function getRoadmapProgress() {
         roadmap: goal.roadmap,
     }
 }
+
+// ============================================================================
+// PROFILE GOALS (Unified Goal Tracking System)
+// ============================================================================
+
+const PROFILE_GOAL_STATUSES = ["pending", "in_progress", "completed"] as const
+export type ProfileGoalStatus = typeof PROFILE_GOAL_STATUSES[number]
+
+export interface ProfileGoalData {
+    id: string
+    title: string
+    targetDate: string
+    status: ProfileGoalStatus
+    createdAt: string
+}
+
+export async function getProfileGoals(): Promise<ProfileGoalData[]> {
+    const { userId } = await auth()
+    if (!userId) throw new Error("Unauthorized")
+
+    const user = await prisma.user.findUnique({
+        where: { clerkId: userId },
+        select: { id: true },
+    })
+
+    if (!user) return []
+
+    const goals = await prisma.profileGoal.findMany({
+        where: { userId: user.id },
+        orderBy: [
+            { status: "asc" },
+            { targetDate: "asc" },
+        ],
+    })
+
+    return goals.map((g) => ({
+        id: g.id,
+        title: g.title,
+        targetDate: g.targetDate.toISOString().split("T")[0],
+        status: g.status as ProfileGoalStatus,
+        createdAt: g.createdAt.toISOString(),
+    }))
+}
+
+export async function addProfileGoal(data: {
+    title: string
+    targetDate: string
+    status?: ProfileGoalStatus
+}) {
+    const { userId } = await auth()
+    if (!userId) throw new Error("Unauthorized")
+
+    const user = await prisma.user.findUnique({
+        where: { clerkId: userId },
+        select: { id: true },
+    })
+
+    if (!user) throw new Error("User not found")
+
+    if (!data.title || data.title.length > 100) {
+        throw new Error("Invalid goal title")
+    }
+
+    const goal = await prisma.profileGoal.create({
+        data: {
+            userId: user.id,
+            title: data.title.trim(),
+            targetDate: new Date(data.targetDate),
+            status: data.status || "pending",
+        },
+    })
+
+    revalidatePath("/profile")
+    revalidatePath("/opportunities")
+    revalidatePath("/analytics")
+
+    return {
+        id: goal.id,
+        title: goal.title,
+        targetDate: goal.targetDate.toISOString().split("T")[0],
+        status: goal.status as ProfileGoalStatus,
+        createdAt: goal.createdAt.toISOString(),
+    }
+}
+
+export async function updateProfileGoal(
+    id: string,
+    data: Partial<{ title: string; targetDate: string; status: ProfileGoalStatus }>
+) {
+    const { userId } = await auth()
+    if (!userId) throw new Error("Unauthorized")
+
+    const user = await prisma.user.findUnique({
+        where: { clerkId: userId },
+        select: { id: true },
+    })
+
+    if (!user) throw new Error("User not found")
+
+    const existing = await prisma.profileGoal.findFirst({
+        where: { id, userId: user.id },
+    })
+
+    if (!existing) throw new Error("Goal not found")
+
+    const updateData: Record<string, unknown> = {}
+    if (data.title !== undefined) updateData.title = data.title.trim()
+    if (data.targetDate !== undefined) updateData.targetDate = new Date(data.targetDate)
+    if (data.status !== undefined) updateData.status = data.status
+
+    const goal = await prisma.profileGoal.update({
+        where: { id },
+        data: updateData,
+    })
+
+    revalidatePath("/profile")
+    revalidatePath("/opportunities")
+    revalidatePath("/analytics")
+
+    return {
+        id: goal.id,
+        title: goal.title,
+        targetDate: goal.targetDate.toISOString().split("T")[0],
+        status: goal.status as ProfileGoalStatus,
+        createdAt: goal.createdAt.toISOString(),
+    }
+}
+
+export async function updateProfileGoalStatus(id: string, status: ProfileGoalStatus) {
+    return updateProfileGoal(id, { status })
+}
+
+export async function deleteProfileGoal(id: string) {
+    const { userId } = await auth()
+    if (!userId) throw new Error("Unauthorized")
+
+    const user = await prisma.user.findUnique({
+        where: { clerkId: userId },
+        select: { id: true },
+    })
+
+    if (!user) throw new Error("User not found")
+
+    const existing = await prisma.profileGoal.findFirst({
+        where: { id, userId: user.id },
+    })
+
+    if (!existing) throw new Error("Goal not found")
+
+    await prisma.profileGoal.delete({
+        where: { id },
+    })
+
+    revalidatePath("/profile")
+    revalidatePath("/opportunities")
+    revalidatePath("/analytics")
+
+    return { success: true }
+}
+
+export async function getProfileGoalsProgress() {
+    const { userId } = await auth()
+    if (!userId) throw new Error("Unauthorized")
+
+    const user = await prisma.user.findUnique({
+        where: { clerkId: userId },
+        select: { id: true },
+    })
+
+    if (!user) return { total: 0, completed: 0, inProgress: 0, pending: 0, percentage: 0 }
+
+    const goals = await prisma.profileGoal.findMany({
+        where: { userId: user.id },
+        select: { status: true },
+    })
+
+    const total = goals.length
+    const completed = goals.filter((g) => g.status === "completed").length
+    const inProgress = goals.filter((g) => g.status === "in_progress").length
+    const pending = goals.filter((g) => g.status === "pending").length
+    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0
+
+    return { total, completed, inProgress, pending, percentage }
+}

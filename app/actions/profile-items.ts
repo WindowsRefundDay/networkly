@@ -9,9 +9,14 @@ import { revalidatePath } from "next/cache"
 // ACHIEVEMENT ACTIONS
 // ============================================================================
 
+const ACHIEVEMENT_CATEGORIES = ["Academic", "Athletic", "Service", "Arts", "Other"] as const
+type AchievementCategory = typeof ACHIEVEMENT_CATEGORIES[number]
+
 const achievementSchema = z.object({
-  title: z.string().min(1).max(100),
-  date: z.string().min(1).max(50),
+  title: z.string().min(1).max(50),
+  category: z.enum(ACHIEVEMENT_CATEGORIES).optional().default("Academic"),
+  description: z.string().max(150).optional(),
+  date: z.string().min(1), // ISO date string from native date input
   icon: z.enum(["trophy", "award", "star"]).default("trophy"),
 })
 
@@ -30,7 +35,11 @@ export async function addAchievement(data: z.infer<typeof achievementSchema>) {
 
   const achievement = await prisma.achievement.create({
     data: {
-      ...validatedData,
+      title: validatedData.title,
+      category: validatedData.category,
+      description: validatedData.description || null,
+      date: validatedData.date,
+      icon: validatedData.icon,
       userId: user.id,
     },
   })
@@ -60,9 +69,16 @@ export async function updateAchievement(
 
   if (!existing) throw new Error("Achievement not found")
 
+  const updateData: Record<string, unknown> = {}
+  if (data.title !== undefined) updateData.title = data.title
+  if (data.category !== undefined) updateData.category = data.category
+  if (data.description !== undefined) updateData.description = data.description || null
+  if (data.date !== undefined) updateData.date = data.date
+  if (data.icon !== undefined) updateData.icon = data.icon
+
   const achievement = await prisma.achievement.update({
     where: { id },
-    data,
+    data: updateData,
   })
 
   revalidatePath("/profile")

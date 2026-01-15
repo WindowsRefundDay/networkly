@@ -46,9 +46,9 @@ export function Sidebar({ isCollapsed = false, toggleCollapse }: SidebarProps) {
   const userInitials = userName.split(" ").map(n => n[0]).join("").toUpperCase()
 
   return (
-    <aside 
+    <aside
       className={cn(
-        "fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-border bg-card transition-all duration-300",
+        "fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-border/50 bg-card/80 backdrop-blur-xl transition-all duration-300",
         isCollapsed ? "w-[80px]" : "w-64"
       )}
     >
@@ -64,7 +64,7 @@ export function Sidebar({ isCollapsed = false, toggleCollapse }: SidebarProps) {
           {navigation.map((item) => {
             const isActive = pathname === item.href
             const LinkContent = (
-               <Link
+              <Link
                 href={item.href}
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
@@ -80,18 +80,18 @@ export function Sidebar({ isCollapsed = false, toggleCollapse }: SidebarProps) {
             )
 
             if (isCollapsed) {
-               return (
-                  <Tooltip key={item.name} delayDuration={0}>
-                     <TooltipTrigger asChild>
-                        {LinkContent}
-                     </TooltipTrigger>
-                     <TooltipContent side="right">
-                        {item.name}
-                     </TooltipContent>
-                  </Tooltip>
-               )
+              return (
+                <Tooltip key={item.name} delayDuration={0}>
+                  <TooltipTrigger asChild>
+                    {LinkContent}
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    {item.name}
+                  </TooltipContent>
+                </Tooltip>
+              )
             }
-            
+
             return <div key={item.name}>{LinkContent}</div>
           })}
         </nav>
@@ -113,13 +113,13 @@ export function Sidebar({ isCollapsed = false, toggleCollapse }: SidebarProps) {
           href="/settings"
           className={cn(
             "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-             isCollapsed && "justify-center px-0"
+            isCollapsed && "justify-center px-0"
           )}
         >
           <Settings className="h-5 w-5 shrink-0" />
           {!isCollapsed && "Settings"}
         </Link>
-        
+
         <div className={cn("flex items-center gap-3 rounded-lg bg-muted/50 p-3", isCollapsed && "justify-center p-2 bg-transparent")}>
           <Avatar className="h-10 w-10 shrink-0">
             <AvatarImage src={userAvatar} alt={userName} />

@@ -170,3 +170,37 @@ export async function syncUserFromClerk(clerkUser: {
 
     return user
 }
+
+// ============================================================================
+// GET USER PROFILE (Extended profile data for high school students)
+// ============================================================================
+
+export async function getUserProfile() {
+    const { userId } = await auth()
+    if (!userId) return null
+
+    const user = await prisma.user.findUnique({
+        where: { clerkId: userId },
+        select: { id: true },
+    })
+
+    if (!user) return null
+
+    const userProfile = await prisma.userProfile.findUnique({
+        where: { userId: user.id },
+    })
+
+    if (!userProfile) return null
+
+    return {
+        id: userProfile.id,
+        school: userProfile.school,
+        grade_level: userProfile.grade_level,
+        interests: userProfile.interests,
+        location: userProfile.location,
+        career_goals: userProfile.career_goals,
+        preferred_opportunity_types: userProfile.preferred_opportunity_types,
+        academic_strengths: userProfile.academic_strengths,
+        availability: userProfile.availability,
+    }
+}
