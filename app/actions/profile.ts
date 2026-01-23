@@ -1,10 +1,10 @@
 "use server"
 
-import { prisma } from "@/lib/prisma"
-import { auth } from "@clerk/nextjs/server"
-import { z } from "zod"
 import { revalidatePath } from "next/cache"
+import { z } from "zod"
+
 import { checkRateLimit, createRateLimitKey, RATE_LIMITS } from "@/lib/rate-limit"
+import { createClient, requireAuth } from "@/lib/supabase/server"
 
 const updateProfileSchema = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -24,11 +24,10 @@ const updateProfileSchema = z.object({
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>
 
 export async function updateProfile(data: UpdateProfileInput) {
-  const { userId } = await auth()
-  if (!userId) throw new Error("Unauthorized")
+  const authUser = await requireAuth()
+  const supabase = await createClient()
 
-  // Rate limit profile updates
-  const rateLimitKey = createRateLimitKey("PROFILE_UPDATE", userId)
+  const rateLimitKey = createRateLimitKey("PROFILE_UPDATE", authUser.id)
   const rateLimit = await checkRateLimit(
     rateLimitKey,
     RATE_LIMITS.PROFILE_UPDATE.limit,
@@ -43,19 +42,32 @@ export async function updateProfile(data: UpdateProfileInput) {
 
   const validatedData = updateProfileSchema.parse(data)
 
-  // Clean up empty strings to null for URL fields
-  const cleanedData = {
-    ...validatedData,
-    linkedinUrl: validatedData.linkedinUrl || null,
-    githubUrl: validatedData.githubUrl || null,
-    portfolioUrl: validatedData.portfolioUrl || null,
-    profileUpdatedAt: new Date(),
+  const updateData: Record<string, unknown> = {
+    profile_updated_at: new Date().toISOString(),
   }
 
-  const user = await prisma.user.update({
-    where: { clerkId: userId },
-    data: cleanedData as any,
-  })
+  if (validatedData.name !== undefined) updateData.name = validatedData.name
+  if (validatedData.headline !== undefined) updateData.headline = validatedData.headline
+  if (validatedData.bio !== undefined) updateData.bio = validatedData.bio
+  if (validatedData.location !== undefined) updateData.location = validatedData.location
+  if (validatedData.university !== undefined) updateData.university = validatedData.university
+  if (validatedData.graduationYear !== undefined) updateData.graduation_year = validatedData.graduationYear
+  if (validatedData.skills !== undefined) updateData.skills = validatedData.skills
+  if (validatedData.interests !== undefined) updateData.interests = validatedData.interests
+  if (validatedData.visibility !== undefined) updateData.visibility = validatedData.visibility
+
+  updateData.linkedin_url = validatedData.linkedinUrl || null
+  updateData.github_url = validatedData.githubUrl || null
+  updateData.portfolio_url = validatedData.portfolioUrl || null
+
+  const { data: user, error } = await supabase
+    .from("users")
+    .update(updateData)
+    .eq("id", authUser.id)
+    .select()
+    .single()
+
+  if (error) throw new Error(error.message)
 
   revalidatePath("/profile")
   revalidatePath("/settings")
@@ -63,44 +75,38 @@ export async function updateProfile(data: UpdateProfileInput) {
 }
 
 export async function getProfileByUserId(userId: string, viewerIp?: string) {
-  const { userId: currentUserId } = await auth()
-  if (!currentUserId) throw new Error("Unauthorized")
+  const authUser = await requireAuth()
+  const supabase = await createClient()
 
-  const currentUser = await prisma.user.findUnique({
-    where: { clerkId: currentUserId },
-    select: { id: true },
-  })
+  const { data: targetUser, error: targetError } = await supabase
+    .from("users")
+    .select("*")
+    .eq("id", userId)
+    .single()
 
-  if (!currentUser) throw new Error("User not found")
+  if (targetError || !targetUser) return null
 
-  const targetUser = await prisma.user.findUnique({
-    where: { id: userId },
-  })
+  const visibility = targetUser.visibility || "public"
 
-  if (!targetUser) return null
-
-  const visibility = (targetUser as any).visibility || "public"
-
-  if (visibility === "private" && targetUser.id !== currentUser.id) {
+  if (visibility === "private" && targetUser.id !== authUser.id) {
     return null
   }
 
-  if (visibility === "connections" && targetUser.id !== currentUser.id) {
-    const connection = await prisma.connection.findFirst({
-      where: {
-        OR: [
-          { requesterId: currentUser.id, receiverId: targetUser.id, status: "accepted" },
-          { requesterId: targetUser.id, receiverId: currentUser.id, status: "accepted" },
-        ],
-      },
-    })
+  if (visibility === "connections" && targetUser.id !== authUser.id) {
+    const { data: connection } = await supabase
+      .from("connections")
+      .select("id")
+      .or(
+        `and(requester_id.eq.${authUser.id},receiver_id.eq.${targetUser.id},status.eq.accepted),and(requester_id.eq.${targetUser.id},receiver_id.eq.${authUser.id},status.eq.accepted)`
+      )
+      .limit(1)
+      .single()
+
     if (!connection) return null
   }
 
-  // Rate limit and track profile views for non-owners
-  if (targetUser.id !== currentUser.id && visibility === "public") {
-    // Rate limit profile views to prevent abuse
-    const identifier = viewerIp || currentUser.id
+  if (targetUser.id !== authUser.id && visibility === "public") {
+    const identifier = viewerIp || authUser.id
     const rateLimitKey = createRateLimitKey("PROFILE_VIEW", identifier, userId)
     const rateLimit = await checkRateLimit(
       rateLimitKey,
@@ -108,51 +114,32 @@ export async function getProfileByUserId(userId: string, viewerIp?: string) {
       RATE_LIMITS.PROFILE_VIEW.windowSeconds
     )
 
-    // Only increment view count if within rate limit
     if (rateLimit.success) {
-      await prisma.user.update({
-        where: { id: userId },
-        data: { 
-          profileViews: { increment: 1 },
-          lastViewedAt: new Date(),
-        },
-      })
+      await supabase
+        .from("users")
+        .update({
+          profile_views: (targetUser.profile_views || 0) + 1,
+          last_viewed_at: new Date().toISOString(),
+        })
+        .eq("id", userId)
     }
   }
 
-  // Get related data
-  const achievements = await prisma.achievement.findMany({
-    where: { userId: targetUser.id },
-    select: { id: true, title: true, date: true, icon: true },
-  })
+  const { data: achievements } = await supabase
+    .from("achievements")
+    .select("id, title, date, icon")
+    .eq("user_id", targetUser.id)
 
-  const extracurriculars = await prisma.extracurricular.findMany({
-    where: { userId: targetUser.id },
-    select: {
-      id: true,
-      title: true,
-      organization: true,
-      type: true,
-      startDate: true,
-      endDate: true,
-      description: true,
-      logo: true,
-    },
-  })
+  const { data: extracurriculars } = await supabase
+    .from("extracurriculars")
+    .select("id, title, organization, type, start_date, end_date, description, logo")
+    .eq("user_id", targetUser.id)
 
-  const recommendations = await prisma.recommendation.findMany({
-    where: { receiverId: targetUser.id },
-    select: {
-      id: true,
-      content: true,
-      authorName: true,
-      authorRole: true,
-      authorAvatar: true,
-      date: true,
-      createdAt: true,
-    },
-    orderBy: { createdAt: "desc" },
-  })
+  const { data: recommendations } = await supabase
+    .from("recommendations")
+    .select("id, content, author_name, author_role, author_avatar, date, created_at")
+    .eq("receiver_id", targetUser.id)
+    .order("created_at", { ascending: false })
 
   return {
     id: targetUser.id,
@@ -162,35 +149,54 @@ export async function getProfileByUserId(userId: string, viewerIp?: string) {
     bio: targetUser.bio,
     location: targetUser.location,
     university: targetUser.university,
-    graduationYear: targetUser.graduationYear?.toString() || null,
+    graduationYear: targetUser.graduation_year?.toString() || null,
     skills: targetUser.skills,
     interests: targetUser.interests,
     connections: targetUser.connections,
-    profileViews: targetUser.profileViews,
-    searchAppearances: targetUser.searchAppearances,
-    completedProjects: targetUser.completedProjects,
+    profileViews: targetUser.profile_views,
+    searchAppearances: targetUser.search_appearances,
+    completedProjects: targetUser.completed_projects,
     visibility,
-    linkedinUrl: (targetUser as any).linkedinUrl || null,
-    githubUrl: (targetUser as any).githubUrl || null,
-    portfolioUrl: (targetUser as any).portfolioUrl || null,
-    createdAt: targetUser.createdAt,
-    achievements,
-    extracurriculars,
-    recommendationsReceived: recommendations,
+    linkedinUrl: targetUser.linkedin_url || null,
+    githubUrl: targetUser.github_url || null,
+    portfolioUrl: targetUser.portfolio_url || null,
+    createdAt: targetUser.created_at,
+    achievements: achievements || [],
+    extracurriculars: (extracurriculars || []).map((e) => ({
+      id: e.id,
+      title: e.title,
+      organization: e.organization,
+      type: e.type,
+      startDate: e.start_date,
+      endDate: e.end_date,
+      description: e.description,
+      logo: e.logo,
+    })),
+    recommendationsReceived: (recommendations || []).map((r) => ({
+      id: r.id,
+      content: r.content,
+      authorName: r.author_name,
+      authorRole: r.author_role,
+      authorAvatar: r.author_avatar,
+      date: r.date,
+      createdAt: r.created_at,
+    })),
   }
 }
 
 export async function calculateProfileStrength(userId: string) {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: {
-      achievements: true,
-    },
-  })
+  const supabase = await createClient()
+
+  const { data: user } = await supabase
+    .from("users")
+    .select("*, achievements (*)")
+    .eq("id", userId)
+    .single()
 
   if (!user) return 0
 
   let score = 0
+  const achievements = user.achievements || []
   const checks = [
     { field: user.name, weight: 5 },
     { field: user.headline, weight: 10 },
@@ -198,14 +204,14 @@ export async function calculateProfileStrength(userId: string) {
     { field: user.avatar, weight: 5 },
     { field: user.location, weight: 5 },
     { field: user.university, weight: 5 },
-    { field: user.graduationYear, weight: 5 },
+    { field: user.graduation_year, weight: 5 },
     { field: user.skills.length > 0, weight: 15 },
     { field: user.skills.length >= 5, weight: 5 },
     { field: user.interests.length > 0, weight: 10 },
-    { field: user.achievements.length > 0, weight: 5 },
-    { field: (user as any).linkedinUrl, weight: 5 },
-    { field: (user as any).githubUrl, weight: 5 },
-    { field: (user as any).portfolioUrl, weight: 5 },
+    { field: achievements.length > 0, weight: 5 },
+    { field: user.linkedin_url, weight: 5 },
+    { field: user.github_url, weight: 5 },
+    { field: user.portfolio_url, weight: 5 },
   ]
 
   checks.forEach(({ field, weight }) => {
@@ -216,22 +222,15 @@ export async function calculateProfileStrength(userId: string) {
 }
 
 export async function updateProfileCompleteness() {
-  const { userId } = await auth()
-  if (!userId) throw new Error("Unauthorized")
+  const authUser = await requireAuth()
+  const supabase = await createClient()
 
-  const user = await prisma.user.findUnique({
-    where: { clerkId: userId },
-    select: { id: true },
-  })
+  const strength = await calculateProfileStrength(authUser.id)
 
-  if (!user) throw new Error("User not found")
-
-  const strength = await calculateProfileStrength(user.id)
-
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { isProfileComplete: strength >= 80 } as any,
-  })
+  await supabase
+    .from("users")
+    .update({ is_profile_complete: strength >= 80 })
+    .eq("id", authUser.id)
 
   return strength
 }

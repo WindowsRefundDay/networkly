@@ -9,7 +9,7 @@ import { z } from 'zod'
 // Provider Types
 // ============================================================================
 
-export type ProviderName = 'openrouter' | 'groq' | 'gemini'
+export type ProviderName = 'openrouter' | 'gemini'
 
 export type ModelCapability = 
   | 'chat'
@@ -218,7 +218,7 @@ export class AuthenticationError extends AIProviderError {
 // ============================================================================
 
 export const ProviderConfigSchema = z.object({
-  name: z.enum(['openrouter', 'groq', 'gemini']),
+  name: z.enum(['openrouter', 'gemini']),
   apiKey: z.string().min(1, 'API key is required'),
   baseUrl: z.string().url(),
   defaultModel: z.string(),
@@ -308,44 +308,11 @@ export interface ModelPricing {
 }
 
 export const MODEL_PRICING: Record<string, ModelPricing> = {
-  // Groq models (FREE)
-  'llama-3.3-70b-versatile': { inputPer1kTokens: 0, outputPer1kTokens: 0 },
-  'llama-3.1-8b-instant': { inputPer1kTokens: 0, outputPer1kTokens: 0 },
-  'meta-llama/llama-4-scout-17b-16e-instruct': { inputPer1kTokens: 0, outputPer1kTokens: 0 },
-  'meta-llama/llama-4-maverick-17b-128e-instruct': { inputPer1kTokens: 0, outputPer1kTokens: 0 },
-  'qwen/qwen3-32b': { inputPer1kTokens: 0, outputPer1kTokens: 0 },
-  'openai/gpt-oss-20b': { inputPer1kTokens: 0, outputPer1kTokens: 0 },
-  'openai/gpt-oss-120b': { inputPer1kTokens: 0, outputPer1kTokens: 0 },
-  'moonshotai/kimi-k2-instruct': { inputPer1kTokens: 0, outputPer1kTokens: 0 },
-  'moonshotai/kimi-k2-instruct-0905': { inputPer1kTokens: 0, outputPer1kTokens: 0 },
-  'groq/compound': { inputPer1kTokens: 0, outputPer1kTokens: 0 },
-  'groq/compound-mini': { inputPer1kTokens: 0, outputPer1kTokens: 0 },
-  'meta-llama/llama-guard-4-12b': { inputPer1kTokens: 0, outputPer1kTokens: 0 },
-  'openai/gpt-oss-safeguard-20b': { inputPer1kTokens: 0, outputPer1kTokens: 0 },
-  'meta-llama/llama-prompt-guard-2-86m': { inputPer1kTokens: 0, outputPer1kTokens: 0 },
-  'meta-llama/llama-prompt-guard-2-22m': { inputPer1kTokens: 0, outputPer1kTokens: 0 },
-  'whisper-large-v3': { inputPer1kTokens: 0, outputPer1kTokens: 0 },
-  'whisper-large-v3-turbo': { inputPer1kTokens: 0, outputPer1kTokens: 0 },
-  'allam-2-7b': { inputPer1kTokens: 0, outputPer1kTokens: 0 },
-  'deepseek-r1-distill-llama-70b': { inputPer1kTokens: 0, outputPer1kTokens: 0 },
-  'deepseek-r1-distill-qwen-32b': { inputPer1kTokens: 0, outputPer1kTokens: 0 },
-  'distil-whisper-large-v3-en': { inputPer1kTokens: 0, outputPer1kTokens: 0 },
-  'playai-tts': { inputPer1kTokens: 0, outputPer1kTokens: 0 },
-  'playai-tts-arabic': { inputPer1kTokens: 0, outputPer1kTokens: 0 },
-
-  // Gemini models (Google pricing as of January 2025)
-  // Prices in USD per 1K tokens
-  // Gemini 2.5 (Latest)
-  'gemini-2.5-pro-preview-06-05': { inputPer1kTokens: 0.00125, outputPer1kTokens: 0.01 },
-  'gemini-2.5-flash-preview-05-20': { inputPer1kTokens: 0.00015, outputPer1kTokens: 0.0006 },
-  'gemini-2.5-flash-lite-preview-06-17': { inputPer1kTokens: 0.000075, outputPer1kTokens: 0.0003 },
-  // Gemini 2.0
+  // Gemini models (Google pricing as of January 2026)
+  // Prices in USD per 1K tokens - VERIFIED WORKING MODELS
+  'gemini-2.5-pro': { inputPer1kTokens: 0.00125, outputPer1kTokens: 0.01 },
+  'gemini-2.5-flash': { inputPer1kTokens: 0.00015, outputPer1kTokens: 0.0006 },
   'gemini-2.0-flash': { inputPer1kTokens: 0.0001, outputPer1kTokens: 0.0004 },
-  'gemini-2.0-flash-lite': { inputPer1kTokens: 0.000075, outputPer1kTokens: 0.0003 },
-  // Gemini 1.5 (Legacy)
-  'gemini-1.5-pro': { inputPer1kTokens: 0.00125, outputPer1kTokens: 0.005 },
-  'gemini-1.5-flash': { inputPer1kTokens: 0.000075, outputPer1kTokens: 0.0003 },
-  'gemini-1.5-flash-8b': { inputPer1kTokens: 0.0000375, outputPer1kTokens: 0.00015 },
 
   // OpenRouter models (various pricing)
   'openai/gpt-4o': { inputPer1kTokens: 0.005, outputPer1kTokens: 0.015 },

@@ -1,9 +1,9 @@
 "use server"
 
-import { prisma } from "@/lib/prisma"
-import { auth } from "@clerk/nextjs/server"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
+
+import { createClient, requireAuth } from "@/lib/supabase/server"
 
 // ============================================================================
 // PREFERENCES SCHEMA
@@ -29,41 +29,41 @@ export type UserPreferencesInput = z.infer<typeof preferencesSchema>
 // ============================================================================
 
 export async function getPreferences() {
-  const { userId: clerkId } = await auth()
-  if (!clerkId) throw new Error("Unauthorized")
+  const supabase = await createClient()
+  const authUser = await requireAuth()
 
-  const user = await prisma.user.findUnique({
-    where: { clerkId },
-    select: { id: true },
-  })
+  let { data: preferences, error } = await supabase
+    .from("user_preferences")
+    .select("*")
+    .eq("user_id", authUser.id)
+    .single()
 
-  if (!user) throw new Error("User not found")
+  if (error || !preferences) {
+    const { data: newPreferences, error: insertError } = await supabase
+      .from("user_preferences")
+      .insert({ user_id: authUser.id })
+      .select()
+      .single()
 
-  let preferences = await prisma.userPreferences.findUnique({
-    where: { userId: user.id },
-  })
-
-  // If no preferences exist, create default ones
-  if (!preferences) {
-    preferences = await prisma.userPreferences.create({
-      data: {
-        userId: user.id,
-      },
-    })
+    if (insertError) {
+      console.error("[getPreferences]", insertError)
+      throw new Error("Failed to create preferences")
+    }
+    preferences = newPreferences
   }
 
   return {
     id: preferences.id,
-    notifyOpportunities: preferences.notifyOpportunities,
-    notifyConnections: preferences.notifyConnections,
-    notifyMessages: preferences.notifyMessages,
-    weeklyDigest: preferences.weeklyDigest,
-    publicProfile: preferences.publicProfile,
-    showActivityStatus: preferences.showActivityStatus,
-    showProfileViews: preferences.showProfileViews,
-    aiSuggestions: preferences.aiSuggestions,
-    autoIcebreakers: preferences.autoIcebreakers,
-    careerNudges: preferences.careerNudges,
+    notifyOpportunities: preferences.notify_opportunities,
+    notifyConnections: preferences.notify_connections,
+    notifyMessages: preferences.notify_messages,
+    weeklyDigest: preferences.weekly_digest,
+    publicProfile: preferences.public_profile,
+    showActivityStatus: preferences.show_activity_status,
+    showProfileViews: preferences.show_profile_views,
+    aiSuggestions: preferences.ai_suggestions,
+    autoIcebreakers: preferences.auto_icebreakers,
+    careerNudges: preferences.career_nudges,
   }
 }
 
@@ -72,30 +72,51 @@ export async function getPreferences() {
 // ============================================================================
 
 export async function updatePreferences(data: UserPreferencesInput) {
-  const { userId: clerkId } = await auth()
-  if (!clerkId) throw new Error("Unauthorized")
-
-  const user = await prisma.user.findUnique({
-    where: { clerkId },
-    select: { id: true },
-  })
-
-  if (!user) throw new Error("User not found")
+  const supabase = await createClient()
+  const authUser = await requireAuth()
 
   const validatedData = preferencesSchema.parse(data)
 
-  // Upsert preferences
-  const preferences = await prisma.userPreferences.upsert({
-    where: { userId: user.id },
-    update: {
-      ...validatedData,
-      updatedAt: new Date(),
-    },
-    create: {
-      userId: user.id,
-      ...validatedData,
-    },
-  })
+  const updateData: Record<string, unknown> = { updated_at: new Date().toISOString() }
+  if (validatedData.notifyOpportunities !== undefined)
+    updateData.notify_opportunities = validatedData.notifyOpportunities
+  if (validatedData.notifyConnections !== undefined)
+    updateData.notify_connections = validatedData.notifyConnections
+  if (validatedData.notifyMessages !== undefined)
+    updateData.notify_messages = validatedData.notifyMessages
+  if (validatedData.weeklyDigest !== undefined)
+    updateData.weekly_digest = validatedData.weeklyDigest
+  if (validatedData.publicProfile !== undefined)
+    updateData.public_profile = validatedData.publicProfile
+  if (validatedData.showActivityStatus !== undefined)
+    updateData.show_activity_status = validatedData.showActivityStatus
+  if (validatedData.showProfileViews !== undefined)
+    updateData.show_profile_views = validatedData.showProfileViews
+  if (validatedData.aiSuggestions !== undefined)
+    updateData.ai_suggestions = validatedData.aiSuggestions
+  if (validatedData.autoIcebreakers !== undefined)
+    updateData.auto_icebreakers = validatedData.autoIcebreakers
+  if (validatedData.careerNudges !== undefined)
+    updateData.career_nudges = validatedData.careerNudges
+
+  const { data: preferences, error } = await supabase
+    .from("user_preferences")
+    .upsert(
+      {
+        user_id: authUser.id,
+        ...updateData,
+      },
+      {
+        onConflict: "user_id",
+      }
+    )
+    .select()
+    .single()
+
+  if (error || !preferences) {
+    console.error("[updatePreferences]", error)
+    throw new Error("Failed to update preferences")
+  }
 
   revalidatePath("/settings")
   return preferences
@@ -106,26 +127,21 @@ export async function updatePreferences(data: UserPreferencesInput) {
 // ============================================================================
 
 export async function resetPreferences() {
-  const { userId: clerkId } = await auth()
-  if (!clerkId) throw new Error("Unauthorized")
+  const supabase = await createClient()
+  const authUser = await requireAuth()
 
-  const user = await prisma.user.findUnique({
-    where: { clerkId },
-    select: { id: true },
-  })
+  await supabase.from("user_preferences").delete().eq("user_id", authUser.id)
 
-  if (!user) throw new Error("User not found")
+  const { data: preferences, error } = await supabase
+    .from("user_preferences")
+    .insert({ user_id: authUser.id })
+    .select()
+    .single()
 
-  // Delete and recreate with defaults
-  await prisma.userPreferences.deleteMany({
-    where: { userId: user.id },
-  })
-
-  const preferences = await prisma.userPreferences.create({
-    data: {
-      userId: user.id,
-    },
-  })
+  if (error || !preferences) {
+    console.error("[resetPreferences]", error)
+    throw new Error("Failed to reset preferences")
+  }
 
   revalidatePath("/settings")
   return preferences

@@ -1,0 +1,33 @@
+import { auth } from "@clerk/nextjs/server"
+import { NextResponse } from "next/server"
+import { exec } from "child_process"
+import { promisify } from "util"
+
+const execAsync = promisify(exec)
+
+export async function GET() {
+  const { userId } = await auth()
+  
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  }
+
+  try {
+    const { stdout: branch } = await execAsync("git rev-parse --abbrev-ref HEAD")
+    const { stdout: commit } = await execAsync("git rev-parse --short HEAD")
+    
+    await execAsync("git fetch origin")
+    const { stdout: behind } = await execAsync(`git rev-list --count HEAD..origin/${branch.trim()}`)
+
+    return NextResponse.json({
+      branch: branch.trim(),
+      commit: commit.trim(),
+      behind: parseInt(behind.trim()) || 0
+    })
+  } catch (error) {
+    return NextResponse.json({ 
+      error: "Failed to fetch GitHub status",
+      details: error instanceof Error ? error.message : String(error)
+    }, { status: 500 })
+  }
+}

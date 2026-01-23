@@ -19,15 +19,17 @@ import { AIProviderError, AuthenticationError } from '../types'
 import { logger } from '../utils/logger'
 import { getCostTracker } from '../utils/cost-tracker'
 
-// Gemini model definitions with pricing (Updated January 2025)
+// Gemini model definitions with pricing (Updated January 2026)
 // https://ai.google.dev/gemini-api/docs/models/gemini
+// Using VERIFIED WORKING models with your API key
 const GEMINI_MODELS: Record<string, Omit<ModelInfo, 'id' | 'provider'>> = {
   // =========================================================================
-  // GEMINI 2.5 - LATEST GENERATION
+  // GEMINI 2.5 - STABLE PRODUCTION MODELS (January 2026)
+  // Verified working: gemini-2.5-flash, gemini-2.5-pro, gemini-2.0-flash
   // =========================================================================
   
-  'gemini-2.5-pro-preview-06-05': {
-    name: 'Gemini 2.5 Pro (Latest)',
+  'gemini-2.5-pro': {
+    name: 'Gemini 2.5 Pro',
     contextLength: 1048576,
     maxOutputTokens: 65536,
     capabilities: ['chat', 'vision', 'function-calling', 'json-mode', 'streaming'],
@@ -39,35 +41,18 @@ const GEMINI_MODELS: Record<string, Omit<ModelInfo, 'id' | 'provider'>> = {
     tier: 'premium',
   },
   
-  'gemini-2.5-flash-preview-05-20': {
-    name: 'Gemini 2.5 Flash (Latest)',
+  'gemini-2.5-flash': {
+    name: 'Gemini 2.5 Flash',
     contextLength: 1048576,
     maxOutputTokens: 65536,
     capabilities: ['chat', 'vision', 'function-calling', 'json-mode', 'streaming'],
     costPer1kInputTokens: 0.00015,   // $0.15/1M input
-    costPer1kOutputTokens: 0.0006,    // $0.60/1M output (non-thinking)
+    costPer1kOutputTokens: 0.0006,    // $0.60/1M output
     supportsStreaming: true,
     supportsVision: true,
     supportsFunctionCalling: true,
     tier: 'standard',
   },
-
-  'gemini-2.5-flash-lite-preview-06-17': {
-    name: 'Gemini 2.5 Flash Lite',
-    contextLength: 1048576,
-    maxOutputTokens: 65536,
-    capabilities: ['chat', 'vision', 'function-calling', 'json-mode', 'streaming'],
-    costPer1kInputTokens: 0.000075,  // $0.075/1M input
-    costPer1kOutputTokens: 0.0003,    // $0.30/1M output
-    supportsStreaming: true,
-    supportsVision: true,
-    supportsFunctionCalling: true,
-    tier: 'free',
-  },
-
-  // =========================================================================
-  // GEMINI 2.0 - CURRENT STABLE
-  // =========================================================================
 
   'gemini-2.0-flash': {
     name: 'Gemini 2.0 Flash',
@@ -81,66 +66,10 @@ const GEMINI_MODELS: Record<string, Omit<ModelInfo, 'id' | 'provider'>> = {
     supportsFunctionCalling: true,
     tier: 'standard',
   },
-
-  'gemini-2.0-flash-lite': {
-    name: 'Gemini 2.0 Flash Lite',
-    contextLength: 1048576,
-    maxOutputTokens: 8192,
-    capabilities: ['chat', 'streaming'],
-    costPer1kInputTokens: 0.000075,  // $0.075/1M input
-    costPer1kOutputTokens: 0.0003,    // $0.30/1M output
-    supportsStreaming: true,
-    supportsVision: false,
-    supportsFunctionCalling: false,
-    tier: 'free',
-  },
-
-  // =========================================================================
-  // GEMINI 1.5 - LEGACY (Still supported)
-  // =========================================================================
-
-  'gemini-1.5-pro': {
-    name: 'Gemini 1.5 Pro',
-    contextLength: 2097152,
-    maxOutputTokens: 8192,
-    capabilities: ['chat', 'vision', 'function-calling', 'json-mode', 'streaming'],
-    costPer1kInputTokens: 0.00125,
-    costPer1kOutputTokens: 0.005,
-    supportsStreaming: true,
-    supportsVision: true,
-    supportsFunctionCalling: true,
-    tier: 'premium',
-  },
-
-  'gemini-1.5-flash': {
-    name: 'Gemini 1.5 Flash',
-    contextLength: 1048576,
-    maxOutputTokens: 8192,
-    capabilities: ['chat', 'vision', 'function-calling', 'json-mode', 'streaming'],
-    costPer1kInputTokens: 0.000075,
-    costPer1kOutputTokens: 0.0003,
-    supportsStreaming: true,
-    supportsVision: true,
-    supportsFunctionCalling: true,
-    tier: 'standard',
-  },
-
-  'gemini-1.5-flash-8b': {
-    name: 'Gemini 1.5 Flash 8B',
-    contextLength: 1048576,
-    maxOutputTokens: 8192,
-    capabilities: ['chat', 'streaming'],
-    costPer1kInputTokens: 0.0000375,
-    costPer1kOutputTokens: 0.00015,
-    supportsStreaming: true,
-    supportsVision: false,
-    supportsFunctionCalling: false,
-    tier: 'free',
-  },
 }
 
-// Default to latest 2.5 Flash Lite for cost-effectiveness
-const DEFAULT_MODEL = 'gemini-2.5-flash-lite-preview-06-17'
+// Default to stable 2.5 Flash for balanced cost/performance
+const DEFAULT_MODEL = 'gemini-2.5-flash'
 
 export class GeminiProvider {
   private client: GoogleGenerativeAI

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback, useEffect } from "react"
 import { Bell, Search, MessageCircle, Plus } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -16,9 +16,15 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { useUser, useClerk } from "@clerk/nextjs"
 import { useHasMounted } from "@/hooks/use-has-mounted"
+import { SearchResultsDropdown } from "@/components/search/search-results-dropdown"
+import { globalSearch, type SearchResults } from "@/app/actions/search"
+import { useDebouncedCallback } from "@/hooks/use-debounced-callback"
 
 export function Header() {
   const [searchQuery, setSearchQuery] = useState("")
+  const [searchResults, setSearchResults] = useState<SearchResults | null>(null)
+  const [isSearching, setIsSearching] = useState(false)
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
   const { user } = useUser()
   const { signOut } = useClerk()
   const hasMounted = useHasMounted()
@@ -28,16 +34,79 @@ export function Header() {
   const userAvatar = user?.imageUrl || "/placeholder.svg"
   const userInitials = userName.split(" ").map(n => n[0]).join("").toUpperCase()
 
+  const performSearch = useDebouncedCallback(async (query: string) => {
+    if (!query || query.trim().length < 2) {
+      setSearchResults(null)
+      setIsSearching(false)
+      return
+    }
+
+    setIsSearching(true)
+    try {
+      const results = await globalSearch({ query: query.trim(), type: "all" })
+      setSearchResults(results)
+    } catch (error) {
+      console.error("[Header] Search error:", error)
+      setSearchResults(null)
+    } finally {
+      setIsSearching(false)
+    }
+  }, 300)
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value)
+    if (value.trim().length >= 2) {
+      setIsSearchOpen(true)
+      performSearch(value)
+    } else {
+      setIsSearchOpen(false)
+      setSearchResults(null)
+    }
+  }
+
+  const handleCloseSearch = () => {
+    setIsSearchOpen(false)
+  }
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('.search-container')) {
+        setIsSearchOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-border/50 bg-card/80 backdrop-blur-xl px-6">
-      <div className="relative flex-1 max-w-md">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <div className="relative flex-1 max-w-md search-container">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none z-10" />
         <Input
           type="search"
           placeholder="Search people, opportunities, projects..."
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e) => handleSearchChange(e.target.value)}
+          onFocus={() => {
+            if (searchQuery.trim().length >= 2) {
+              setIsSearchOpen(true)
+            }
+          }}
           className="pl-10 bg-muted/50 border-0 focus-visible:ring-1 focus-visible:ring-primary"
+        />
+        
+        <SearchResultsDropdown
+          isOpen={isSearchOpen}
+          isLoading={isSearching}
+          results={searchResults}
+          onClose={handleCloseSearch}
+          onSelectResult={() => {
+            setIsSearchOpen(false)
+            setSearchQuery("")
+            setSearchResults(null)
+          }}
         />
       </div>
 

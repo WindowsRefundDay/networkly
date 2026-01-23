@@ -2,10 +2,11 @@
 
 This script runs a comprehensive discovery process using:
 1. Curated high-quality sources
-2. Sitemap crawling from trusted domains
-3. RSS feed monitoring
-4. AI-powered search discovery
-5. Recheck queue for expired opportunities
+2. Sitemap crawling from trusted domains (powered by Scrapy)
+3. AI-powered search discovery
+4. Recheck queue for expired opportunities
+
+Note: RSS monitoring removed - replaced with enhanced Scrapy sitemap discovery.
 """
 
 import asyncio
@@ -26,10 +27,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.sources.curated_sources import get_all_curated_urls, CURATED_SOURCES
 from src.sources.sitemap_crawler import get_sitemap_crawler
-from src.sources.rss_monitor import get_rss_monitor
 from src.agents.discovery import get_discovery_agent
 from src.agents.extractor import get_extractor
-from src.crawlers.crawl4ai_client import get_crawler
+from src.crawlers.hybrid_crawler import get_hybrid_crawler
 from src.db.url_cache import get_url_cache
 from src.api.postgres_sync import PostgresSync
 from src.config import get_settings
@@ -56,16 +56,14 @@ class BatchDiscovery:
         # Initialize components
         self.url_cache = get_url_cache()
         self.sitemap_crawler = get_sitemap_crawler()
-        self.rss_monitor = get_rss_monitor()
         self.discovery_agent = get_discovery_agent()
-        self.crawler = get_crawler()
+        self.crawler = get_hybrid_crawler()
         self.extractor = get_extractor()
         
         # Statistics
         self.stats = {
             "curated_urls": 0,
             "sitemap_urls": 0,
-            "rss_urls": 0,
             "search_urls": 0,
             "recheck_urls": 0,
             "total_processed": 0,
@@ -127,29 +125,8 @@ class BatchDiscovery:
         
         return set(unseen[:limit])
     
-    async def discover_from_rss(self, limit: int = 50) -> Set[str]:
-        """
-        Discover URLs from RSS feeds.
-        
-        Args:
-            limit: Max URLs to process
-            
-        Returns:
-            Set of discovered URLs
-        """
-        self.log("📡 Discovering from RSS feeds...")
-        
-        urls = await self.rss_monitor.get_urls(
-            filter_opportunities=True,
-            max_age_days=7,  # Only last week
-        )
-        
-        unseen = self.url_cache.filter_unseen(urls, within_days=7)
-        
-        self.log(f"  Found {len(urls)} RSS URLs, {len(unseen)} new/due for recheck")
-        self.stats["rss_urls"] = len(unseen)
-        
-        return set(unseen[:limit])
+    # RSS monitoring removed - replaced with Scrapy sitemap discovery
+    # This functionality is now handled by sitemap crawler with higher performance
     
     async def discover_from_search(self, focus_areas: List[str], limit: int = 100) -> Set[str]:
         """
@@ -242,8 +219,8 @@ class BatchDiscovery:
                         self.url_cache.mark_seen(crawl_result.url, "failed", expires_days=14, notes=extraction.error)
                         return {"success": False, "error": extraction.error}
                     
-                    ec = extraction.ec_card
-                    if not ec:
+                    opp = extraction.opportunity_card
+                    if not opp:
                         self.url_cache.mark_seen(crawl_result.url, "invalid", expires_days=30, notes="No card extracted")
                         return {"success": False, "error": "No card extracted"}
                     
@@ -254,12 +231,12 @@ class BatchDiscovery:
                         return {"success": False, "error": f"Low confidence: {confidence:.2f}"}
                     
                     # Skip generic extractions
-                    if ec.title == "Unknown Opportunity":
+                    if opp.title == "Unknown Opportunity":
                         self.url_cache.mark_seen(crawl_result.url, "invalid", expires_days=30)
                         return {"success": False, "error": "Generic extraction"}
                     
                     # Skip expired one-time opportunities
-                    if ec.is_expired and ec.timing_type == OpportunityTiming.ONE_TIME:
+                    if opp.is_expired and opp.timing_type == OpportunityTiming.ONE_TIME:
                         self.url_cache.mark_seen(crawl_result.url, "expired", expires_days=365)
                         return {"success": False, "error": "Expired one-time"}
                     
@@ -267,9 +244,9 @@ class BatchDiscovery:
                     await sync.upsert_opportunity(ec)
                     
                     # Mark as successful
-                    self.url_cache.mark_seen(crawl_result.url, "success", expires_days=ec.recheck_days, notes=ec.title)
+                    self.url_cache.mark_seen(crawl_result.url, "success", expires_days=opp.recheck_days, notes=opp.title)
                     
-                    return {"success": True, "title": ec.title, "type": ec.ec_type.value}
+                    return {"success": True, "title": opp.title, "type": opp.opportunity_type.value}
                 
                 except Exception as e:
                     self.url_cache.mark_seen(crawl_result.url, "failed", expires_days=14, notes=str(e)[:100])
@@ -316,7 +293,7 @@ class BatchDiscovery:
         
         # Default sources and focus areas
         if sources is None:
-            sources = ["curated", "sitemaps", "rss", "search", "recheck"]
+            sources = ["curated", "sitemaps", "search", "recheck"]  # rss removed
         
         if focus_areas is None:
             focus_areas = [
@@ -335,9 +312,7 @@ class BatchDiscovery:
             urls = await self.discover_from_sitemaps(limit=limit_per_source)
             all_urls.update(urls)
         
-        if "rss" in sources:
-            urls = await self.discover_from_rss(limit=limit_per_source)
-            all_urls.update(urls)
+        # rss removed - replaced with Scrapy sitemap discovery
         
         if "search" in sources:
             urls = await self.discover_from_search(focus_areas, limit=limit_per_source)
@@ -359,7 +334,6 @@ class BatchDiscovery:
         self.log("="*60)
         self.log(f"  Curated URLs discovered:  {self.stats['curated_urls']}")
         self.log(f"  Sitemap URLs discovered:  {self.stats['sitemap_urls']}")
-        self.log(f"  RSS URLs discovered:      {self.stats['rss_urls']}")
         self.log(f"  Search URLs discovered:   {self.stats['search_urls']}")
         self.log(f"  Recheck URLs queued:      {self.stats['recheck_urls']}")
         self.log(f"  Total URLs processed:     {self.stats['total_processed']}")

@@ -2,7 +2,7 @@
  * AI Model Management System
  * 
  * A robust, configurable AI model management system with support for
- * multiple AI service providers (OpenRouter, Groq).
+ * multiple AI service providers (OpenRouter, Gemini).
  * 
  * @example Basic usage
  * ```typescript
@@ -25,17 +25,14 @@
  * 
  * @example Switch between provider configs
  * ```typescript
- * import { setActiveConfig, getActiveConfig, GROQ_CONFIG, GEMINI_CONFIG } from '@/lib/ai'
- * 
- * // Use Groq (free)
- * setActiveConfig('groq')
+ * import { setActiveConfig, getActiveConfig, GEMINI_CONFIG } from '@/lib/ai'
  * 
  * // Use Gemini
  * setActiveConfig('gemini')
  * 
  * // Get current config
  * const config = getActiveConfig()
- * console.log(config.displayName) // "Groq (Free)" or "Google Gemini"
+ * console.log(config.displayName) // "Google Gemini"
  * ```
  */
 
@@ -44,19 +41,15 @@ export { AIModelManager, getAIManager, createAIManager } from './manager'
 
 // Providers
 export { OpenRouterProvider, createOpenRouterProvider } from './providers/openrouter'
-export { GroqProvider, createGroqProvider } from './providers/groq'
 export { GeminiProvider, createGeminiProvider } from './providers/gemini'
 export { BaseProvider } from './providers/base'
 
 // Model Configurations (Modular)
 export {
   // Configs
-  GROQ_CONFIG,
   GEMINI_CONFIG,
   MODEL_CONFIGS,
-  GROQ_MODELS,
   GEMINI_MODELS,
-  GROQ_USE_CASES,
   GEMINI_USE_CASES,
   // Agent recommendations
   AGENT_MODEL_RECOMMENDATIONS,

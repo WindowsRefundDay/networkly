@@ -1,92 +1,104 @@
 "use server"
 
-import { prisma } from "@/lib/prisma"
-import { auth } from "@clerk/nextjs/server"
+import { createClient, requireAuth } from "@/lib/supabase/server"
 
 export async function getAnalyticsSummary() {
-    const { userId } = await auth()
-    if (!userId) return null
+  const supabase = await createClient()
+  const authUser = await requireAuth()
 
-    const user = await prisma.user.findUnique({
-        where: { clerkId: userId },
-        include: {
-            applications: true,
-            analyticsData: true,
-        }
-    })
+  const { data: user, error: userError } = await supabase
+    .from("users")
+    .select("profile_views, search_appearances, connections, completed_projects")
+    .eq("id", authUser.id)
+    .single()
 
-    if (!user) return null
+  if (userError || !user) return null
 
-    const profileViewsData = user.analyticsData?.profileViews
-        ? (user.analyticsData.profileViews as { value: number }[])
-        : generateDefaultSparklineData()
+  const { count: applicationsCount } = await supabase
+    .from("applications")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", authUser.id)
 
-    const networkGrowthData = user.analyticsData?.networkGrowth
-        ? (user.analyticsData.networkGrowth as { value: number }[])
-        : generateDefaultSparklineData()
+  const { data: analyticsData } = await supabase
+    .from("analytics_data")
+    .select("profile_views, network_growth")
+    .eq("user_id", authUser.id)
+    .single()
 
-    const searchAppearancesData = generateDefaultSparklineData()
+  const profileViewsData = analyticsData?.profile_views
+    ? (analyticsData.profile_views as { value: number }[])
+    : generateDefaultSparklineData()
 
-    return {
-        profileViews: {
-            value: user.profileViews,
-            change: "+0%",
-            trend: "up"
-        },
-        searchAppearances: {
-            value: user.searchAppearances,
-            change: "+0%",
-            trend: "up"
-        },
-        connections: {
-            value: user.connections,
-            change: "+0%",
-            trend: "up"
-        },
-        applications: {
-            value: user.applications.length,
-            change: "+0",
-            trend: "up"
-        },
-        projects: {
-            value: user.completedProjects,
-            change: "+0",
-            trend: "up"
-        },
-        sparklineData: {
-            profileViews: profileViewsData,
-            networkGrowth: networkGrowthData,
-            searchAppearances: searchAppearancesData
-        }
-    }
+  const networkGrowthData = analyticsData?.network_growth
+    ? (analyticsData.network_growth as { value: number }[])
+    : generateDefaultSparklineData()
+
+  const searchAppearancesData = generateDefaultSparklineData()
+
+  return {
+    profileViews: {
+      value: user.profile_views,
+      change: "+0%",
+      trend: "up",
+    },
+    searchAppearances: {
+      value: user.search_appearances,
+      change: "+0%",
+      trend: "up",
+    },
+    connections: {
+      value: user.connections,
+      change: "+0%",
+      trend: "up",
+    },
+    applications: {
+      value: applicationsCount || 0,
+      change: "+0",
+      trend: "up",
+    },
+    projects: {
+      value: user.completed_projects,
+      change: "+0",
+      trend: "up",
+    },
+    sparklineData: {
+      profileViews: profileViewsData,
+      networkGrowth: networkGrowthData,
+      searchAppearances: searchAppearancesData,
+    },
+  }
 }
 
 function generateDefaultSparklineData(): { value: number }[] {
-    return Array.from({ length: 7 }, () => ({ value: 0 }))
+  return Array.from({ length: 7 }, () => ({ value: 0 }))
 }
 
 export async function getProfileViewsData() {
-    const { userId } = await auth()
-    if (!userId) throw new Error("Unauthorized")
+  const supabase = await createClient()
+  const authUser = await requireAuth()
 
-    const analytics = await prisma.analyticsData.findUnique({
-        where: { userId: (await prisma.user.findUnique({ where: { clerkId: userId } }))?.id }
-    })
+  const { data: analytics, error } = await supabase
+    .from("analytics_data")
+    .select("profile_views")
+    .eq("user_id", authUser.id)
+    .single()
 
-    if (!analytics || !analytics.profileViews) return []
+  if (error || !analytics || !analytics.profile_views) return []
 
-    return analytics.profileViews as { date: string; views: number }[]
+  return analytics.profile_views as { date: string; views: number }[]
 }
 
 export async function getNetworkGrowthData() {
-    const { userId } = await auth()
-    if (!userId) throw new Error("Unauthorized")
+  const supabase = await createClient()
+  const authUser = await requireAuth()
 
-    const analytics = await prisma.analyticsData.findUnique({
-        where: { userId: (await prisma.user.findUnique({ where: { clerkId: userId } }))?.id }
-    })
+  const { data: analytics, error } = await supabase
+    .from("analytics_data")
+    .select("network_growth")
+    .eq("user_id", authUser.id)
+    .single()
 
-    if (!analytics || !analytics.networkGrowth) return []
+  if (error || !analytics || !analytics.network_growth) return []
 
-    return analytics.networkGrowth as { month: string; connections: number }[]
+  return analytics.network_growth as { month: string; connections: number }[]
 }

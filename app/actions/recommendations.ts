@@ -1,64 +1,67 @@
 "use server"
 
-import { prisma } from "@/lib/prisma"
-import { auth } from "@clerk/nextjs/server"
 import { revalidatePath } from "next/cache"
 
+import { createClient, requireAuth } from "@/lib/supabase/server"
+
 export async function getRecommendations(targetUserId?: string) {
-    const { userId: clerkId } = await auth()
-    if (!clerkId) throw new Error("Unauthorized")
+  const supabase = await createClient()
+  const authUser = await requireAuth()
 
-    let dbUserId = targetUserId
+  const userId = targetUserId || authUser.id
 
-    if (!dbUserId) {
-        const user = await prisma.user.findUnique({
-            where: { clerkId },
-            select: { id: true }
-        })
-        if (!user) return []
-        dbUserId = user.id
-    }
+  const { data: recommendations, error } = await supabase
+    .from("recommendations")
+    .select("*")
+    .eq("receiver_id", userId)
+    .order("created_at", { ascending: false })
 
-    const recommendations = await prisma.recommendation.findMany({
-        where: { receiverId: dbUserId },
-        orderBy: { createdAt: "desc" },
-    })
+  if (error) {
+    console.error("[getRecommendations]", error)
+    return []
+  }
 
-    return recommendations.map(rec => ({
-        id: rec.id,
-        author: rec.authorName,
-        role: rec.authorRole,
-        avatar: rec.authorAvatar,
-        content: rec.content,
-        date: rec.date,
-    }))
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (recommendations || []).map((rec: any) => ({
+    id: rec.id,
+    author: rec.author_name,
+    role: rec.author_role,
+    avatar: rec.author_avatar,
+    content: rec.content,
+    date: rec.date,
+  }))
 }
 
 export async function addRecommendation(data: {
-    receiverId: string
-    content: string
-    authorName: string
-    authorRole: string
-    authorAvatar?: string
-    date: string
+  receiverId: string
+  content: string
+  authorName: string
+  authorRole: string
+  authorAvatar?: string
+  date: string
 }) {
-    const { userId: clerkId } = await auth()
-    if (!clerkId) throw new Error("Unauthorized")
+  const supabase = await createClient()
+  const authUser = await requireAuth()
 
-    const author = await prisma.user.findUnique({
-        where: { clerkId },
-        select: { id: true }
+  const { data: recommendation, error } = await supabase
+    .from("recommendations")
+    .insert({
+      receiver_id: data.receiverId,
+      content: data.content,
+      author_name: data.authorName,
+      author_role: data.authorRole,
+      author_avatar: data.authorAvatar || null,
+      date: data.date,
+      author_id: authUser.id,
     })
+    .select()
+    .single()
 
-    if (!author) throw new Error("Author not found")
+  if (error || !recommendation) {
+    console.error("[addRecommendation]", error)
+    throw new Error("Failed to add recommendation")
+  }
 
-    const recommendation = await prisma.recommendation.create({
-        data: {
-            ...data,
-            authorId: author.id,
-        }
-    })
-
-    revalidatePath("/profile")
-    return recommendation
+  revalidatePath("/profile")
+  return recommendation
 }

@@ -1,60 +1,62 @@
 "use server"
 
-import { prisma } from "@/lib/prisma"
-import { auth } from "@clerk/nextjs/server"
 import { revalidatePath } from "next/cache"
+
+import { createClient, getCurrentUser, requireAuth } from "@/lib/supabase/server"
 
 // ============================================================================
 // ENDORSE SKILL
 // ============================================================================
 
 export async function endorseSkill(endorseeId: string, skill: string) {
-  const { userId: clerkId } = await auth()
-  if (!clerkId) throw new Error("Unauthorized")
+  const supabase = await createClient()
+  const authUser = await requireAuth()
 
-  const endorser = await prisma.user.findUnique({
-    where: { clerkId },
-    select: { id: true },
-  })
-
-  if (!endorser) throw new Error("User not found")
-
-  // Can't endorse yourself
-  if (endorser.id === endorseeId) {
+  if (authUser.id === endorseeId) {
     throw new Error("Cannot endorse your own skills")
   }
 
-  // Verify the endorsee has this skill
-  const endorsee = await prisma.user.findUnique({
-    where: { id: endorseeId },
-    select: { skills: true },
-  })
+  const { data: endorsee, error: endorseeError } = await supabase
+    .from("users")
+    .select("skills")
+    .eq("id", endorseeId)
+    .single()
 
-  if (!endorsee) throw new Error("User not found")
+  if (endorseeError || !endorsee) throw new Error("User not found")
 
   if (!endorsee.skills.includes(skill)) {
     throw new Error("User does not have this skill listed")
   }
 
-  // Create endorsement (or do nothing if it already exists due to unique constraint)
-  try {
-    const endorsement = await prisma.skillEndorsement.create({
-      data: {
-        endorserId: endorser.id,
-        endorseeId,
-        skill,
-      },
-    })
+  const { data: existing } = await supabase
+    .from("skill_endorsements")
+    .select("id")
+    .eq("endorser_id", authUser.id)
+    .eq("endorsee_id", endorseeId)
+    .eq("skill", skill)
+    .single()
 
-    revalidatePath("/profile")
-    return endorsement
-  } catch (error: any) {
-    // If unique constraint violation, it means already endorsed
-    if (error.code === "P2002") {
-      return { alreadyEndorsed: true }
-    }
-    throw error
+  if (existing) {
+    return { alreadyEndorsed: true }
   }
+
+  const { data: endorsement, error: insertError } = await supabase
+    .from("skill_endorsements")
+    .insert({
+      endorser_id: authUser.id,
+      endorsee_id: endorseeId,
+      skill,
+    })
+    .select()
+    .single()
+
+  if (insertError) {
+    console.error("[endorseSkill]", insertError)
+    throw new Error("Failed to endorse skill")
+  }
+
+  revalidatePath("/profile")
+  return endorsement
 }
 
 // ============================================================================
@@ -62,25 +64,20 @@ export async function endorseSkill(endorseeId: string, skill: string) {
 // ============================================================================
 
 export async function removeEndorsement(endorseeId: string, skill: string) {
-  const { userId: clerkId } = await auth()
-  if (!clerkId) throw new Error("Unauthorized")
+  const supabase = await createClient()
+  const authUser = await requireAuth()
 
-  const endorser = await prisma.user.findUnique({
-    where: { clerkId },
-    select: { id: true },
-  })
+  const { error } = await supabase
+    .from("skill_endorsements")
+    .delete()
+    .eq("endorser_id", authUser.id)
+    .eq("endorsee_id", endorseeId)
+    .eq("skill", skill)
 
-  if (!endorser) throw new Error("User not found")
-
-  await prisma.skillEndorsement.delete({
-    where: {
-      endorserId_endorseeId_skill: {
-        endorserId: endorser.id,
-        endorseeId,
-        skill,
-      },
-    },
-  })
+  if (error) {
+    console.error("[removeEndorsement]", error)
+    throw new Error("Failed to remove endorsement")
+  }
 
   revalidatePath("/profile")
   return { success: true }
@@ -91,41 +88,44 @@ export async function removeEndorsement(endorseeId: string, skill: string) {
 // ============================================================================
 
 export async function getSkillEndorsements(userId: string) {
-  const endorsements = await prisma.skillEndorsement.findMany({
-    where: { endorseeId: userId },
-    include: {
-      endorser: {
-        select: {
-          id: true,
-          name: true,
-          avatar: true,
-          headline: true,
-        },
-      },
-    },
-    orderBy: { createdAt: "desc" },
-  })
+  const supabase = await createClient()
 
-  // Group by skill
+  const { data: endorsements, error } = await supabase
+    .from("skill_endorsements")
+    .select(
+      `
+      *,
+      endorser:users!skill_endorsements_endorser_id_fkey(id, name, avatar, headline)
+    `
+    )
+    .eq("endorsee_id", userId)
+    .order("created_at", { ascending: false })
+
+  if (error) {
+    console.error("[getSkillEndorsements]", error)
+    return []
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const groupedBySkill: Record<string, any[]> = {}
 
-  endorsements.forEach((endorsement) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(endorsements || []).forEach((endorsement: any) => {
     if (!groupedBySkill[endorsement.skill]) {
       groupedBySkill[endorsement.skill] = []
     }
     groupedBySkill[endorsement.skill].push({
       id: endorsement.id,
       endorser: {
-        id: endorsement.endorser.id,
-        name: endorsement.endorser.name,
-        avatar: endorsement.endorser.avatar,
-        headline: endorsement.endorser.headline,
+        id: endorsement.endorser?.id,
+        name: endorsement.endorser?.name,
+        avatar: endorsement.endorser?.avatar,
+        headline: endorsement.endorser?.headline,
       },
-      createdAt: endorsement.createdAt.toISOString(),
+      createdAt: endorsement.created_at,
     })
   })
 
-  // Convert to array format with counts
   const skillEndorsements = Object.entries(groupedBySkill).map(
     ([skill, endorsers]) => ({
       skill,
@@ -134,7 +134,6 @@ export async function getSkillEndorsements(userId: string) {
     })
   )
 
-  // Sort by count descending
   skillEndorsements.sort((a, b) => b.count - a.count)
 
   return skillEndorsements
@@ -145,36 +144,31 @@ export async function getSkillEndorsements(userId: string) {
 // ============================================================================
 
 export async function getMyEndorsements() {
-  const { userId: clerkId } = await auth()
-  if (!clerkId) throw new Error("Unauthorized")
+  const supabase = await createClient()
+  const authUser = await requireAuth()
 
-  const user = await prisma.user.findUnique({
-    where: { clerkId },
-    select: { id: true },
-  })
+  const { data: endorsements, error } = await supabase
+    .from("skill_endorsements")
+    .select(
+      `
+      *,
+      endorsee:users!skill_endorsements_endorsee_id_fkey(id, name, avatar, headline)
+    `
+    )
+    .eq("endorser_id", authUser.id)
+    .order("created_at", { ascending: false })
 
-  if (!user) throw new Error("User not found")
+  if (error) {
+    console.error("[getMyEndorsements]", error)
+    return []
+  }
 
-  const endorsements = await prisma.skillEndorsement.findMany({
-    where: { endorserId: user.id },
-    include: {
-      endorsee: {
-        select: {
-          id: true,
-          name: true,
-          avatar: true,
-          headline: true,
-        },
-      },
-    },
-    orderBy: { createdAt: "desc" },
-  })
-
-  return endorsements.map((e) => ({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (endorsements || []).map((e: any) => ({
     id: e.id,
     skill: e.skill,
     endorsee: e.endorsee,
-    createdAt: e.createdAt.toISOString(),
+    createdAt: e.created_at,
   }))
 }
 
@@ -183,25 +177,17 @@ export async function getMyEndorsements() {
 // ============================================================================
 
 export async function hasEndorsed(endorseeId: string, skill: string) {
-  const { userId: clerkId } = await auth()
-  if (!clerkId) return false
+  const supabase = await createClient()
+  const authUser = await getCurrentUser()
+  if (!authUser) return false
 
-  const user = await prisma.user.findUnique({
-    where: { clerkId },
-    select: { id: true },
-  })
-
-  if (!user) return false
-
-  const endorsement = await prisma.skillEndorsement.findUnique({
-    where: {
-      endorserId_endorseeId_skill: {
-        endorserId: user.id,
-        endorseeId,
-        skill,
-      },
-    },
-  })
+  const { data: endorsement } = await supabase
+    .from("skill_endorsements")
+    .select("id")
+    .eq("endorser_id", authUser.id)
+    .eq("endorsee_id", endorseeId)
+    .eq("skill", skill)
+    .single()
 
   return !!endorsement
 }

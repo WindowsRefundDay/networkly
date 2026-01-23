@@ -2,7 +2,7 @@
  * AI Model Manager - Central orchestration for multi-provider AI
  * 
  * Features:
- * - Multi-provider support (OpenRouter, Groq)
+ * - Multi-provider support (OpenRouter, Gemini)
  * - Use case-based model selection
  * - Automatic fallback handling
  * - Health monitoring
@@ -28,53 +28,59 @@ import type {
 import { AIProviderError, AIManagerConfigSchema } from './types'
 import { BaseProvider } from './providers/base'
 import { OpenRouterProvider } from './providers/openrouter'
-import { GroqProvider } from './providers/groq'
+
 import { GeminiProvider } from './providers/gemini'
 import { logger } from './utils/logger'
 import { DEFAULT_USE_CASE_MODELS } from './model-configs'
 
-// Use case to model mapping defaults - Prioritize Groq (FREE)
-// Based on benchmarks: GPT-OSS 120B (90% MMLU), Llama 3.3 (86% MMLU)
-// Preview models marked with (Preview) suffix may be discontinued without notice
-// NOTE: For chat with tool calling, use llama-3.3-70b which has reliable tool support
+let logQueryFn: any = null
+try {
+  const loggerModule = require('./query-logger')
+  logQueryFn = loggerModule.logQuery
+} catch (e) {
+  logQueryFn = async () => {}
+}
+
+// Use case to model mapping defaults - Using Gemini 2.5 STABLE models only
+// Model IDs: gemini-2.5-pro, gemini-2.5-flash (gemini-2.5-flash-lite does NOT exist)
+// NO preview suffixes - these are production-ready stable models
 const DEFAULT_USE_CASE_MODELS_INTERNAL: Record<UseCase, { primary: string; fallbacks: string[] }> = {
   'chat': {
-    // llama-3.3-70b has reliable tool calling support on Groq
-    primary: 'llama-3.3-70b-versatile',
-    fallbacks: ['groq/compound', 'llama-3.1-8b-instant'],
+    // gemini-2.5-flash - best balance of speed/quality/cost with tool calling
+    primary: 'gemini-2.5-flash',
+    fallbacks: ['gemini-2.5-pro', 'gemini-2.0-flash'],
   },
   'analysis': {
-    // llama-3.3-70b for reliable tool calling, Kimi has inconsistent tool support
-    primary: 'llama-3.3-70b-versatile',
-    fallbacks: ['qwen/qwen3-32b', 'groq/compound'],
+    primary: 'gemini-2.5-flash',
+    fallbacks: ['gemini-2.5-pro', 'gemini-2.0-flash'],
   },
   'code-generation': {
-    primary: 'qwen/qwen3-32b',
-    fallbacks: ['llama-3.3-70b-versatile', 'groq/compound'],
+    primary: 'gemini-2.5-flash',
+    fallbacks: ['gemini-2.5-pro', 'gemini-2.0-flash'],
   },
   'summarization': {
-    primary: 'llama-3.1-8b-instant',
-    fallbacks: ['openai/gpt-oss-20b', 'llama-3.3-70b-versatile'],
+    primary: 'gemini-2.5-flash',
+    fallbacks: ['gemini-2.5-pro', 'gemini-2.0-flash'],
   },
   'extraction': {
-    primary: 'groq/compound',
-    fallbacks: ['llama-3.3-70b-versatile', 'qwen/qwen3-32b'],
+    primary: 'gemini-2.5-flash',
+    fallbacks: ['gemini-2.5-pro', 'gemini-2.0-flash'],
   },
   'vision': {
-    primary: 'llama-3.3-70b-versatile',
-    fallbacks: ['groq/compound', 'llama-3.1-8b-instant'],
+    primary: 'gemini-2.5-flash',
+    fallbacks: ['gemini-2.5-pro', 'gemini-2.0-flash'],
   },
   'fast-response': {
-    primary: 'llama-3.1-8b-instant',
-    fallbacks: ['openai/gpt-oss-20b', 'groq/compound'],
+    primary: 'gemini-2.5-flash',
+    fallbacks: ['gemini-2.0-flash', 'gemini-2.5-pro'],
   },
   'high-quality': {
-    primary: 'meta-llama/llama-4-maverick-17b-128e-instruct',
-    fallbacks: ['llama-3.3-70b-versatile', 'groq/compound'],
+    primary: 'gemini-2.5-pro',
+    fallbacks: ['gemini-2.5-flash', 'gemini-2.0-flash'],
   },
   'cost-effective': {
-    primary: 'llama-3.1-8b-instant',
-    fallbacks: ['openai/gpt-oss-20b', 'llama-3.3-70b-versatile'],
+    primary: 'gemini-2.5-flash',
+    fallbacks: ['gemini-2.0-flash', 'gemini-2.5-pro'],
   },
 }
 
@@ -119,9 +125,7 @@ const DEFAULT_USE_CASE_MODELS_INTERNAL: Record<UseCase, { primary: string; fallb
         case 'openrouter':
           provider = new OpenRouterProvider(providerConfig)
           break
-        case 'groq':
-          provider = new GroqProvider(providerConfig)
-          break
+
         case 'gemini':
           // Gemini uses a different provider class
           this.geminiProvider = new GeminiProvider(providerConfig)
@@ -198,19 +202,7 @@ const DEFAULT_USE_CASE_MODELS_INTERNAL: Record<UseCase, { primary: string; fallb
       })
     }
 
-    // Groq
-    const groqKey = process.env.GROQ_API_KEY
-    if (groqKey) {
-      providers.push({
-        name: 'groq',
-        apiKey: groqKey,
-        baseUrl: process.env.GROQ_BASE_URL || 'https://api.groq.com/openai/v1/chat/completions',
-        defaultModel: process.env.GROQ_DEFAULT_MODEL || 'llama-3.3-70b-versatile',
-        enabled: true,
-        timeout: parseInt(process.env.AI_TIMEOUT || '30000', 10),
-        maxRetries: parseInt(process.env.AI_MAX_RETRIES || '3', 10),
-      })
-    }
+
 
     // Gemini (Google AI)
     const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY
@@ -219,7 +211,7 @@ const DEFAULT_USE_CASE_MODELS_INTERNAL: Record<UseCase, { primary: string; fallb
         name: 'gemini',
         apiKey: geminiKey,
         baseUrl: 'https://generativelanguage.googleapis.com',
-        defaultModel: process.env.GEMINI_DEFAULT_MODEL || 'gemini-2.0-flash',
+        defaultModel: process.env.GEMINI_DEFAULT_MODEL || 'gemini-2.5-flash',
         enabled: true,
         timeout: parseInt(process.env.AI_TIMEOUT || '60000', 10),
         maxRetries: parseInt(process.env.AI_MAX_RETRIES || '3', 10),
@@ -227,7 +219,7 @@ const DEFAULT_USE_CASE_MODELS_INTERNAL: Record<UseCase, { primary: string; fallb
     }
 
     if (providers.length === 0) {
-      throw new Error('No AI providers configured. Set OPENROUTER_API_KEY, GROQ_API_KEY, or GEMINI_API_KEY.')
+      throw new Error('No AI providers configured. Set OPENROUTER_API_KEY or GEMINI_API_KEY.')
     }
 
     this.initialize({
@@ -285,8 +277,12 @@ const DEFAULT_USE_CASE_MODELS_INTERNAL: Record<UseCase, { primary: string; fallb
   private parseModelId(fullModelId: string): [ProviderName, string] {
     const colonIndex = fullModelId.indexOf(':')
     if (colonIndex === -1) {
-      // Default to groq for backward compatibility
-      return ['groq', fullModelId]
+      // Auto-detect provider from model name prefix
+      if (fullModelId.startsWith('gemini-')) {
+        return ['gemini', fullModelId]
+      }
+      // Default to openrouter for models without explicit provider
+      return ['openrouter', fullModelId]
     }
     return [
       fullModelId.substring(0, colonIndex) as ProviderName,
@@ -298,6 +294,11 @@ const DEFAULT_USE_CASE_MODELS_INTERNAL: Record<UseCase, { primary: string; fallb
    * Complete a chat with automatic fallback
    */
   async complete(options: CompletionOptions & { useCase?: UseCase }): Promise<CompletionResult> {
+    const startTime = Date.now()
+    const useCase = options.useCase || 'chat'
+    const firstPrompt = Array.isArray(options.messages) && options.messages.length > 0
+      ? (typeof options.messages[0].content === 'string' ? options.messages[0].content : JSON.stringify(options.messages[0].content))
+      : ''
     const modelsToTry = this.getModelsForRequest(options)
 
     let lastError: Error | undefined
@@ -305,7 +306,6 @@ const DEFAULT_USE_CASE_MODELS_INTERNAL: Record<UseCase, { primary: string; fallb
     for (const fullModelId of modelsToTry) {
       const [providerName, modelId] = this.parseModelId(fullModelId)
 
-      // Check provider health
       const status = this.providerStatuses.get(providerName)
       if (status && status.consecutiveFailures >= 5) {
         logger.warn('AIManager', `Skipping unhealthy provider: ${providerName}`)
@@ -315,7 +315,6 @@ const DEFAULT_USE_CASE_MODELS_INTERNAL: Record<UseCase, { primary: string; fallb
       try {
         let result: CompletionResult
 
-        // Handle Gemini provider separately
         if (providerName === 'gemini' && this.geminiProvider) {
           result = await this.geminiProvider.complete({
             ...options,
@@ -333,17 +332,27 @@ const DEFAULT_USE_CASE_MODELS_INTERNAL: Record<UseCase, { primary: string; fallb
           })
         }
 
-        // Update provider status on success
         if (status) {
           status.consecutiveFailures = 0
           status.healthy = true
+        }
+
+        if (logQueryFn) {
+          logQueryFn({
+            useCase,
+            provider: providerName,
+            model: modelId,
+            prompt: firstPrompt.slice(0, 200),
+            success: true,
+            latencyMs: Date.now() - startTime,
+            tokensUsed: result.usage?.totalTokens
+          }).catch(() => {})
         }
 
         return result
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error))
         
-        // Update provider status on failure
         if (status) {
           status.consecutiveFailures++
           if (status.consecutiveFailures >= 3) {
@@ -351,12 +360,23 @@ const DEFAULT_USE_CASE_MODELS_INTERNAL: Record<UseCase, { primary: string; fallb
           }
         }
 
-        // Log and try next model
         const nextModel = modelsToTry[modelsToTry.indexOf(fullModelId) + 1]
         if (nextModel) {
           logger.fallback(fullModelId, nextModel, lastError.message)
         }
       }
+    }
+
+    if (logQueryFn) {
+      logQueryFn({
+        useCase,
+        provider: 'unknown',
+        model: modelsToTry[0] || 'unknown',
+        prompt: firstPrompt.slice(0, 200),
+        success: false,
+        error: lastError?.message || 'All models failed',
+        latencyMs: Date.now() - startTime
+      }).catch(() => {})
     }
 
     throw lastError || new Error('All models failed')
@@ -428,7 +448,7 @@ const DEFAULT_USE_CASE_MODELS_INTERNAL: Record<UseCase, { primary: string; fallb
 
   /**
    * Get ordered list of models to try for a request
-   * Uses DEFAULT_USE_CASE_MODELS with optimal Groq models based on benchmarks
+   * Uses DEFAULT_USE_CASE_MODELS with optimal Gemini models
    */
   private getModelsForRequest(options: CompletionOptions & { useCase?: UseCase }): string[] {
     // If specific model requested, use it with fallbacks
@@ -600,4 +620,4 @@ export function createAIManager(config: AIManagerConfig): AIModelManager {
 }
 
 // Re-export providers for direct use if needed
-export { OpenRouterProvider, GroqProvider, GeminiProvider }
+export { OpenRouterProvider, GeminiProvider }

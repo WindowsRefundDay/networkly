@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
+import Image from "next/image"
 import {
   Home,
   User,
@@ -20,6 +21,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useUser } from "@clerk/nextjs"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { useTheme } from "next-themes"
+import { useHasMounted } from "@/hooks/use-has-mounted"
 
 const navigation = [
   { name: "Home", href: "/dashboard", icon: Home },
@@ -40,10 +43,18 @@ interface SidebarProps {
 export function Sidebar({ isCollapsed = false, toggleCollapse }: SidebarProps) {
   const pathname = usePathname()
   const { user } = useUser()
+  const { theme } = useTheme()
+  const hasMounted = useHasMounted()
+
 
   const userName = user?.fullName || user?.firstName || "User"
   const userAvatar = user?.imageUrl || "/placeholder.svg"
   const userInitials = userName.split(" ").map(n => n[0]).join("").toUpperCase()
+
+  // Full logo for expanded sidebar
+  const logoSrc = hasMounted && theme === 'dark' ? '/networkly-logo-dark.png' : '/networkly-logo.png'
+  // Mini logo for collapsed sidebar
+  const logoMiniSrc = hasMounted && theme === 'dark' ? '/networkly-logo-mini.png' : '/networkly-logo-mini-dark.png'
 
   return (
     <aside
@@ -53,10 +64,25 @@ export function Sidebar({ isCollapsed = false, toggleCollapse }: SidebarProps) {
       )}
     >
       <div className={cn("flex h-16 items-center border-b border-border px-6", isCollapsed ? "justify-center px-0" : "gap-2")}>
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary shrink-0">
-          <Sparkles className="h-5 w-5 text-primary-foreground" />
-        </div>
-        {!isCollapsed && <span className="text-xl font-bold text-foreground">Networkly</span>}
+        {!isCollapsed ? (
+          <Image
+            src={logoSrc}
+            alt="Networkly"
+            width={120}
+            height={40}
+            className="object-contain"
+            priority
+          />
+        ) : (
+          <Image
+            src={logoMiniSrc}
+            alt="Networkly"
+            width={40}
+            height={40}
+            className="object-contain"
+            priority
+          />
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-6">
