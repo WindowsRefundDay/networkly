@@ -1,206 +1,192 @@
 "use server"
 
-import { prisma } from "@/lib/prisma"
-import { auth } from "@clerk/nextjs/server"
 import { cache } from "react"
 
-// ============================================================================
-// GET CURRENT USER (with React cache for deduplication)
-// ============================================================================
+import { createClient, requireAuth } from "@/lib/supabase/server"
 
 async function fetchCurrentUser() {
-    const { userId } = await auth()
-    if (!userId) return null
+  const supabase = await createClient()
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser()
+  if (!authUser) return null
 
-    const user = await prisma.user.findUnique({
-        where: { clerkId: userId },
-        include: {
-            achievements: true,
-            extracurriculars: true,
-            analyticsData: true,
-        },
-    })
+  const { data: user, error } = await supabase
+    .from("users")
+    .select(
+      `
+            *,
+            achievements (*),
+            extracurriculars (*),
+            analytics_data (*)
+        `
+    )
+    .eq("id", authUser.id)
+    .single()
 
-    if (!user) return null
+  if (error || !user) return null
 
-    return {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        avatar: user.avatar,
-        headline: user.headline,
-        bio: user.bio,
-        location: user.location,
-        university: user.university,
-        graduationYear: user.graduationYear?.toString() || null,
-        skills: user.skills,
-        interests: user.interests,
-        connections: user.connections,
-        profileViews: user.profileViews,
-        searchAppearances: user.searchAppearances,
-        completedProjects: user.completedProjects,
-        linkedinUrl: (user as any).linkedinUrl || null,
-        githubUrl: (user as any).githubUrl || null,
-        portfolioUrl: (user as any).portfolioUrl || null,
-        achievements: user.achievements.map((a) => ({
-            id: a.id,
-            title: a.title,
-            date: a.date,
-            icon: a.icon,
-        })),
-        extracurriculars: user.extracurriculars.map((e) => ({
-            id: e.id,
-            title: e.title,
-            organization: e.organization,
-            type: e.type,
-            startDate: e.startDate,
-            endDate: e.endDate,
-            description: e.description,
-            logo: e.logo,
-        })),
-    }
+  const analyticsData = Array.isArray(user.analytics_data) ? user.analytics_data[0] : user.analytics_data
+
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    avatar: user.avatar,
+    headline: user.headline,
+    bio: user.bio,
+    location: user.location,
+    university: user.university,
+    graduationYear: user.graduation_year?.toString() || null,
+    skills: user.skills,
+    interests: user.interests,
+    connections: user.connections,
+    profileViews: user.profile_views,
+    searchAppearances: user.search_appearances,
+    completedProjects: user.completed_projects,
+    linkedinUrl: user.linkedin_url || null,
+    githubUrl: user.github_url || null,
+    portfolioUrl: user.portfolio_url || null,
+    achievements: (user.achievements || []).map((a: { id: string; title: string; date: string; icon: string }) => ({
+      id: a.id,
+      title: a.title,
+      date: a.date,
+      icon: a.icon,
+    })),
+    extracurriculars: (user.extracurriculars || []).map(
+      (e: {
+        id: string
+        title: string
+        organization: string
+        type: string
+        start_date: string
+        end_date: string
+        description: string | null
+        logo: string | null
+      }) => ({
+        id: e.id,
+        title: e.title,
+        organization: e.organization,
+        type: e.type,
+        startDate: e.start_date,
+        endDate: e.end_date,
+        description: e.description,
+        logo: e.logo,
+      })
+    ),
+    analyticsData: analyticsData || null,
+  }
 }
 
-// Cache the user fetch to deduplicate requests within the same render
 export const getCurrentUser = cache(fetchCurrentUser)
 
-// ============================================================================
-// GET USER ANALYTICS
-// ============================================================================
-
 export async function getUserAnalytics() {
-    const { userId } = await auth()
-    if (!userId) return null
+  const supabase = await createClient()
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser()
+  if (!authUser) return null
 
-    const user = await prisma.user.findUnique({
-        where: { clerkId: userId },
-        include: {
-            analyticsData: true,
-        },
-    })
+  const { data: analyticsData } = await supabase
+    .from("analytics_data")
+    .select("*")
+    .eq("user_id", authUser.id)
+    .single()
 
-    if (!user || !user.analyticsData) {
-        return {
-            profileViews: [],
-            networkGrowth: [],
-            skillEndorsements: [],
-        }
-    }
-
+  if (!analyticsData) {
     return {
-        profileViews: user.analyticsData.profileViews as { date: string; views: number }[],
-        networkGrowth: user.analyticsData.networkGrowth as { month: string; connections: number }[],
-        skillEndorsements: user.analyticsData.skillEndorsements as { skill: string; count: number }[],
+      profileViews: [],
+      networkGrowth: [],
+      skillEndorsements: [],
     }
-}
+  }
 
-// ============================================================================
-// UPDATE USER PROFILE
-// ============================================================================
+  return {
+    profileViews: analyticsData.profile_views as { date: string; views: number }[],
+    networkGrowth: analyticsData.network_growth as { month: string; connections: number }[],
+    skillEndorsements: analyticsData.skill_endorsements as { skill: string; count: number }[],
+  }
+}
 
 export async function updateUserProfile(data: {
-    name?: string
-    headline?: string
-    bio?: string
-    location?: string
-    university?: string
-    graduationYear?: number
-    skills?: string[]
-    interests?: string[]
+  name?: string
+  headline?: string
+  bio?: string
+  location?: string
+  university?: string
+  graduationYear?: number
+  skills?: string[]
+  interests?: string[]
 }) {
-    const { userId } = await auth()
-    if (!userId) throw new Error("Unauthorized")
+  const authUser = await requireAuth()
+  const supabase = await createClient()
 
-    const user = await prisma.user.update({
-        where: { clerkId: userId },
-        data,
-    })
+  const updateData: Record<string, unknown> = {}
+  if (data.name !== undefined) updateData.name = data.name
+  if (data.headline !== undefined) updateData.headline = data.headline
+  if (data.bio !== undefined) updateData.bio = data.bio
+  if (data.location !== undefined) updateData.location = data.location
+  if (data.university !== undefined) updateData.university = data.university
+  if (data.graduationYear !== undefined) updateData.graduation_year = data.graduationYear
+  if (data.skills !== undefined) updateData.skills = data.skills
+  if (data.interests !== undefined) updateData.interests = data.interests
 
-    return user
+  const { data: user, error } = await supabase
+    .from("users")
+    .update(updateData)
+    .eq("id", authUser.id)
+    .select()
+    .single()
+
+  if (error) throw new Error(error.message)
+  return user
 }
-
-// ============================================================================
-// GET EVENTS
-// ============================================================================
 
 export async function getEvents() {
-    const events = await prisma.event.findMany({
-        orderBy: { createdAt: "desc" },
-    })
+  const supabase = await createClient()
 
-    return events.map((event) => ({
-        id: event.id,
-        title: event.title,
-        date: event.date,
-        location: event.location,
-        type: event.type,
-        attendees: event.attendees,
-        image: event.image,
-    }))
+  const { data: events, error } = await supabase
+    .from("events")
+    .select("*")
+    .order("created_at", { ascending: false })
+
+  if (error) throw new Error(error.message)
+
+  return (events || []).map((event) => ({
+    id: event.id,
+    title: event.title,
+    date: event.date,
+    location: event.location,
+    type: event.type,
+    attendees: event.attendees,
+    image: event.image,
+  }))
 }
-
-// ============================================================================
-// SYNC USER FROM CLERK
-// ============================================================================
-
-export async function syncUserFromClerk(clerkUser: {
-    id: string
-    emailAddresses: { emailAddress: string }[]
-    firstName: string | null
-    lastName: string | null
-    imageUrl: string | null
-}) {
-    const email = clerkUser.emailAddresses[0]?.emailAddress
-    const name = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") || "User"
-
-    const user = await prisma.user.upsert({
-        where: { clerkId: clerkUser.id },
-        update: {
-            email,
-            name,
-            avatar: clerkUser.imageUrl,
-        },
-        create: {
-            clerkId: clerkUser.id,
-            email,
-            name,
-            avatar: clerkUser.imageUrl,
-        },
-    })
-
-    return user
-}
-
-// ============================================================================
-// GET USER PROFILE (Extended profile data for high school students)
-// ============================================================================
 
 export async function getUserProfile() {
-    const { userId } = await auth()
-    if (!userId) return null
+  const supabase = await createClient()
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser()
+  if (!authUser) return null
 
-    const user = await prisma.user.findUnique({
-        where: { clerkId: userId },
-        select: { id: true },
-    })
+  const { data: userProfile } = await supabase
+    .from("user_profiles")
+    .select("*")
+    .eq("user_id", authUser.id)
+    .single()
 
-    if (!user) return null
+  if (!userProfile) return null
 
-    const userProfile = await prisma.userProfile.findUnique({
-        where: { userId: user.id },
-    })
-
-    if (!userProfile) return null
-
-    return {
-        id: userProfile.id,
-        school: userProfile.school,
-        grade_level: userProfile.grade_level,
-        interests: userProfile.interests,
-        location: userProfile.location,
-        career_goals: userProfile.career_goals,
-        preferred_opportunity_types: userProfile.preferred_opportunity_types,
-        academic_strengths: userProfile.academic_strengths,
-        availability: userProfile.availability,
-    }
+  return {
+    id: userProfile.id,
+    school: userProfile.school,
+    grade_level: userProfile.grade_level,
+    interests: userProfile.interests,
+    location: userProfile.location,
+    career_goals: userProfile.career_goals,
+    preferred_opportunity_types: userProfile.preferred_opportunity_types,
+    academic_strengths: userProfile.academic_strengths,
+    availability: userProfile.availability,
+  }
 }

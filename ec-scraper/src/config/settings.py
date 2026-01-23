@@ -24,9 +24,9 @@ class Settings(BaseSettings):
 
     # Gemini Model Configuration
     # Main model: Used for discovery, planning, and complex reasoning tasks
-    gemini_pro_model: str = "gemini-3-flash-preview"
+    gemini_pro_model: str = "gemini-2.5-flash"
     # Fast model: Used for extraction, matching, profiling (when use_fast_model=True)
-    gemini_flash_model: str = "gemini-2.5-flash-lite"
+    gemini_flash_model: str = "gemini-2.0-flash-lite"
 
     # Groq Model Configuration (used when api_mode="groq")
     groq_model: str = "llama-3.3-70b-versatile"

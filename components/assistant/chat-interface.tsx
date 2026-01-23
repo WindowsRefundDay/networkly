@@ -5,14 +5,14 @@
  * 
  * Features:
  * - Streams AI responses with tool calling
- * - Renders opportunity cards inline
+ * - Renders opportunity cards inline (via {{card:id}} syntax)
  * - Handles bookmark/discovery confirmations
  * - Integrates web discovery with live progress
  * - Save/load chat session
  */
 
 import type React from 'react'
-import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -22,6 +22,7 @@ import { useUser } from '@clerk/nextjs'
 import { OpportunityGrid, type InlineOpportunity } from './opportunity-card-inline'
 import { SimpleLoading, DiscoveryLoading, TypingIndicator } from './simple-loading'
 import { WebDiscoveryConfirm } from './action-buttons'
+import { MarkdownMessage } from './markdown-message'
 import { saveChatSession, getSavedChatSession, type ChatSession } from '@/app/actions/chat'
 import { useInlineDiscovery } from '@/hooks/use-inline-discovery'
 
@@ -31,6 +32,8 @@ interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   opportunities?: InlineOpportunity[]
+  // Cache of opportunities by ID for inline card rendering
+  opportunityCache?: Record<string, InlineOpportunity>
   isStreaming?: boolean
   toolStatus?: string
   // For discovery prompt
@@ -67,6 +70,7 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
   const [toolStatus, setToolStatus] = useState<string | null>(null)
   const [pendingDiscoveryQuery, setPendingDiscoveryQuery] = useState<string | null>(null)
   const [bookmarkingId, setBookmarkingId] = useState<string | null>(null)
+  const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set())
   const [hasSavedSession, setHasSavedSession] = useState(false)
 
   const scrollAreaRef = useRef<HTMLDivElement>(null)
@@ -75,6 +79,24 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
 
   const userName = user?.fullName || user?.firstName || 'User'
   const userAvatar = user?.imageUrl || '/placeholder.svg'
+
+  // Build a global opportunity cache from all messages
+  const globalOpportunityCache = useMemo(() => {
+    const cache: Record<string, InlineOpportunity> = {}
+    for (const message of messages) {
+      // Add from message's opportunities array
+      if (message.opportunities) {
+        for (const opp of message.opportunities) {
+          cache[opp.id] = opp
+        }
+      }
+      // Add from message's opportunityCache
+      if (message.opportunityCache) {
+        Object.assign(cache, message.opportunityCache)
+      }
+    }
+    return cache
+  }, [messages])
 
   // Inline discovery hook
   const { progress: discoveryProgress, isActive: isDiscovering, startDiscovery, stopDiscovery } = useInlineDiscovery({
@@ -85,9 +107,11 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
         if (discoveryMsgIndex >= 0) {
           const msg = prev[discoveryMsgIndex]
           const newOpps = [...(msg.opportunities || []), opportunity]
+          // Also update the cache
+          const newCache = { ...(msg.opportunityCache || {}), [opportunity.id]: opportunity }
           return [
             ...prev.slice(0, discoveryMsgIndex),
-            { ...msg, opportunities: newOpps },
+            { ...msg, opportunities: newOpps, opportunityCache: newCache },
             ...prev.slice(discoveryMsgIndex + 1),
           ]
         }
@@ -104,10 +128,16 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
           ? `Great news! I found ${opportunities.length} opportunities for you:`
           : "I searched the web but couldn't find any new opportunities matching your criteria. Try a different search term?"
 
+        // Build cache from opportunities
+        const cache: Record<string, InlineOpportunity> = {}
+        for (const opp of opportunities) {
+          cache[opp.id] = opp
+        }
+
         if (discoveryMsgIndex >= 0) {
           return [
             ...prev.slice(0, discoveryMsgIndex),
-            { ...prev[discoveryMsgIndex], content, opportunities, isStreaming: false },
+            { ...prev[discoveryMsgIndex], content, opportunities, opportunityCache: cache, isStreaming: false },
             ...prev.slice(discoveryMsgIndex + 1),
           ]
         }
@@ -117,6 +147,7 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
           role: 'assistant' as const,
           content,
           opportunities,
+          opportunityCache: cache,
         }]
       })
     },
@@ -199,6 +230,7 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
       const decoder = new TextDecoder()
       let accumulatedContent = ''
       let accumulatedOpportunities: InlineOpportunity[] = []
+      let opportunityCache: Record<string, InlineOpportunity> = {}
 
       while (true) {
         const { done, value } = await reader.read()
@@ -220,7 +252,7 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
                   accumulatedContent += event.textDelta || ''
                   setMessages(prev => prev.map(m =>
                     m.id === assistantId
-                      ? { ...m, content: accumulatedContent }
+                      ? { ...m, content: accumulatedContent, opportunityCache }
                       : m
                   ))
                   setToolStatus(null)
@@ -233,9 +265,13 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
                 case 'opportunities':
                   if (event.opportunities) {
                     accumulatedOpportunities = [...accumulatedOpportunities, ...event.opportunities]
+                    // Build cache from opportunities
+                    for (const opp of event.opportunities) {
+                      opportunityCache[opp.id] = opp
+                    }
                     setMessages(prev => prev.map(m =>
                       m.id === assistantId
-                        ? { ...m, opportunities: accumulatedOpportunities }
+                        ? { ...m, opportunities: accumulatedOpportunities, opportunityCache }
                         : m
                     ))
                   }
@@ -268,7 +304,7 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
       // Finalize the message
       setMessages(prev => prev.map(m =>
         m.id === assistantId
-          ? { ...m, isStreaming: false }
+          ? { ...m, isStreaming: false, opportunityCache }
           : m
       ))
 
@@ -295,12 +331,22 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
     },
     loadSession: (session: ChatSession) => {
       if (session && session.messages.length > 0) {
-        setMessages(session.messages.map((m, i) => ({
-          id: `loaded-${i}`,
-          role: m.role as 'user' | 'assistant',
-          content: m.content,
-          opportunities: m.opportunities as InlineOpportunity[] | undefined,
-        })))
+        setMessages(session.messages.map((m, i) => {
+          // Build cache from opportunities
+          const cache: Record<string, InlineOpportunity> = {}
+          if (m.opportunities) {
+            for (const opp of m.opportunities as InlineOpportunity[]) {
+              cache[opp.id] = opp
+            }
+          }
+          return {
+            id: `loaded-${i}`,
+            role: m.role as 'user' | 'assistant',
+            content: m.content,
+            opportunities: m.opportunities as InlineOpportunity[] | undefined,
+            opportunityCache: Object.keys(cache).length > 0 ? cache : undefined,
+          }
+        }))
         setHasSavedSession(true)
       }
     }
@@ -319,6 +365,9 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
 
   // Handle bookmark
   const handleBookmark = async (opportunityId: string, opportunityTitle: string) => {
+    // Don't bookmark if already bookmarked
+    if (bookmarkedIds.has(opportunityId)) return
+
     setBookmarkingId(opportunityId)
     try {
       const response = await fetch('/api/chat', {
@@ -332,6 +381,9 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
       const result = await response.json()
 
       if (result.success) {
+        // Add to bookmarked set
+        setBookmarkedIds(prev => new Set([...prev, opportunityId]))
+        
         // Add confirmation message
         setMessages(prev => [...prev, {
           id: generateId(),
@@ -399,12 +451,22 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
   const handleLoadChat = async () => {
     const session = await getSavedChatSession()
     if (session && session.messages.length > 0) {
-      setMessages(session.messages.map((m, i) => ({
-        id: `loaded-${i}`,
-        role: m.role as 'user' | 'assistant',
-        content: m.content,
-        opportunities: m.opportunities as InlineOpportunity[] | undefined,
-      })))
+      setMessages(session.messages.map((m, i) => {
+        // Build cache from opportunities
+        const cache: Record<string, InlineOpportunity> = {}
+        if (m.opportunities) {
+          for (const opp of m.opportunities as InlineOpportunity[]) {
+            cache[opp.id] = opp
+          }
+        }
+        return {
+          id: `loaded-${i}`,
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+          opportunities: m.opportunities as InlineOpportunity[] | undefined,
+          opportunityCache: Object.keys(cache).length > 0 ? cache : undefined,
+        }
+      }))
     }
   }
 
@@ -419,6 +481,7 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
     setIsLoading(false)
     setToolStatus(null)
     setPendingDiscoveryQuery(null)
+    setBookmarkedIds(new Set())
   }
 
   return (
@@ -530,7 +593,13 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
                         }`}
                     >
                       {message.content ? (
-                        <p className="text-base whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                        <MarkdownMessage 
+                          content={message.content}
+                          opportunityCache={globalOpportunityCache}
+                          onBookmark={handleBookmark}
+                          bookmarkingId={bookmarkingId || undefined}
+                          bookmarkedIds={bookmarkedIds}
+                        />
                       ) : message.isStreaming ? (
                         <TypingIndicator />
                       ) : null}
@@ -542,6 +611,7 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
                           opportunities={message.opportunities}
                           onBookmark={handleBookmark}
                           bookmarkingId={bookmarkingId || undefined}
+                          bookmarkedIds={bookmarkedIds}
                         />
                       </div>
                     )}

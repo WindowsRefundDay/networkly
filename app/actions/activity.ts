@@ -1,7 +1,6 @@
 "use server"
 
-import { prisma } from "@/lib/prisma"
-import { auth } from "@clerk/nextjs/server"
+import { createClient, getCurrentUser, requireAuth } from "@/lib/supabase/server"
 
 // ============================================================================
 // LOG ACTIVITY
@@ -9,26 +8,27 @@ import { auth } from "@clerk/nextjs/server"
 
 export async function logActivity(
   type: string,
-  metadata?: Record<string, any>
+  metadata?: Record<string, unknown>
 ) {
-  const { userId: clerkId } = await auth()
-  if (!clerkId) return null
+  const supabase = await createClient()
+  const authUser = await getCurrentUser()
+  if (!authUser) return null
 
-  const user = await prisma.user.findUnique({
-    where: { clerkId },
-    select: { id: true },
-  })
-
-  if (!user) return null
-
-  const activity = await prisma.userActivity.create({
-    data: {
-      userId: user.id,
+  const { data: activity, error } = await supabase
+    .from("user_activities")
+    .insert({
+      user_id: authUser.id,
       type,
-      metadata: metadata ? metadata : undefined,
-      date: new Date(),
-    },
-  })
+      metadata: metadata || null,
+      date: new Date().toISOString(),
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error("[logActivity]", error)
+    return null
+  }
 
   return activity
 }
@@ -38,48 +38,35 @@ export async function logActivity(
 // ============================================================================
 
 export async function getActivityHeatmap(weeks: number = 12) {
-  const { userId: clerkId } = await auth()
-  if (!clerkId) throw new Error("Unauthorized")
+  const supabase = await createClient()
+  const authUser = await requireAuth()
 
-  const user = await prisma.user.findUnique({
-    where: { clerkId },
-    select: { id: true },
-  })
-
-  if (!user) throw new Error("User not found")
-
-  // Calculate date range
   const endDate = new Date()
   const startDate = new Date()
   startDate.setDate(startDate.getDate() - weeks * 7)
 
-  // Fetch activities in the date range
-  const activities = await prisma.userActivity.findMany({
-    where: {
-      userId: user.id,
-      date: {
-        gte: startDate,
-        lte: endDate,
-      },
-    },
-    select: {
-      date: true,
-      type: true,
-    },
-    orderBy: { date: "asc" },
-  })
+  const { data: activities, error } = await supabase
+    .from("user_activities")
+    .select("date, type")
+    .eq("user_id", authUser.id)
+    .gte("date", startDate.toISOString())
+    .lte("date", endDate.toISOString())
+    .order("date", { ascending: true })
 
-  // Group activities by date
+  if (error) {
+    console.error("[getActivityHeatmap]", error)
+    return []
+  }
+
   const activityMap: Record<string, number> = {}
 
-  activities.forEach((activity) => {
-    const dateKey = activity.date.toISOString().split("T")[0]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(activities || []).forEach((activity: any) => {
+    const dateKey = new Date(activity.date).toISOString().split("T")[0]
     activityMap[dateKey] = (activityMap[dateKey] || 0) + 1
   })
 
-  // Create a complete grid for all days in the range
-  const heatmapData: Array<{ date: string; count: number; dayOfWeek: number }> =
-    []
+  const heatmapData: Array<{ date: string; count: number; dayOfWeek: number }> = []
 
   for (
     let d = new Date(startDate);
@@ -90,7 +77,7 @@ export async function getActivityHeatmap(weeks: number = 12) {
     heatmapData.push({
       date: dateKey,
       count: activityMap[dateKey] || 0,
-      dayOfWeek: d.getDay(), // 0 = Sunday, 1 = Monday, etc.
+      dayOfWeek: d.getDay(),
     })
   }
 
@@ -102,15 +89,8 @@ export async function getActivityHeatmap(weeks: number = 12) {
 // ============================================================================
 
 export async function getDailyActivity(date: Date) {
-  const { userId: clerkId } = await auth()
-  if (!clerkId) throw new Error("Unauthorized")
-
-  const user = await prisma.user.findUnique({
-    where: { clerkId },
-    select: { id: true },
-  })
-
-  if (!user) throw new Error("User not found")
+  const supabase = await createClient()
+  const authUser = await requireAuth()
 
   const startOfDay = new Date(date)
   startOfDay.setHours(0, 0, 0, 0)
@@ -118,22 +98,25 @@ export async function getDailyActivity(date: Date) {
   const endOfDay = new Date(date)
   endOfDay.setHours(23, 59, 59, 999)
 
-  const activities = await prisma.userActivity.findMany({
-    where: {
-      userId: user.id,
-      date: {
-        gte: startOfDay,
-        lte: endOfDay,
-      },
-    },
-    orderBy: { date: "desc" },
-  })
+  const { data: activities, error } = await supabase
+    .from("user_activities")
+    .select("*")
+    .eq("user_id", authUser.id)
+    .gte("date", startOfDay.toISOString())
+    .lte("date", endOfDay.toISOString())
+    .order("date", { ascending: false })
 
-  return activities.map((activity) => ({
+  if (error) {
+    console.error("[getDailyActivity]", error)
+    return []
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (activities || []).map((activity: any) => ({
     id: activity.id,
     type: activity.type,
     metadata: activity.metadata,
-    date: activity.date.toISOString(),
+    date: activity.date,
   }))
 }
 
@@ -142,39 +125,35 @@ export async function getDailyActivity(date: Date) {
 // ============================================================================
 
 export async function getActivityStats(days: number = 30) {
-  const { userId: clerkId } = await auth()
-  if (!clerkId) throw new Error("Unauthorized")
-
-  const user = await prisma.user.findUnique({
-    where: { clerkId },
-    select: { id: true },
-  })
-
-  if (!user) throw new Error("User not found")
+  const supabase = await createClient()
+  const authUser = await requireAuth()
 
   const startDate = new Date()
   startDate.setDate(startDate.getDate() - days)
 
-  const activities = await prisma.userActivity.findMany({
-    where: {
-      userId: user.id,
-      date: {
-        gte: startDate,
-      },
-    },
-    select: {
-      type: true,
-    },
-  })
+  const { data: activities, error } = await supabase
+    .from("user_activities")
+    .select("type")
+    .eq("user_id", authUser.id)
+    .gte("date", startDate.toISOString())
 
-  // Count by type
+  if (error) {
+    console.error("[getActivityStats]", error)
+    return {
+      total: 0,
+      byType: {},
+      period: `${days} days`,
+    }
+  }
+
   const stats: Record<string, number> = {}
-  activities.forEach((activity) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(activities || []).forEach((activity: any) => {
     stats[activity.type] = (stats[activity.type] || 0) + 1
   })
 
   return {
-    total: activities.length,
+    total: activities?.length || 0,
     byType: stats,
     period: `${days} days`,
   }

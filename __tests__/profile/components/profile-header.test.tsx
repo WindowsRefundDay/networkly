@@ -57,14 +57,15 @@ describe("ProfileHeader", () => {
     expect(screen.getByText("500 profile views")).toBeInTheDocument()
   })
 
-  it("navigates to settings when Edit button is clicked", async () => {
+  it("enters edit mode when Edit button is clicked", async () => {
     const user = userEvent.setup()
     render(<ProfileHeader user={defaultUser} />)
 
     const editButton = screen.getByRole("button", { name: /edit/i })
     await user.click(editButton)
 
-    expect(mockPush).toHaveBeenCalledWith("/settings")
+    expect(screen.getByLabelText("Name")).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /save/i })).toBeInTheDocument()
   })
 
   it("navigates to messages when Message button is clicked", async () => {
@@ -96,7 +97,7 @@ describe("ProfileHeader", () => {
     )
 
     expect(screen.getByText("Jane Doe")).toBeInTheDocument()
-    expect(screen.getByText("Professional")).toBeInTheDocument() // default headline
+    expect(screen.getByText("High School Student")).toBeInTheDocument()
     expect(screen.getByText("0 connections")).toBeInTheDocument()
   })
 })

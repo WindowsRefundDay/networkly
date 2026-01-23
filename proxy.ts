@@ -1,53 +1,56 @@
-import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server"
-import { NextResponse } from "next/server"
+import { NextResponse, type NextRequest } from "next/server"
+import { updateSession } from "@/lib/supabase/middleware"
 
-// Define public routes that don't require authentication
-const isPublicRoute = createRouteMatcher([
+const publicRoutes = [
     "/",
-    "/login(.*)",
-    "/signup(.*)",
-    "/api/(.*)",
-])
+    "/login",
+    "/signup",
+    "/auth/callback",
+    "/api/chat",
+    "/api/discovery",
+    "/api/profile",
+    "/api/ai",
+    "/api/health",
+]
 
-export default clerkMiddleware(
-    async (auth, request) => {
-        const response = NextResponse.next()
+export default async function middleware(request: NextRequest) {
+    const { supabaseResponse, user } = await updateSession(request)
 
-        // Add security headers (non-CSP)
-        response.headers.set("X-Frame-Options", "DENY")
-        response.headers.set("X-Content-Type-Options", "nosniff")
-        response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
-        response.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+    supabaseResponse.headers.set("X-Frame-Options", "DENY")
+    supabaseResponse.headers.set("X-Content-Type-Options", "nosniff")
+    supabaseResponse.headers.set("Referrer-Policy", "strict-origin-when-cross-origin")
+    supabaseResponse.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
 
-        const url = request.nextUrl
+    const url = request.nextUrl
 
-        // Rate limit tracking for profile views
-        if (url.pathname.startsWith("/profile/") && url.pathname !== "/profile") {
-            const profileId = url.pathname.split("/")[2]
-            if (profileId && profileId.length === 36) {
-                const ipAddress = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "unknown"
-                const rateLimitKey = `profile_view:${ipAddress}:${profileId}`
-                response.headers.set("X-Rate-Limit-Key", rateLimitKey)
-            }
+    if (url.pathname.startsWith("/profile/") && url.pathname !== "/profile") {
+        const profileId = url.pathname.split("/")[2]
+        if (profileId && profileId.length === 36) {
+            const ipAddress =
+                request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "unknown"
+            const rateLimitKey = `profile_view:${ipAddress}:${profileId}`
+            supabaseResponse.headers.set("X-Rate-Limit-Key", rateLimitKey)
         }
-
-        // Protect all routes except public ones
-        if (!isPublicRoute(request)) {
-            await auth.protect()
-        }
-
-        return response
-    },
-    {
-        // Use Clerk's automatic CSP configuration for proper inline styles support
-        contentSecurityPolicy: {
-            // Additional directives beyond Clerk's defaults
-            "img-src": ["'self'", "data:", "https:", "blob:"],
-            "font-src": ["'self'", "data:", "https://fonts.gstatic.com", "https://r2cdn.perplexity.ai"],
-            "connect-src": ["'self'", "https:"],
-        },
     }
-)
+
+    const path = url.pathname
+    const isPublic = publicRoutes.some((route) => path === route || path.startsWith(`${route}/`))
+
+    if (!isPublic && !user) {
+        const redirectUrl = request.nextUrl.clone()
+        redirectUrl.pathname = "/login"
+        redirectUrl.searchParams.set("redirect", path)
+        return NextResponse.redirect(redirectUrl)
+    }
+
+    if (user && (path === "/login" || path === "/signup")) {
+        const redirectUrl = request.nextUrl.clone()
+        redirectUrl.pathname = "/dashboard"
+        return NextResponse.redirect(redirectUrl)
+    }
+
+    return supabaseResponse
+}
 
 export const config = {
     matcher: [

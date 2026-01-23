@@ -1,7 +1,6 @@
 import type React from "react"
 import type { Metadata } from "next"
 import { Inter, Plus_Jakarta_Sans } from "next/font/google"
-import { ClerkProvider } from "@clerk/nextjs"
 import { Toaster } from "sonner"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
@@ -38,17 +37,11 @@ export default async function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <ClerkProvider
-      signInUrl="/login"
-      signUpUrl="/signup"
-      signInFallbackRedirectUrl="/dashboard"
-      signUpFallbackRedirectUrl="/dashboard"
-    >
-      <html lang="en" suppressHydrationWarning>
-        <head>
-          <script
-            dangerouslySetInnerHTML={{
-              __html: `
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
                 try {
                   if (localStorage.getItem('theme') === 'dark' || ((!('theme' in localStorage) || localStorage.getItem('theme') === 'system') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
                     document.documentElement.classList.add('dark');
@@ -57,28 +50,27 @@ export default async function RootLayout({
                   }
                 } catch (_) {}
               `,
-            }}
-          />
-        </head>
-        <body className={`font-sans antialiased`}>
-          <div className="fixed inset-0 -z-0 bg-gradient-to-br from-primary/10 via-background to-secondary/10">
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/20 via-transparent to-transparent" />
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-secondary/20 via-transparent to-transparent" />
-          </div>
+          }}
+        />
+      </head>
+      <body className={`font-sans antialiased`}>
+        <div className="fixed inset-0 -z-0 bg-gradient-to-br from-primary/10 via-background to-secondary/10">
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/20 via-transparent to-transparent" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,_var(--tw-gradient-stops))] from-secondary/20 via-transparent to-transparent" />
+        </div>
 
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange={false}
-          >
-            <div className="relative z-10">
-              {children}
-            </div>
-            <Toaster position="top-center" />
-          </ThemeProvider>
-        </body>
-      </html>
-    </ClerkProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange={false}
+        >
+          <div className="relative z-10">
+            {children}
+          </div>
+          <Toaster position="top-center" />
+        </ThemeProvider>
+      </body>
+    </html>
   )
 }

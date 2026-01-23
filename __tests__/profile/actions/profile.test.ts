@@ -1,25 +1,28 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
-// Mock Prisma
-vi.mock("@/lib/prisma", () => ({
-  prisma: {
-    user: {
-      findUnique: vi.fn(),
-      update: vi.fn(),
+const createQueryMock = () => {
+  const query: any = {
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    update: vi.fn().mockReturnThis(),
+    insert: vi.fn().mockReturnThis(),
+    delete: vi.fn().mockReturnThis(),
+    order: vi.fn().mockReturnThis(),
+    or: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
+    single: vi.fn(),
+    __result: { data: null, error: null },
+    then: function (resolve: (value: any) => any, reject?: (reason: any) => any) {
+      return Promise.resolve(this.__result).then(resolve, reject)
     },
-    achievement: {
-      findMany: vi.fn(),
-    },
-    extracurricular: {
-      findMany: vi.fn(),
-    },
-    recommendation: {
-      findMany: vi.fn(),
-    },
-    connection: {
-      findFirst: vi.fn(),
-    },
-  },
+  }
+
+  return query
+}
+
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: vi.fn(),
+  requireAuth: vi.fn(),
 }))
 
 // Mock rate limiting
@@ -35,18 +38,36 @@ vi.mock("@/lib/rate-limit", () => ({
   },
 }))
 
-import { prisma } from "@/lib/prisma"
-import { auth } from "@clerk/nextjs/server"
 import { checkRateLimit } from "@/lib/rate-limit"
+import { createClient, requireAuth } from "@/lib/supabase/server"
 
 describe("Profile Actions", () => {
+  const queryMocks = {
+    users: createQueryMock(),
+    achievements: createQueryMock(),
+    extracurriculars: createQueryMock(),
+    recommendations: createQueryMock(),
+    connections: createQueryMock(),
+  }
+
+  const supabaseMock = {
+    from: vi.fn((table: keyof typeof queryMocks) => queryMocks[table]),
+    auth: {
+      getUser: vi.fn(),
+    },
+  }
+
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(createClient).mockResolvedValue(supabaseMock as any)
+    Object.values(queryMocks).forEach((query) => {
+      query.__result = { data: null, error: null }
+    })
   })
 
   describe("updateProfile", () => {
     it("should throw error if user is not authenticated", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ userId: null } as any)
+      vi.mocked(requireAuth).mockRejectedValueOnce(new Error("Unauthorized"))
 
       const { updateProfile } = await import("@/app/actions/profile")
 
@@ -54,29 +75,32 @@ describe("Profile Actions", () => {
     })
 
     it("should update user profile with valid data", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ userId: "clerk-123" } as any)
-      vi.mocked(prisma.user.update).mockResolvedValueOnce({
+      vi.mocked(requireAuth).mockResolvedValueOnce({ id: "user-1" } as any)
+      queryMocks.users.single.mockResolvedValueOnce({
+        data: {
         id: "user-1",
-        clerkId: "clerk-123",
-        name: "Updated Name",
-        email: "test@example.com",
-      } as any)
+          name: "Updated Name",
+          email: "test@example.com",
+        },
+        error: null,
+      })
 
       const { updateProfile } = await import("@/app/actions/profile")
 
       const result = await updateProfile({ name: "Updated Name" })
 
-      expect(prisma.user.update).toHaveBeenCalledWith({
-        where: { clerkId: "clerk-123" },
-        data: expect.objectContaining({
+      expect(queryMocks.users.update).toHaveBeenCalledWith(
+        expect.objectContaining({
           name: "Updated Name",
-        }),
-      })
+          profile_updated_at: expect.any(String),
+        })
+      )
+      expect(queryMocks.users.eq).toHaveBeenCalledWith("id", "user-1")
       expect(result.name).toBe("Updated Name")
     })
 
     it("should throw error when rate limit exceeded", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ userId: "clerk-123" } as any)
+      vi.mocked(requireAuth).mockResolvedValueOnce({ id: "user-1" } as any)
       vi.mocked(checkRateLimit).mockResolvedValueOnce({
         success: false,
         remaining: 0,
@@ -86,17 +110,22 @@ describe("Profile Actions", () => {
 
       const { updateProfile } = await import("@/app/actions/profile")
 
-      await expect(updateProfile({ name: "Test" })).rejects.toThrow("Rate limit exceeded")
+      await expect(updateProfile({ name: "Test" })).rejects.toThrow(
+        "Rate limit exceeded. You can update your profile 30 times per hour. Try again later."
+      )
     })
 
     it("should validate URL fields and clean empty strings to null", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ userId: "clerk-123" } as any)
-      vi.mocked(prisma.user.update).mockResolvedValueOnce({
-        id: "user-1",
-        linkedinUrl: null,
-        githubUrl: null,
-        portfolioUrl: null,
-      } as any)
+      vi.mocked(requireAuth).mockResolvedValueOnce({ id: "user-1" } as any)
+      queryMocks.users.single.mockResolvedValueOnce({
+        data: {
+          id: "user-1",
+          linkedin_url: null,
+          github_url: null,
+          portfolio_url: null,
+        },
+        error: null,
+      })
 
       const { updateProfile } = await import("@/app/actions/profile")
 
@@ -106,20 +135,20 @@ describe("Profile Actions", () => {
         portfolioUrl: "",
       })
 
-      expect(prisma.user.update).toHaveBeenCalledWith({
-        where: { clerkId: "clerk-123" },
-        data: expect.objectContaining({
-          linkedinUrl: null,
-          githubUrl: null,
-          portfolioUrl: null,
-        }),
-      })
+      expect(queryMocks.users.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          linkedin_url: null,
+          github_url: null,
+          portfolio_url: null,
+          profile_updated_at: expect.any(String),
+        })
+      )
     })
   })
 
   describe("getProfileByUserId", () => {
     it("should throw error if user is not authenticated", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ userId: null } as any)
+      vi.mocked(requireAuth).mockRejectedValueOnce(new Error("Unauthorized"))
 
       const { getProfileByUserId } = await import("@/app/actions/profile")
 
@@ -127,10 +156,11 @@ describe("Profile Actions", () => {
     })
 
     it("should return null if target user does not exist", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ userId: "clerk-123" } as any)
-      vi.mocked(prisma.user.findUnique)
-        .mockResolvedValueOnce({ id: "current-user" } as any) // current user
-        .mockResolvedValueOnce(null) // target user not found
+      vi.mocked(requireAuth).mockResolvedValueOnce({ id: "viewer-1" } as any)
+      queryMocks.users.single.mockResolvedValueOnce({
+        data: null,
+        error: null,
+      })
 
       const { getProfileByUserId } = await import("@/app/actions/profile")
 
@@ -140,13 +170,14 @@ describe("Profile Actions", () => {
     })
 
     it("should return null for private profiles when not owner", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ userId: "clerk-123" } as any)
-      vi.mocked(prisma.user.findUnique)
-        .mockResolvedValueOnce({ id: "current-user" } as any)
-        .mockResolvedValueOnce({
+      vi.mocked(requireAuth).mockResolvedValueOnce({ id: "viewer-1" } as any)
+      queryMocks.users.single.mockResolvedValueOnce({
+        data: {
           id: "other-user",
           visibility: "private",
-        } as any)
+        },
+        error: null,
+      })
 
       const { getProfileByUserId } = await import("@/app/actions/profile")
 
@@ -156,20 +187,26 @@ describe("Profile Actions", () => {
     })
 
     it("should return profile data for public profiles", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ userId: "clerk-123" } as any)
-      vi.mocked(prisma.user.findUnique)
-        .mockResolvedValueOnce({ id: "current-user" } as any)
-        .mockResolvedValueOnce({
+      vi.mocked(requireAuth).mockResolvedValueOnce({ id: "viewer-1" } as any)
+      queryMocks.users.single.mockResolvedValueOnce({
+        data: {
           id: "target-user",
           name: "Target User",
           visibility: "public",
           skills: ["React", "TypeScript"],
           interests: ["AI", "Web Dev"],
-        } as any)
-      vi.mocked(prisma.user.update).mockResolvedValueOnce({} as any)
-      vi.mocked(prisma.achievement.findMany).mockResolvedValueOnce([])
-      vi.mocked(prisma.extracurricular.findMany).mockResolvedValueOnce([])
-      vi.mocked(prisma.recommendation.findMany).mockResolvedValueOnce([])
+        },
+        error: null,
+      })
+      queryMocks.achievements.__result = { data: [], error: null }
+      queryMocks.extracurriculars.__result = { data: [], error: null }
+      queryMocks.recommendations.__result = { data: [], error: null }
+      vi.mocked(checkRateLimit).mockResolvedValueOnce({
+        success: true,
+        remaining: 99,
+        reset: Date.now(),
+        limit: 100,
+      })
 
       const { getProfileByUserId } = await import("@/app/actions/profile")
 
@@ -179,11 +216,36 @@ describe("Profile Actions", () => {
       expect(result?.name).toBe("Target User")
       expect(result?.visibility).toBe("public")
     })
+
+    it("should allow connections-only visibility with a connection", async () => {
+      vi.mocked(requireAuth).mockResolvedValueOnce({ id: "viewer-1" } as any)
+      queryMocks.users.single.mockResolvedValueOnce({
+        data: {
+          id: "target-user",
+          name: "Target User",
+          visibility: "connections",
+          skills: [],
+          interests: [],
+        },
+        error: null,
+      })
+      queryMocks.connections.single.mockResolvedValueOnce({ data: { id: "conn-1" }, error: null })
+      queryMocks.achievements.__result = { data: [], error: null }
+      queryMocks.extracurriculars.__result = { data: [], error: null }
+      queryMocks.recommendations.__result = { data: [], error: null }
+
+      const { getProfileByUserId } = await import("@/app/actions/profile")
+
+      const result = await getProfileByUserId("target-user")
+
+      expect(result).not.toBeNull()
+      expect(result?.visibility).toBe("connections")
+    })
   })
 
   describe("calculateProfileStrength", () => {
     it("should return 0 if user does not exist", async () => {
-      vi.mocked(prisma.user.findUnique).mockResolvedValueOnce(null)
+      queryMocks.users.single.mockResolvedValueOnce({ data: null, error: null })
 
       const { calculateProfileStrength } = await import("@/app/actions/profile")
 
@@ -193,22 +255,25 @@ describe("Profile Actions", () => {
     })
 
     it("should calculate score based on filled fields", async () => {
-      vi.mocked(prisma.user.findUnique).mockResolvedValueOnce({
-        id: "user-1",
-        name: "Test User",
-        headline: "Developer",
-        bio: "About me",
-        avatar: "https://example.com/avatar.jpg",
-        location: "NYC",
-        university: "MIT",
-        graduationYear: 2024,
-        skills: ["React", "TypeScript", "Node.js", "Python", "SQL"],
-        interests: ["AI"],
-        achievements: [{ id: "1" }],
-        linkedinUrl: "https://linkedin.com/in/test",
-        githubUrl: "https://github.com/test",
-        portfolioUrl: null,
-      } as any)
+      queryMocks.users.single.mockResolvedValueOnce({
+        data: {
+          id: "user-1",
+          name: "Test User",
+          headline: "Developer",
+          bio: "About me",
+          avatar: "https://example.com/avatar.jpg",
+          location: "NYC",
+          university: "MIT",
+          graduation_year: 2024,
+          skills: ["React", "TypeScript", "Node.js", "Python", "SQL"],
+          interests: ["AI"],
+          achievements: [{ id: "1" }],
+          linkedin_url: "https://linkedin.com/in/test",
+          github_url: "https://github.com/test",
+          portfolio_url: null,
+        },
+        error: null,
+      })
 
       const { calculateProfileStrength } = await import("@/app/actions/profile")
 
@@ -221,28 +286,56 @@ describe("Profile Actions", () => {
     })
 
     it("should cap score at 100", async () => {
-      vi.mocked(prisma.user.findUnique).mockResolvedValueOnce({
-        id: "user-1",
-        name: "Test User",
-        headline: "Developer",
-        bio: "About me",
-        avatar: "https://example.com/avatar.jpg",
-        location: "NYC",
-        university: "MIT",
-        graduationYear: 2024,
-        skills: ["React", "TypeScript", "Node.js", "Python", "SQL"],
-        interests: ["AI"],
-        achievements: [{ id: "1" }],
-        linkedinUrl: "https://linkedin.com/in/test",
-        githubUrl: "https://github.com/test",
-        portfolioUrl: "https://example.com",
-      } as any)
+      queryMocks.users.single.mockResolvedValueOnce({
+        data: {
+          id: "user-1",
+          name: "Test User",
+          headline: "Developer",
+          bio: "About me",
+          avatar: "https://example.com/avatar.jpg",
+          location: "NYC",
+          university: "MIT",
+          graduation_year: 2024,
+          skills: ["React", "TypeScript", "Node.js", "Python", "SQL"],
+          interests: ["AI"],
+          achievements: [{ id: "1" }],
+          linkedin_url: "https://linkedin.com/in/test",
+          github_url: "https://github.com/test",
+          portfolio_url: "https://example.com",
+        },
+        error: null,
+      })
 
       const { calculateProfileStrength } = await import("@/app/actions/profile")
 
       const result = await calculateProfileStrength("user-1")
 
       expect(result).toBeLessThanOrEqual(100)
+    })
+  })
+
+  describe("updateProfileCompleteness", () => {
+    it("should update profile completeness based on strength", async () => {
+      vi.mocked(requireAuth).mockResolvedValueOnce({ id: "user-1" } as any)
+      queryMocks.users.single.mockResolvedValueOnce({
+        data: {
+          id: "user-1",
+          name: "Test User",
+          skills: [],
+          interests: [],
+          achievements: [],
+        },
+        error: null,
+      })
+
+      const { updateProfileCompleteness } = await import("@/app/actions/profile")
+
+      const result = await updateProfileCompleteness()
+
+      expect(queryMocks.users.update).toHaveBeenCalledWith(
+        expect.objectContaining({ is_profile_complete: false })
+      )
+      expect(result).toBeGreaterThanOrEqual(0)
     })
   })
 })

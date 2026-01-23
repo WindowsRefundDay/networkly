@@ -1,44 +1,77 @@
 "use server"
 
-import { prisma } from "@/lib/prisma"
-import { auth } from "@clerk/nextjs/server"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
+
+import { createClient, getCurrentUser, requireAuth } from "@/lib/supabase/server"
 
 // ============================================================================
 // GET EVENTS
 // ============================================================================
 
 export async function getEvents() {
-  const { userId: clerkId } = await auth()
+  const supabase = await createClient()
+  const authUser = await getCurrentUser()
 
-  let dbUserId: string | null = null
-  if (clerkId) {
-    const user = await prisma.user.findUnique({
-      where: { clerkId },
-      select: { id: true },
-    })
-    dbUserId = user?.id || null
+  const { data: events, error } = await supabase
+    .from("events")
+    .select("*")
+    .order("created_at", { ascending: false })
+
+  if (error) {
+    console.error("[getEvents]", error)
+    return []
   }
 
-  const events = await prisma.event.findMany({
-    include: dbUserId
-      ? {
-          registrations: {
-            where: { userId: dbUserId },
-            select: {
-              id: true,
-              status: true,
-            },
-          },
-        }
-      : undefined,
-    orderBy: { createdAt: "desc" },
-  })
+  if (!authUser) {
+    return (events || []).map(
+      (event: {
+        id: string
+        title: string
+        date: string
+        location: string
+        type: string
+        attendees: number
+        image: string | null
+        description: string | null
+        match_score: number
+      }) => ({
+        id: event.id,
+        title: event.title,
+        date: event.date,
+        location: event.location,
+        type: event.type,
+        attendees: event.attendees,
+        image: event.image,
+        description: event.description,
+        matchScore: event.match_score,
+        registered: false,
+        registrationStatus: null,
+      })
+    )
+  }
 
-  return events.map((event) => {
-    const registration = (event as any).registrations?.[0]
-    return {
+  const { data: registrations } = await supabase
+    .from("event_registrations")
+    .select("event_id, status")
+    .eq("user_id", authUser.id)
+
+  const registrationMap = new Map(
+    (registrations || []).map((r: { event_id: string; status: string }) => [r.event_id, r.status])
+  )
+
+  return (events || []).map(
+    (event: {
+      id: string
+      title: string
+      date: string
+      location: string
+      type: string
+      attendees: number
+      image: string | null
+      description: string | null
+      match_score: number
+    }) => ({
       id: event.id,
       title: event.title,
       date: event.date,
@@ -47,11 +80,11 @@ export async function getEvents() {
       attendees: event.attendees,
       image: event.image,
       description: event.description,
-      matchScore: event.matchScore,
-      registered: !!registration,
-      registrationStatus: registration?.status || null,
-    }
-  })
+      matchScore: event.match_score,
+      registered: registrationMap.has(event.id),
+      registrationStatus: registrationMap.get(event.id) || null,
+    })
+  )
 }
 
 // ============================================================================
@@ -59,35 +92,29 @@ export async function getEvents() {
 // ============================================================================
 
 export async function getEventById(id: string) {
-  const { userId: clerkId } = await auth()
+  const supabase = await createClient()
+  const authUser = await getCurrentUser()
 
-  let dbUserId: string | null = null
-  if (clerkId) {
-    const user = await prisma.user.findUnique({
-      where: { clerkId },
-      select: { id: true },
-    })
-    dbUserId = user?.id || null
+  const { data: event, error } = await supabase
+    .from("events")
+    .select("*")
+    .eq("id", id)
+    .single()
+
+  if (error || !event) return null
+
+  let registrationStatus = null
+  if (authUser) {
+    const { data: registration } = await supabase
+      .from("event_registrations")
+      .select("status")
+      .eq("event_id", id)
+      .eq("user_id", authUser.id)
+      .single()
+
+    registrationStatus = registration?.status || null
   }
 
-  const event = await prisma.event.findUnique({
-    where: { id },
-    include: {
-      registrations: dbUserId
-        ? {
-            where: { userId: dbUserId },
-            select: {
-              id: true,
-              status: true,
-            },
-          }
-        : undefined,
-    },
-  })
-
-  if (!event) return null
-
-  const registration = (event as any).registrations?.[0]
   return {
     id: event.id,
     title: event.title,
@@ -97,9 +124,9 @@ export async function getEventById(id: string) {
     attendees: event.attendees,
     image: event.image,
     description: event.description,
-    matchScore: event.matchScore,
-    registered: !!registration,
-    registrationStatus: registration?.status || null,
+    matchScore: event.match_score,
+    registered: !!registrationStatus,
+    registrationStatus,
   }
 }
 
@@ -119,13 +146,14 @@ const createEventSchema = z.object({
 })
 
 export async function createEvent(data: z.infer<typeof createEventSchema>) {
-  const { userId } = await auth()
-  if (!userId) throw new Error("Unauthorized")
+  const supabase = await createClient()
+  await requireAuth()
 
   const validatedData = createEventSchema.parse(data)
 
-  const event = await prisma.event.create({
-    data: {
+  const { data: event, error } = await supabase
+    .from("events")
+    .insert({
       title: validatedData.title,
       date: validatedData.date,
       location: validatedData.location,
@@ -133,9 +161,15 @@ export async function createEvent(data: z.infer<typeof createEventSchema>) {
       attendees: validatedData.attendees || 0,
       image: validatedData.image || null,
       description: validatedData.description || null,
-      matchScore: validatedData.matchScore || 0,
-    },
-  })
+      match_score: validatedData.matchScore || 0,
+    })
+    .select()
+    .single()
+
+  if (error || !event) {
+    console.error("[createEvent]", error)
+    throw new Error("Failed to create event")
+  }
 
   revalidatePath("/events")
   return event
@@ -146,50 +180,54 @@ export async function createEvent(data: z.infer<typeof createEventSchema>) {
 // ============================================================================
 
 export async function registerForEvent(eventId: string) {
-  const { userId: clerkId } = await auth()
-  if (!clerkId) throw new Error("Unauthorized")
+  const supabase = await createClient()
+  const authUser = await requireAuth()
 
-  const user = await prisma.user.findUnique({
-    where: { clerkId },
-    select: { id: true },
-  })
+  const { data: event, error: eventError } = await supabase
+    .from("events")
+    .select("*")
+    .eq("id", eventId)
+    .single()
 
-  if (!user) throw new Error("User not found")
+  if (eventError || !event) throw new Error("Event not found")
 
-  // Check if event exists
-  const event = await prisma.event.findUnique({
-    where: { id: eventId },
-  })
+  const { data: existingReg } = await supabase
+    .from("event_registrations")
+    .select("id")
+    .eq("user_id", authUser.id)
+    .eq("event_id", eventId)
+    .single()
 
-  if (!event) throw new Error("Event not found")
+  const isNewRegistration = !existingReg
 
-  // Create or update registration
-  const registration = await prisma.eventRegistration.upsert({
-    where: {
-      userId_eventId: {
-        userId: user.id,
-        eventId,
+  const { error: upsertError } = await supabase
+    .from("event_registrations")
+    .upsert(
+      {
+        user_id: authUser.id,
+        event_id: eventId,
+        status: "registered",
+        updated_at: new Date().toISOString(),
       },
-    },
-    update: {
-      status: "registered",
-      updatedAt: new Date(),
-    },
-    create: {
-      userId: user.id,
-      eventId,
-      status: "registered",
-    },
-  })
+      {
+        onConflict: "user_id,event_id",
+      }
+    )
 
-  // Increment attendee count
-  await prisma.event.update({
-    where: { id: eventId },
-    data: { attendees: { increment: 1 } },
-  })
+  if (upsertError) {
+    console.error("[registerForEvent]", upsertError)
+    throw new Error("Failed to register for event")
+  }
+
+  if (isNewRegistration) {
+    await supabase
+      .from("events")
+      .update({ attendees: event.attendees + 1 })
+      .eq("id", eventId)
+  }
 
   revalidatePath("/events")
-  return registration
+  return { success: true }
 }
 
 // ============================================================================
@@ -197,37 +235,31 @@ export async function registerForEvent(eventId: string) {
 // ============================================================================
 
 export async function unregisterFromEvent(eventId: string) {
-  const { userId: clerkId } = await auth()
-  if (!clerkId) throw new Error("Unauthorized")
+  const supabase = await createClient()
+  const authUser = await requireAuth()
 
-  const user = await prisma.user.findUnique({
-    where: { clerkId },
-    select: { id: true },
-  })
+  const { error: deleteError } = await supabase
+    .from("event_registrations")
+    .delete()
+    .eq("user_id", authUser.id)
+    .eq("event_id", eventId)
 
-  if (!user) throw new Error("User not found")
+  if (deleteError) {
+    console.error("[unregisterFromEvent]", deleteError)
+    throw new Error("Failed to unregister from event")
+  }
 
-  // Delete registration
-  await prisma.eventRegistration.delete({
-    where: {
-      userId_eventId: {
-        userId: user.id,
-        eventId,
-      },
-    },
-  })
-
-  // Decrement attendee count (but don't go below 0)
-  const event = await prisma.event.findUnique({
-    where: { id: eventId },
-    select: { attendees: true },
-  })
+  const { data: event } = await supabase
+    .from("events")
+    .select("attendees")
+    .eq("id", eventId)
+    .single()
 
   if (event && event.attendees > 0) {
-    await prisma.event.update({
-      where: { id: eventId },
-      data: { attendees: { decrement: 1 } },
-    })
+    await supabase
+      .from("events")
+      .update({ attendees: event.attendees - 1 })
+      .eq("id", eventId)
   }
 
   revalidatePath("/events")
@@ -239,34 +271,40 @@ export async function unregisterFromEvent(eventId: string) {
 // ============================================================================
 
 export async function getMyRegistrations() {
-  const { userId: clerkId } = await auth()
-  if (!clerkId) throw new Error("Unauthorized")
+  const supabase = await createClient()
+  const authUser = await requireAuth()
 
-  const user = await prisma.user.findUnique({
-    where: { clerkId },
-    select: { id: true },
-  })
+  const { data: registrations, error } = await supabase
+    .from("event_registrations")
+    .select(
+      `
+      *,
+      events(*)
+    `
+    )
+    .eq("user_id", authUser.id)
+    .order("created_at", { ascending: false })
 
-  if (!user) throw new Error("User not found")
+  if (error) {
+    console.error("[getMyRegistrations]", error)
+    throw new Error("Failed to get registrations")
+  }
 
-  const registrations = await prisma.eventRegistration.findMany({
-    where: { userId: user.id },
-    include: { event: true },
-    orderBy: { createdAt: "desc" },
-  })
-
-  return registrations.map((reg) => ({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (registrations || []).map((reg: any) => ({
     id: reg.id,
     status: reg.status,
-    registeredAt: reg.createdAt.toISOString(),
-    event: {
-      id: reg.event.id,
-      title: reg.event.title,
-      date: reg.event.date,
-      location: reg.event.location,
-      type: reg.event.type,
-      attendees: reg.event.attendees,
-      image: reg.event.image,
-    },
+    registeredAt: reg.created_at,
+    event: reg.events
+      ? {
+          id: reg.events.id,
+          title: reg.events.title,
+          date: reg.events.date,
+          location: reg.events.location,
+          type: reg.events.type,
+          attendees: reg.events.attendees,
+          image: reg.events.image,
+        }
+      : null,
   }))
 }

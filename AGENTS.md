@@ -1,13 +1,131 @@
-# AGENTS.md - Agentic Coding Guidelines
+# NETWORKLY KNOWLEDGE BASE
 
-> Instructions for AI coding agents operating in this Next.js + Prisma codebase.
+**Generated:** 2026-01-16T01:42:00Z  
+**Commit:** a46f470  
+**Branch:** networkly-main
 
-## Quick Reference
+## OVERVIEW
+
+AI-powered professional networking platform. Next.js 16 + Prisma + multi-provider AI (Groq/Gemini/OpenRouter) + embedded Python scraper.
+
+## STRUCTURE
+
+```
+app/
+├── actions/          # Server Actions (see app/actions/AGENTS.md)
+├── api/              # API routes (chat, discovery, AI management)
+├── (features)/       # Pages: dashboard, profile, network, opportunities, etc.
+components/
+├── ui/               # shadcn/ui primitives (see components/ui/AGENTS.md)
+├── assistant/        # Chat interface (633L complexity hotspot)
+├── discovery/        # Real-time opportunity discovery UI
+├── (features)/       # Feature-specific components
+hooks/                # Custom hooks (see hooks/AGENTS.md)
+lib/
+├── ai/               # Multi-provider AI system (see lib/ai/AGENTS.md)
+├── prisma.ts         # DB singleton
+├── utils.ts          # cn() utility
+ec-scraper/           # Python discovery engine (polyglot repo)
+```
+
+## WHERE TO LOOK
+
+| Task | Location | Notes |
+|------|----------|-------|
+| AI completions/chat | `lib/ai/` | Use `getAIManager()` singleton |
+| Server-side mutations | `app/actions/` | Clerk auth + Zod validation |
+| API routes | `app/api/` | Chat, discovery streaming (SSE) |
+| Real-time discovery | `hooks/use-discovery-layers.ts` | 550L state machine |
+| Chat UI | `components/assistant/chat-interface.tsx` | 633L - refactor candidate |
+| UI primitives | `components/ui/` | shadcn/ui + GlassCard |
+| Auth proxy | `proxy.ts` | **Next.js 16**: Correct naming (was `middleware.ts` in v15) |
+| Database schema | `prisma/schema.prisma` | PostgreSQL ORM |
+| Mock data | `lib/mock-data.ts` | 673L - split recommended |
+
+## CRITICAL DEVIATIONS
+
+| Issue | Current | Standard (Next.js 16) | Fix |
+|-------|---------|----------|-----|
+| **CORRECT** ✓ | `proxy.ts` | `proxy.ts` (v16+) | Already using correct naming |
+| Actions location | `app/actions/` | `actions/` (root) | Acceptable but non-standard |
+| Build errors | `ignoreBuildErrors: true` | `false` | Allows type errors in prod |
+| Polyglot repo | Python in `ec-scraper/` | Separate repo/monorepo | Document or extract |
+| Package managers | `bun.lock` + `pnpm-lock.yaml` | Single manager | Remove one |
+
+## CONVENTIONS
+
+### Import Order
+1. React/Next.js (`react`, `next/*`)
+2. External (`@clerk/*`, `@radix-ui/*`, `zod`)
+3. Internal (`@/lib/*`, `@/components/*`, `@/hooks/*`)
+4. Relative (`./`, `../`)
+
+### Naming
+- Files (components): `kebab-case.tsx`
+- Files (hooks): `use-kebab-case.ts`
+- Components: `PascalCase`
+- Functions: `camelCase`
+- Constants: `SCREAMING_SNAKE`
+
+### AI System
+- **Never call providers directly** — Use `getAIManager()`
+- **Use-case routing** — Pass `useCase: 'chat' | 'analysis' | 'fast-response'` etc.
+- **Cost tracking** — Built-in, view with `pnpm costs`
+
+### Styling
+- **Tailwind CSS 4** with `@theme inline` in `globals.css`
+- **OKLCH colors** — Not hex/rgb (perceptually uniform)
+- **Glassmorphism** — Use `GlassCard` from `components/ui`
+- **cn()** — Always use for conditional classes
+
+### Database
+- **Singleton only** — `import { prisma } from '@/lib/prisma'`
+- **Server Actions** — Preferred over direct API routes for mutations
+- **Transactions** — Multi-step ops use `prisma.$transaction`
+
+### Testing
+- **Vitest + React Testing Library** — Tests in `__tests__/`
+- **Per-file Prisma mocks** — No global mock
+- **Integration tests** — `__tests__/(feature)/integration/`
+
+## ANTI-PATTERNS (THIS PROJECT)
+
+**NEVER:**
+- Call AI providers directly (Groq/Gemini/OpenRouter SDKs) — Use `getAIManager()`
+- Use `as any`, `@ts-ignore`, `@ts-expect-error` — Type errors are allowed in build but should be fixed
+- Import Prisma from anywhere except `@/lib/prisma`
+- Hardcode colors — Use OKLCH variables from `globals.css`
+- Mix package managers — Stick to `pnpm`
+
+**ALWAYS:**
+- Use `cn()` for class merging
+- Validate server action input with Zod
+- Check `auth()` in server actions before DB ops
+- Use `'use client'` only when needed (hooks, browser APIs)
+
+## UNIQUE STYLES
+
+### Hybrid Next.js/Python Architecture
+- **API spawns Python** — `app/api/discovery/stream/route.ts` uses `child_process.spawn`
+- **Shared DB** — Python scraper writes to same PostgreSQL via `DATABASE_URL`
+- **Environment bridging** — API passes env vars from both root + `ec-scraper/.env`
+
+### Real-Time Discovery (SSE)
+- **Multi-layer streaming** — Query gen → web search → semantic filter → ranking
+- **State machine** — `useDiscoveryLayers` manages complex event flow (550L)
+- **Progress UI** — Components in `discovery/` show live updates
+
+### AI Model Management
+- **Use-case based** — System selects model based on task type, not manual choice
+- **Auto-fallback** — Groq fails → OpenRouter → Gemini
+- **Cost monitoring** — Every completion tracked in `data/ai-costs.json`
+
+## COMMANDS
 
 ```bash
 # Development
 pnpm dev              # Start dev server (port 3000)
-pnpm build            # Production build
+pnpm build            # Production build (ignores TS errors!)
 pnpm lint             # ESLint check
 
 # Type Checking
@@ -18,200 +136,33 @@ pnpm db:generate      # Generate Prisma client
 pnpm db:push          # Push schema to database
 pnpm db:seed          # Seed database
 pnpm db:studio        # Open Prisma Studio
+
+# Testing
+pnpm test             # Run Vitest in watch mode
+pnpm test:run         # Single test run
+pnpm test:coverage    # Coverage report
+
+# AI Costs
+pnpm costs            # Calculate AI API expenditures
+pnpm costs:clear      # Reset cost tracking data
+
+# Python Scraper (from ec-scraper/)
+cd ec-scraper && hatch run discover <query>
 ```
 
-## Project Structure
+## COMPLEXITY HOTSPOTS
 
-```
-app/                  # Next.js App Router pages and API routes
-  api/                # API routes (route.ts files)
-  (feature)/          # Feature pages (page.tsx, layout.tsx, loading.tsx)
-components/
-  ui/                 # Reusable UI primitives (shadcn/ui)
-  (feature)/          # Feature-specific components
-hooks/                # React hooks (use-*.ts)
-lib/
-  ai/                 # AI model management system
-  prisma.ts           # Prisma client singleton
-  utils.ts            # Utility functions (cn, etc.)
-prisma/
-  schema.prisma       # Database schema
-  seed.ts             # Database seeding
-```
+**Refactor Candidates (>500L):**
+1. `components/assistant/chat-interface.tsx` (633L) — Split into smaller components + hook
+2. `hooks/use-discovery-layers.ts` (550L) — Extract `processEvent` reducer logic
+3. `app/settings/page.tsx` (594L) — Move each section to own component
+4. `lib/mock-data.ts` (673L) — Split into `mock/` directory by entity
+5. `lib/ai/manager.ts` (603L) — Extract health monitor + factory pattern
 
-## Code Style Guidelines
+## NOTES
 
-### Imports
-
-Order imports in this sequence with blank lines between groups:
-1. React/Next.js core (`react`, `next/*`)
-2. External packages (`@clerk/*`, `@radix-ui/*`, `zod`, etc.)
-3. Internal aliases (`@/lib/*`, `@/components/*`, `@/hooks/*`)
-4. Relative imports (`./`, `../`)
-
-```typescript
-import { useState, useCallback } from 'react'
-import { NextRequest, NextResponse } from 'next/server'
-
-import { z } from 'zod'
-
-import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
-
-import { localHelper } from './helpers'
-```
-
-### TypeScript
-
-- **Strict mode enabled** - No implicit any, strict null checks
-- Use `interface` for object shapes, `type` for unions/intersections
-- Prefer explicit return types on exported functions
-- Use Zod for runtime validation (schemas in `lib/ai/types.ts`)
-
-```typescript
-// Interfaces for objects
-interface UserProfile {
-  id: string
-  name: string
-  email: string
-}
-
-// Types for unions
-type Status = 'pending' | 'active' | 'completed'
-
-// Explicit return types
-export function getUser(id: string): Promise<UserProfile | null> {
-  // ...
-}
-```
-
-### Naming Conventions
-
-| Type | Convention | Example |
-|------|------------|---------|
-| Files (components) | kebab-case | `opportunity-card.tsx` |
-| Files (hooks) | use-kebab-case | `use-ai-chat.ts` |
-| Components | PascalCase | `OpportunityCard` |
-| Functions/hooks | camelCase | `useAIChat`, `getUser` |
-| Constants | SCREAMING_SNAKE | `MAX_RETRIES` |
-| Types/Interfaces | PascalCase | `UserProfile`, `CompletionOptions` |
-
-### React Components
-
-- Use function components with TypeScript props
-- Use `'use client'` directive only when needed (hooks, browser APIs)
-- Destructure props in function signature
-- Use `cn()` from `@/lib/utils` for conditional classes
-
-```typescript
-'use client'
-
-import { cn } from '@/lib/utils'
-
-interface CardProps {
-  title: string
-  className?: string
-  children: React.ReactNode
-}
-
-export function Card({ title, className, children }: CardProps) {
-  return (
-    <div className={cn('rounded-lg border p-4', className)}>
-      <h2>{title}</h2>
-      {children}
-    </div>
-  )
-}
-```
-
-### API Routes
-
-- Use Next.js App Router conventions (`route.ts`)
-- Return `NextResponse.json()` for all responses
-- Validate input with Zod schemas
-- Use try/catch with proper error responses
-
-```typescript
-import { NextRequest, NextResponse } from 'next/server'
-
-export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json()
-    // Validate and process...
-    return NextResponse.json({ data: result })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
-  }
-}
-```
-
-### Error Handling
-
-- Use custom error classes for domain errors (see `lib/ai/types.ts`)
-- Always catch and handle errors appropriately
-- Log errors with context: `console.error('[Context]', error)`
-- Return user-friendly messages, log detailed errors
-
-```typescript
-try {
-  await riskyOperation()
-} catch (error) {
-  console.error('[FeatureName]', error)
-  throw new Error('Operation failed')
-}
-```
-
-### Database (Prisma)
-
-- Import client from `@/lib/prisma` (singleton pattern)
-- Use transactions for multi-step operations
-- Always include `onDelete: Cascade` on relations where appropriate
-
-```typescript
-import { prisma } from '@/lib/prisma'
-
-const user = await prisma.user.findUnique({
-  where: { clerkId },
-  include: { projects: true },
-})
-```
-
-## Key Technologies
-
-| Technology | Purpose |
-|------------|---------|
-| Next.js 16 | App Router, React Server Components |
-| React 19 | UI library |
-| TypeScript 5 | Type safety |
-| Prisma 5 | Database ORM (PostgreSQL) |
-| Clerk | Authentication |
-| Tailwind CSS 4 | Styling |
-| shadcn/ui | UI component library |
-| Zod | Schema validation |
-| AI SDK | AI model integration |
-
-## AI System (`lib/ai/`)
-
-Multi-provider AI management with Groq (primary) and OpenRouter (fallback).
-
-```typescript
-import { getAIManager } from '@/lib/ai'
-
-const ai = getAIManager()
-const result = await ai.complete({
-  messages: [{ role: 'user', content: 'Hello' }],
-  useCase: 'chat',
-})
-```
-
-Use cases: `chat`, `analysis`, `code-generation`, `summarization`, `extraction`, `vision`, `fast-response`, `high-quality`, `cost-effective`
-
-## Verification Checklist
-
-Before committing changes, verify:
-
-1. `npx tsc --noEmit` - No TypeScript errors
-2. `pnpm lint` - No ESLint errors  
-3. `pnpm build` - Production build succeeds
-4. Test affected functionality manually
+- **Proxy naming** — `proxy.ts` is CORRECT for Next.js 16 (replaces `middleware.ts` from v15)
+- **Build allows errors** — `next.config.mjs` has `ignoreBuildErrors: true`
+- **Doc mismatch** — Structure uses flat dirs, not `(feature)/` route groups
+- **Lock file conflict** — Both `bun.lock` and `pnpm-lock.yaml` present
+- **Python integration** — Not microservice, runs as child process from API routes

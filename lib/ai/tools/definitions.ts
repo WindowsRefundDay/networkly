@@ -90,7 +90,7 @@ export const AI_TOOLS: ToolDefinition[] = [
     type: 'function',
     function: {
       name: 'search_opportunities',
-      description: 'Look for opportunities in the database. Returns matching opportunities or empty array if none found. Use this when user asks to find opportunities.',
+      description: 'Basic search for opportunities. Use smart_search_opportunities instead for personalized results.',
       parameters: {
         type: 'object',
         properties: {
@@ -114,6 +114,72 @@ export const AI_TOOLS: ToolDefinition[] = [
           }
         },
         required: ['query']
+      }
+    }
+  },
+
+  // Smart Search - Profile-Aware (Preferred)
+  {
+    type: 'function',
+    function: {
+      name: 'smart_search_opportunities',
+      description: 'Search opportunities with automatic personalization based on user profile. This is the PREFERRED search - it automatically considers user interests, skills, grade level, and location. Use this for all opportunity searches.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: {
+            type: 'string',
+            description: 'Search query (e.g., "robotics", "summer internship", "coding"). Can be empty to get personalized recommendations.'
+          },
+          category: {
+            type: 'string',
+            description: 'Category filter (optional)',
+            enum: ['STEM', 'Arts', 'Business', 'Community Service', 'Sports', 'Other']
+          },
+          type: {
+            type: 'string',
+            description: 'Type filter (optional)',
+            enum: ['Internship', 'Competition', 'Summer Program', 'Research', 'Volunteer', 'Scholarship']
+          },
+          limit: {
+            type: 'number',
+            description: 'Maximum results to return (default 10)'
+          }
+        },
+        required: []
+      }
+    }
+  },
+
+  // Filter by Deadline
+  {
+    type: 'function',
+    function: {
+      name: 'filter_by_deadline',
+      description: 'Find opportunities with deadlines within a specific timeframe. Great for "what\'s due soon" or "deadlines this week/month" queries.',
+      parameters: {
+        type: 'object',
+        properties: {
+          days: {
+            type: 'number',
+            description: 'Number of days from now to search within (e.g., 7 for next week, 30 for next month)'
+          },
+          category: {
+            type: 'string',
+            description: 'Category filter (optional)',
+            enum: ['STEM', 'Arts', 'Business', 'Community Service', 'Sports', 'Other']
+          },
+          type: {
+            type: 'string',
+            description: 'Type filter (optional)',
+            enum: ['Internship', 'Competition', 'Summer Program', 'Research', 'Volunteer', 'Scholarship']
+          },
+          limit: {
+            type: 'number',
+            description: 'Maximum results to return (default 10)'
+          }
+        },
+        required: ['days']
       }
     }
   },
@@ -146,7 +212,7 @@ export const AI_TOOLS: ToolDefinition[] = [
     type: 'function',
     function: {
       name: 'trigger_web_discovery',
-      description: 'Search the web for new opportunities. Only call this AFTER user has agreed to look on the web (clicked the button). This takes 30-60 seconds.',
+      description: 'Basic web search for opportunities. Use personalized_web_discovery instead for better results. Only call AFTER user agrees.',
       parameters: {
         type: 'object',
         properties: {
@@ -156,6 +222,30 @@ export const AI_TOOLS: ToolDefinition[] = [
           }
         },
         required: ['query']
+      }
+    }
+  },
+
+  // Personalized Web Discovery (preferred)
+  {
+    type: 'function',
+    function: {
+      name: 'personalized_web_discovery',
+      description: 'Search the web for opportunities using the user profile (interests, skills, location). This is the PREFERRED web discovery tool. Only call AFTER user has explicitly agreed to look on the web. Takes 30-60 seconds.',
+      parameters: {
+        type: 'object',
+        properties: {
+          topic: {
+            type: 'string',
+            description: 'Optional topic focus (e.g., "robotics", "summer programs"). If empty, uses user interests.'
+          },
+          category: {
+            type: 'string',
+            description: 'Category focus (optional)',
+            enum: ['STEM', 'Arts', 'Business', 'Community Service', 'Sports']
+          }
+        },
+        required: []
       }
     }
   }
@@ -169,6 +259,9 @@ export const TOOL_ACTIONS: Record<string, string> = {
   'get_projects': 'Checking your projects...',
   'get_goals': 'Looking at your goals...',
   'search_opportunities': 'Looking for opportunities...',
+  'smart_search_opportunities': 'Finding personalized opportunities...',
+  'filter_by_deadline': 'Checking deadlines...',
   'bookmark_opportunity': 'Saving to your bookmarks...',
   'trigger_web_discovery': 'Looking across the web...',
+  'personalized_web_discovery': 'Searching the web based on your interests...',
 }

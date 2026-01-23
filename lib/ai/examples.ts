@@ -8,8 +8,8 @@
 import {
   getAIManager,
   createAIManager,
-  createGroqProvider,
   createOpenRouterProvider,
+  createGeminiProvider,
   type Message,
   type UseCase,
   type CompletionResult,
@@ -72,14 +72,14 @@ async function streamingExample() {
 async function useCaseExamples() {
   const ai = getAIManager()
 
-  // Fast response - uses Groq's fast inference
+  // Fast response - uses Gemini Flash
   const quickAnswer = await ai.complete({
     messages: [{ role: 'user', content: 'What is 2+2?' }],
     useCase: 'fast-response',
   })
   console.log('Fast response:', quickAnswer.content)
 
-  // High quality - uses Claude or GPT-4
+  // High quality - uses Gemini Pro
   const qualityAnswer = await ai.complete({
     messages: [{ role: 'user', content: 'Explain quantum entanglement to a 5-year-old.' }],
     useCase: 'high-quality',
@@ -94,7 +94,7 @@ async function useCaseExamples() {
   })
   console.log('Generated code:', code.content)
 
-  // Cost-effective - uses free/cheap models
+  // Cost-effective - uses efficient models
   const cheapAnswer = await ai.complete({
     messages: [{ role: 'user', content: 'Summarize: The quick brown fox jumps over the lazy dog.' }],
     useCase: 'cost-effective',
@@ -113,15 +113,13 @@ async function customConfigExample() {
   const ai = createAIManager({
     providers: [
       {
-        name: 'groq',
-        apiKey: process.env.GROQ_API_KEY!,
-        baseUrl: 'https://api.groq.com/openai/v1/chat/completions',
-        defaultModel: 'llama-3.3-70b-versatile',
+        name: 'gemini',
+        apiKey: process.env.GEMINI_API_KEY!,
+        baseUrl: 'https://generativelanguage.googleapis.com',
+        defaultModel: 'gemini-2.5-flash',
         enabled: true,
-        timeout: 30000,
+        timeout: 60000,
         maxRetries: 3,
-        rateLimitRpm: 30,
-        rateLimitTpm: 14400,
       },
       {
         name: 'openrouter',
@@ -136,14 +134,14 @@ async function customConfigExample() {
     useCases: [
       {
         useCase: 'chat',
-        primaryModel: 'groq:llama-3.3-70b-versatile',
+        primaryModel: 'gemini-2.5-flash',
         fallbackModels: ['openrouter:openai/gpt-4o-mini'],
         defaultTemperature: 0.7,
       },
       {
         useCase: 'analysis',
-        primaryModel: 'openrouter:anthropic/claude-3.5-sonnet',
-        fallbackModels: ['groq:llama-3.3-70b-versatile'],
+        primaryModel: 'gemini-2.5-pro',
+        fallbackModels: ['openrouter:anthropic/claude-3.5-sonnet'],
         defaultTemperature: 0.3,
         maxTokens: 4000,
       },
@@ -175,15 +173,15 @@ async function customConfigExample() {
  * Example 5: Use providers directly for fine-grained control
  */
 async function directProviderExample() {
-  // Create Groq provider directly
-  const groq = createGroqProvider(process.env.GROQ_API_KEY!)
+  // Create Gemini provider directly
+  const gemini = createGeminiProvider(process.env.GEMINI_API_KEY!)
 
   // List available models
-  console.log('Groq models:', groq.getModels().map(m => m.id))
+  console.log('Gemini models:', gemini.getModels().map((m: { id: string }) => m.id))
 
   // Make a request
-  const result = await groq.complete({
-    model: 'llama-3.3-70b-versatile',
+  const result = await gemini.complete({
+    model: 'gemini-2.5-flash',
     messages: [
       { role: 'system', content: 'You are a helpful assistant.' },
       { role: 'user', content: 'What is the meaning of life?' }
@@ -257,8 +255,8 @@ async function healthMonitoringExample() {
   console.log('Provider statuses:', statuses)
 
   // Check specific provider
-  const groqStatus = ai.getProviderStatus('groq')
-  console.log('Groq healthy:', groqStatus?.healthy)
+  const geminiStatus = ai.getProviderStatus('gemini')
+  console.log('Gemini healthy:', geminiStatus?.healthy)
 
   // Run health checks manually
   const results = await ai.runHealthChecks()
@@ -284,10 +282,10 @@ function modelDiscoveryExample() {
   console.log(`Total models available: ${allModels.length}`)
 
   // Get models by provider
-  const groqModels = ai.getProviderModels('groq')
+  const geminiModels = ai.getProviderModels('gemini')
   const openrouterModels = ai.getProviderModels('openrouter')
   
-  console.log(`Groq models: ${groqModels.length}`)
+  console.log(`Gemini models: ${geminiModels.length}`)
   console.log(`OpenRouter models: ${openrouterModels.length}`)
 
   // Filter by capabilities
@@ -314,8 +312,8 @@ async function dynamicConfigExample() {
   // Add a custom use case configuration
   ai.configureUseCase({
     useCase: 'summarization',
-    primaryModel: 'groq:llama-3.1-8b-instant',
-    fallbackModels: ['groq:gemma2-9b-it'],
+    primaryModel: 'gemini-2.5-flash',
+    fallbackModels: ['gemini-2.0-flash'],
     defaultTemperature: 0.3,
     maxTokens: 500,
     systemPrompt: 'You are a concise summarization assistant.',
@@ -347,7 +345,7 @@ async function functionCallingExample() {
     messages: [
       { role: 'user', content: 'What is the weather in San Francisco?' }
     ],
-    model: 'groq:llama-3.3-70b-versatile',
+    model: 'gemini-2.5-flash',
     tools: [
       {
         type: 'function',
@@ -403,7 +401,7 @@ async function jsonModeExample() {
         content: 'List 3 programming languages with their year of creation'
       }
     ],
-    model: 'groq:llama-3.3-70b-versatile',
+    model: 'gemini-2.5-flash',
     responseFormat: { type: 'json_object' },
     temperature: 0,
   })

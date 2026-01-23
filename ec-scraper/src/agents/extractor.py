@@ -19,15 +19,16 @@ from ..llm import get_llm_provider, GenerationConfig
 
 EXTRACTION_PROMPT = """You are an expert at extracting information about opportunities for high school students.
 
-Current date: January 2026
+Current date: January 16, 2026
 
 Given the following webpage content, extract structured information about the opportunity.
 
 VALIDATION RULES (Set valid=false only if):
-- This is a ranking article listing MULTIPLE different programs (e.g. "Top 10 Internships")
+- This is a ranking article listing MULTIPLE different programs (e.g. "Top 10 Internships", "15 Best Scholarships")
 - This is a general directory or aggregator page without specific application details for a SINGLE program
 - This is strictly a forum discussion (Reddit/Quora)
 - This is clearly for Graduate/PhD students only (not High School)
+- This is a 404 error page or "page not found"
 
 ACCEPTABLE CONTENT (Set valid=true):
 - Specific program landing pages (even if they are marketing/informational)
@@ -38,19 +39,43 @@ ACCEPTABLE CONTENT (Set valid=true):
 
 EXTRACTION INSTRUCTIONS:
 1. Extract the MAIN opportunity described on the page.
-2. If multiple dates exist, look for the most RECENT/UPCOMING 2026 application deadline.
-3. Check if all dates mentioned are in the PAST (e.g., 2025 dates when current year is 2026). If so, set appears_expired=true.
-4. TIMING CLASSIFICATION:
+
+2. **DATE EXTRACTION IS CRITICAL** - Search extensively for dates in these formats:
+   - Application deadline: "Apply by March 15, 2026", "Deadline: 3/15/26", "Applications due March 15"
+   - Program dates: "June 1 - August 15", "Summer 2026", "July 2026"
+   - Start/End dates: "Program runs June-August", "Begins Summer 2026"
+   - Look in: application info, FAQs, timeline sections, headers, footers, sidebar widgets
+   - Common phrases: "deadline", "apply by", "due date", "opens", "closes", "starts", "ends"
+   - If NO specific date found but it's a summer program, infer: June 1 - August 15 for start/end
+   - If scholarship with no deadline, check for "rolling" or "annual deadline"
+
+3. If you find dates, extract ALL of them:
+   - deadline: Application deadline in YYYY-MM-DD format
+   - start_date: When program/opportunity begins in YYYY-MM-DD format  
+   - end_date: When program/opportunity ends in YYYY-MM-DD format
+
+4. Check if dates are in the PAST (e.g., 2025 or earlier when current year is 2026):
+   - If so, set appears_expired=true
+
+5. TIMING CLASSIFICATION:
    - "one-time": Single event, won't recur (e.g., specific workshop with fixed date)
-   - "annual": Happens every year (e.g., Science Olympiad, annual hackathons, yearly contests)
+   - "annual": Happens every year (e.g., Science Olympiad, annual hackathons, yearly contests, annual scholarships)
    - "recurring": Regular schedule (monthly meetings, quarterly programs)
    - "rolling": Rolling admissions, no fixed deadline
    - "ongoing": Always open (e.g., volunteer positions, club membership)
    - "seasonal": Seasonal pattern (summer programs, winter camps)
-5. For annual/recurring opportunities where appears_expired=true, this likely means the page shows past cycle info but the program will run again next year.
-6. For grade_levels, infer from "High School", "Secondary School", "9th-12th grade" -> [9, 10, 11, 12]
-7. Use "Other" category if it doesn't fit perfectly, but provide a specific suggested_category.
-8. Set confidence based on completeness (0.8+ for full details, ~0.5 if some details missing).
+
+6. For annual/recurring opportunities where appears_expired=true, the program will run again next year.
+
+7. For grade_levels, infer from "High School", "Secondary School", "9th-12th grade" -> [9, 10, 11, 12]
+
+8. Use "Other" category if it doesn't fit perfectly, but provide a specific suggested_category.
+
+9. Set confidence based on completeness:
+   - 0.9+: Full details with specific dates, requirements, application info
+   - 0.7-0.8: Good details, missing some dates or specifics
+   - 0.5-0.6: Basic info, missing important details like dates or requirements
+   - Below 0.5: Incomplete or uncertain information
 
 WEBPAGE CONTENT:
 ---

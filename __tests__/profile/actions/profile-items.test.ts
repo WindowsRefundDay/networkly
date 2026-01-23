@@ -1,39 +1,55 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
-// Mock Prisma
-vi.mock("@/lib/prisma", () => ({
-  prisma: {
-    user: {
-      findUnique: vi.fn(),
-      update: vi.fn(),
+const createQueryMock = () => {
+  const query: any = {
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    update: vi.fn().mockReturnThis(),
+    insert: vi.fn().mockReturnThis(),
+    delete: vi.fn().mockReturnThis(),
+    single: vi.fn(),
+    __result: { data: null, error: null },
+    then: function (resolve: (value: any) => any, reject?: (reason: any) => any) {
+      return Promise.resolve(this.__result).then(resolve, reject)
     },
-    achievement: {
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-      findFirst: vi.fn(),
-    },
-    extracurricular: {
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-      findFirst: vi.fn(),
-    },
-  },
+  }
+
+  return query
+}
+
+vi.mock("@/lib/supabase/server", () => ({
+  createClient: vi.fn(),
+  requireAuth: vi.fn(),
 }))
 
-import { prisma } from "@/lib/prisma"
-import { auth } from "@clerk/nextjs/server"
+import { createClient, requireAuth } from "@/lib/supabase/server"
 
 describe("Profile Items Actions", () => {
+  const queryMocks = {
+    users: createQueryMock(),
+    achievements: createQueryMock(),
+    extracurriculars: createQueryMock(),
+  }
+
+  const supabaseMock = {
+    from: vi.fn((table: keyof typeof queryMocks) => queryMocks[table]),
+    auth: {
+      getUser: vi.fn(),
+    },
+  }
+
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(createClient).mockResolvedValue(supabaseMock as any)
+    Object.values(queryMocks).forEach((query) => {
+      query.__result = { data: null, error: null }
+    })
   })
 
   describe("Achievement Actions", () => {
     describe("addAchievement", () => {
       it("should throw error if user is not authenticated", async () => {
-        vi.mocked(auth).mockResolvedValueOnce({ userId: null } as any)
+        vi.mocked(requireAuth).mockRejectedValueOnce(new Error("Unauthorized"))
 
         const { addAchievement } = await import("@/app/actions/profile-items")
 
@@ -42,31 +58,20 @@ describe("Profile Items Actions", () => {
         ).rejects.toThrow("Unauthorized")
       })
 
-      it("should throw error if user is not found", async () => {
-        vi.mocked(auth).mockResolvedValueOnce({ userId: "clerk-123" } as any)
-        vi.mocked(prisma.user.findUnique).mockResolvedValueOnce(null)
-
-        const { addAchievement } = await import("@/app/actions/profile-items")
-
-        await expect(
-          addAchievement({ title: "Award", category: "Academic", date: "2024-01-15", icon: "trophy" })
-        ).rejects.toThrow("User not found")
-      })
-
       it("should create achievement with valid data", async () => {
-        vi.mocked(auth).mockResolvedValueOnce({ userId: "clerk-123" } as any)
-        vi.mocked(prisma.user.findUnique).mockResolvedValueOnce({
-          id: "user-1",
-        } as any)
-        vi.mocked(prisma.achievement.create).mockResolvedValueOnce({
-          id: "achievement-1",
-          title: "Dean's List",
-          category: "Academic",
-          description: null,
-          date: "2024-01-15",
-          icon: "trophy",
-          userId: "user-1",
-        } as any)
+        vi.mocked(requireAuth).mockResolvedValueOnce({ id: "user-1" } as any)
+        queryMocks.achievements.single.mockResolvedValueOnce({
+          data: {
+            id: "achievement-1",
+            title: "Dean's List",
+            category: "Academic",
+            description: null,
+            date: "2024-01-15",
+            icon: "trophy",
+            user_id: "user-1",
+          },
+          error: null,
+        })
 
         const { addAchievement } = await import("@/app/actions/profile-items")
 
@@ -77,27 +82,36 @@ describe("Profile Items Actions", () => {
           icon: "trophy",
         })
 
-        expect(prisma.achievement.create).toHaveBeenCalledWith({
-          data: {
-            title: "Dean's List",
-            category: "Academic",
-            description: null,
-            date: "2024-01-15",
-            icon: "trophy",
-            userId: "user-1",
-          },
+        expect(queryMocks.achievements.insert).toHaveBeenCalledWith({
+          title: "Dean's List",
+          category: "Academic",
+          description: null,
+          date: "2024-01-15",
+          icon: "trophy",
+          user_id: "user-1",
         })
         expect(result.title).toBe("Dean's List")
+      })
+
+      it("should throw error when insert fails", async () => {
+        vi.mocked(requireAuth).mockResolvedValueOnce({ id: "user-1" } as any)
+        queryMocks.achievements.single.mockResolvedValueOnce({
+          data: null,
+          error: { message: "Insert failed" },
+        })
+
+        const { addAchievement } = await import("@/app/actions/profile-items")
+
+        await expect(
+          addAchievement({ title: "Award", category: "Academic", date: "2024-01-15", icon: "trophy" })
+        ).rejects.toThrow("Failed to add achievement")
       })
     })
 
     describe("updateAchievement", () => {
       it("should throw error if achievement not found or not owned", async () => {
-        vi.mocked(auth).mockResolvedValueOnce({ userId: "clerk-123" } as any)
-        vi.mocked(prisma.user.findUnique).mockResolvedValueOnce({
-          id: "user-1",
-        } as any)
-        vi.mocked(prisma.achievement.findFirst).mockResolvedValueOnce(null)
+        vi.mocked(requireAuth).mockResolvedValueOnce({ id: "user-1" } as any)
+        queryMocks.achievements.single.mockResolvedValueOnce({ data: null, error: null })
 
         const { updateAchievement } = await import("@/app/actions/profile-items")
 
@@ -107,18 +121,22 @@ describe("Profile Items Actions", () => {
       })
 
       it("should update achievement when user owns it", async () => {
-        vi.mocked(auth).mockResolvedValueOnce({ userId: "clerk-123" } as any)
-        vi.mocked(prisma.user.findUnique).mockResolvedValueOnce({
-          id: "user-1",
-        } as any)
-        vi.mocked(prisma.achievement.findFirst).mockResolvedValueOnce({
-          id: "achievement-1",
-          userId: "user-1",
-        } as any)
-        vi.mocked(prisma.achievement.update).mockResolvedValueOnce({
-          id: "achievement-1",
-          title: "Updated Title",
-        } as any)
+        vi.mocked(requireAuth).mockResolvedValueOnce({ id: "user-1" } as any)
+        queryMocks.achievements.single
+          .mockResolvedValueOnce({
+            data: {
+              id: "achievement-1",
+              user_id: "user-1",
+            },
+            error: null,
+          })
+          .mockResolvedValueOnce({
+            data: {
+              id: "achievement-1",
+              title: "Updated Title",
+            },
+            error: null,
+          })
 
         const { updateAchievement } = await import("@/app/actions/profile-items")
 
@@ -126,9 +144,8 @@ describe("Profile Items Actions", () => {
           title: "Updated Title",
         })
 
-        expect(prisma.achievement.update).toHaveBeenCalledWith({
-          where: { id: "achievement-1" },
-          data: { title: "Updated Title" },
+        expect(queryMocks.achievements.update).toHaveBeenCalledWith({
+          title: "Updated Title",
         })
         expect(result.title).toBe("Updated Title")
       })
@@ -136,23 +153,18 @@ describe("Profile Items Actions", () => {
 
     describe("deleteAchievement", () => {
       it("should delete achievement when user owns it", async () => {
-        vi.mocked(auth).mockResolvedValueOnce({ userId: "clerk-123" } as any)
-        vi.mocked(prisma.user.findUnique).mockResolvedValueOnce({
-          id: "user-1",
-        } as any)
-        vi.mocked(prisma.achievement.findFirst).mockResolvedValueOnce({
-          id: "achievement-1",
-          userId: "user-1",
-        } as any)
-        vi.mocked(prisma.achievement.delete).mockResolvedValueOnce({} as any)
+        vi.mocked(requireAuth).mockResolvedValueOnce({ id: "user-1" } as any)
+        queryMocks.achievements.single.mockResolvedValueOnce({
+          data: { id: "achievement-1", user_id: "user-1" },
+          error: null,
+        })
+        queryMocks.achievements.__result = { data: null, error: null }
 
         const { deleteAchievement } = await import("@/app/actions/profile-items")
 
         const result = await deleteAchievement("achievement-1")
 
-        expect(prisma.achievement.delete).toHaveBeenCalledWith({
-          where: { id: "achievement-1" },
-        })
+        expect(queryMocks.achievements.delete).toHaveBeenCalled()
         expect(result.success).toBe(true)
       })
     })
@@ -161,19 +173,19 @@ describe("Profile Items Actions", () => {
   describe("Extracurricular Actions", () => {
     describe("addExtracurricular", () => {
       it("should create extracurricular with valid data", async () => {
-        vi.mocked(auth).mockResolvedValueOnce({ userId: "clerk-123" } as any)
-        vi.mocked(prisma.user.findUnique).mockResolvedValueOnce({
-          id: "user-1",
-        } as any)
-        vi.mocked(prisma.extracurricular.create).mockResolvedValueOnce({
-          id: "ext-1",
-          title: "President",
-          organization: "CS Club",
-          type: "Leadership",
-          startDate: "2023",
-          endDate: "Present",
-          userId: "user-1",
-        } as any)
+        vi.mocked(requireAuth).mockResolvedValueOnce({ id: "user-1" } as any)
+        queryMocks.extracurriculars.single.mockResolvedValueOnce({
+          data: {
+            id: "ext-1",
+            title: "President",
+            organization: "CS Club",
+            type: "Leadership",
+            start_date: "2023",
+            end_date: "Present",
+            user_id: "user-1",
+          },
+          error: null,
+        })
 
         const { addExtracurricular } = await import("@/app/actions/profile-items")
 
@@ -185,18 +197,24 @@ describe("Profile Items Actions", () => {
           endDate: "Present",
         })
 
-        expect(prisma.extracurricular.create).toHaveBeenCalled()
+        expect(queryMocks.extracurriculars.insert).toHaveBeenCalledWith({
+          title: "President",
+          organization: "CS Club",
+          type: "Leadership",
+          start_date: "2023",
+          end_date: "Present",
+          description: null,
+          logo: null,
+          user_id: "user-1",
+        })
         expect(result.title).toBe("President")
       })
     })
 
     describe("deleteExtracurricular", () => {
       it("should throw error if not found or not owned", async () => {
-        vi.mocked(auth).mockResolvedValueOnce({ userId: "clerk-123" } as any)
-        vi.mocked(prisma.user.findUnique).mockResolvedValueOnce({
-          id: "user-1",
-        } as any)
-        vi.mocked(prisma.extracurricular.findFirst).mockResolvedValueOnce(null)
+        vi.mocked(requireAuth).mockResolvedValueOnce({ id: "user-1" } as any)
+        queryMocks.extracurriculars.single.mockResolvedValueOnce({ data: null, error: null })
 
         const { deleteExtracurricular } = await import("@/app/actions/profile-items")
 
@@ -204,13 +222,29 @@ describe("Profile Items Actions", () => {
           "Extracurricular not found"
         )
       })
+
+      it("should delete extracurricular when owned", async () => {
+        vi.mocked(requireAuth).mockResolvedValueOnce({ id: "user-1" } as any)
+        queryMocks.extracurriculars.single.mockResolvedValueOnce({
+          data: { id: "ext-1", user_id: "user-1" },
+          error: null,
+        })
+        queryMocks.extracurriculars.__result = { data: null, error: null }
+
+        const { deleteExtracurricular } = await import("@/app/actions/profile-items")
+
+        const result = await deleteExtracurricular("ext-1")
+
+        expect(queryMocks.extracurriculars.delete).toHaveBeenCalled()
+        expect(result.success).toBe(true)
+      })
     })
   })
 
   describe("Skills & Interests Actions", () => {
     describe("addSkill", () => {
       it("should throw error for invalid skill", async () => {
-        vi.mocked(auth).mockResolvedValueOnce({ userId: "clerk-123" } as any)
+        vi.mocked(requireAuth).mockResolvedValueOnce({ id: "user-1" } as any)
 
         const { addSkill } = await import("@/app/actions/profile-items")
 
@@ -218,11 +252,14 @@ describe("Profile Items Actions", () => {
       })
 
       it("should throw error for duplicate skill", async () => {
-        vi.mocked(auth).mockResolvedValueOnce({ userId: "clerk-123" } as any)
-        vi.mocked(prisma.user.findUnique).mockResolvedValueOnce({
-          id: "user-1",
-          skills: ["React", "TypeScript"],
-        } as any)
+        vi.mocked(requireAuth).mockResolvedValueOnce({ id: "user-1" } as any)
+        queryMocks.users.single.mockResolvedValueOnce({
+          data: {
+            id: "user-1",
+            skills: ["React", "TypeScript"],
+          },
+          error: null,
+        })
 
         const { addSkill } = await import("@/app/actions/profile-items")
 
@@ -230,22 +267,23 @@ describe("Profile Items Actions", () => {
       })
 
       it("should add new skill to user", async () => {
-        vi.mocked(auth).mockResolvedValueOnce({ userId: "clerk-123" } as any)
-        vi.mocked(prisma.user.findUnique).mockResolvedValueOnce({
-          id: "user-1",
-          skills: ["React"],
-        } as any)
-        vi.mocked(prisma.user.update).mockResolvedValueOnce({
-          skills: ["React", "TypeScript"],
-        } as any)
+        vi.mocked(requireAuth).mockResolvedValueOnce({ id: "user-1" } as any)
+        queryMocks.users.single
+          .mockResolvedValueOnce({
+            data: { id: "user-1", skills: ["React"] },
+            error: null,
+          })
+          .mockResolvedValueOnce({
+            data: { skills: ["React", "TypeScript"] },
+            error: null,
+          })
 
         const { addSkill } = await import("@/app/actions/profile-items")
 
         const result = await addSkill("TypeScript")
 
-        expect(prisma.user.update).toHaveBeenCalledWith({
-          where: { clerkId: "clerk-123" },
-          data: { skills: ["React", "TypeScript"] },
+        expect(queryMocks.users.update).toHaveBeenCalledWith({
+          skills: ["React", "TypeScript"],
         })
         expect(result).toContain("TypeScript")
       })
@@ -253,14 +291,16 @@ describe("Profile Items Actions", () => {
 
     describe("removeSkill", () => {
       it("should remove skill from user", async () => {
-        vi.mocked(auth).mockResolvedValueOnce({ userId: "clerk-123" } as any)
-        vi.mocked(prisma.user.findUnique).mockResolvedValueOnce({
-          id: "user-1",
-          skills: ["React", "TypeScript"],
-        } as any)
-        vi.mocked(prisma.user.update).mockResolvedValueOnce({
-          skills: ["TypeScript"],
-        } as any)
+        vi.mocked(requireAuth).mockResolvedValueOnce({ id: "user-1" } as any)
+        queryMocks.users.single
+          .mockResolvedValueOnce({
+            data: { id: "user-1", skills: ["React", "TypeScript"] },
+            error: null,
+          })
+          .mockResolvedValueOnce({
+            data: { skills: ["TypeScript"] },
+            error: null,
+          })
 
         const { removeSkill } = await import("@/app/actions/profile-items")
 
@@ -272,11 +312,14 @@ describe("Profile Items Actions", () => {
 
     describe("addInterest", () => {
       it("should throw error for duplicate interest", async () => {
-        vi.mocked(auth).mockResolvedValueOnce({ userId: "clerk-123" } as any)
-        vi.mocked(prisma.user.findUnique).mockResolvedValueOnce({
-          id: "user-1",
-          interests: ["AI", "Web Dev"],
-        } as any)
+        vi.mocked(requireAuth).mockResolvedValueOnce({ id: "user-1" } as any)
+        queryMocks.users.single.mockResolvedValueOnce({
+          data: {
+            id: "user-1",
+            interests: ["AI", "Web Dev"],
+          },
+          error: null,
+        })
 
         const { addInterest } = await import("@/app/actions/profile-items")
 
@@ -284,14 +327,16 @@ describe("Profile Items Actions", () => {
       })
 
       it("should add new interest", async () => {
-        vi.mocked(auth).mockResolvedValueOnce({ userId: "clerk-123" } as any)
-        vi.mocked(prisma.user.findUnique).mockResolvedValueOnce({
-          id: "user-1",
-          interests: ["AI"],
-        } as any)
-        vi.mocked(prisma.user.update).mockResolvedValueOnce({
-          interests: ["AI", "Machine Learning"],
-        } as any)
+        vi.mocked(requireAuth).mockResolvedValueOnce({ id: "user-1" } as any)
+        queryMocks.users.single
+          .mockResolvedValueOnce({
+            data: { id: "user-1", interests: ["AI"] },
+            error: null,
+          })
+          .mockResolvedValueOnce({
+            data: { interests: ["AI", "Machine Learning"] },
+            error: null,
+          })
 
         const { addInterest } = await import("@/app/actions/profile-items")
 
@@ -300,11 +345,32 @@ describe("Profile Items Actions", () => {
         expect(result).toContain("Machine Learning")
       })
     })
+
+    describe("removeInterest", () => {
+      it("should remove interest from user", async () => {
+        vi.mocked(requireAuth).mockResolvedValueOnce({ id: "user-1" } as any)
+        queryMocks.users.single
+          .mockResolvedValueOnce({
+            data: { id: "user-1", interests: ["AI", "Robotics"] },
+            error: null,
+          })
+          .mockResolvedValueOnce({
+            data: { interests: ["Robotics"] },
+            error: null,
+          })
+
+        const { removeInterest } = await import("@/app/actions/profile-items")
+
+        const result = await removeInterest("AI")
+
+        expect(result).not.toContain("AI")
+      })
+    })
   })
 
   describe("updateBio", () => {
     it("should throw error for bio that is too long", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ userId: "clerk-123" } as any)
+      vi.mocked(requireAuth).mockResolvedValueOnce({ id: "user-1" } as any)
 
       const { updateBio } = await import("@/app/actions/profile-items")
 
@@ -313,19 +379,17 @@ describe("Profile Items Actions", () => {
     })
 
     it("should update bio successfully", async () => {
-      vi.mocked(auth).mockResolvedValueOnce({ userId: "clerk-123" } as any)
-      vi.mocked(prisma.user.update).mockResolvedValueOnce({
-        bio: "New bio content",
-      } as any)
+      vi.mocked(requireAuth).mockResolvedValueOnce({ id: "user-1" } as any)
+      queryMocks.users.single.mockResolvedValueOnce({
+        data: { bio: "New bio content" },
+        error: null,
+      })
 
       const { updateBio } = await import("@/app/actions/profile-items")
 
       const result = await updateBio("New bio content")
 
-      expect(prisma.user.update).toHaveBeenCalledWith({
-        where: { clerkId: "clerk-123" },
-        data: { bio: "New bio content" },
-      })
+      expect(queryMocks.users.update).toHaveBeenCalledWith({ bio: "New bio content" })
       expect(result).toBe("New bio content")
     })
   })

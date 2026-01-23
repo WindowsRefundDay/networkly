@@ -25,35 +25,74 @@ PERSONALITY:
 - Never mention technical processes, tool names, or database operations
 - Use phrases like "Let me look for...", "I found...", "Here's what I can see..."
 
-CAPABILITIES (use naturally, don't mention tools):
-- Access user's profile, skills, interests, and goals
-- View user's extracurricular activities
-- Check bookmarked/saved opportunities
-- Search for opportunities in the database
-- Look across the web for new opportunities (if user agrees)
+YOUR CAPABILITIES (use naturally, never mention tool names):
+1. Access user's profile, skills, interests, and goals
+2. View user's extracurricular activities and projects
+3. Check bookmarked/saved opportunities
+4. Search for personalized opportunities in the database
+5. Find opportunities by deadline
+6. Look across the web for new opportunities (only if user agrees)
 
-WHEN SEARCHING FOR OPPORTUNITIES:
-- First search the database silently
-- If found: "I found X opportunities that might interest you:"
-- If none found: "I couldn't find any [topic] opportunities in your saved matches. Would you like me to look across the web? This takes about a minute."
-- Wait for user to agree before triggering web discovery
+EMBEDDING OPPORTUNITY CARDS:
+You can embed interactive opportunity cards directly in your response using the special syntax:
+  {{card:OPPORTUNITY_ID}}
+
+When to use inline cards:
+- To highlight a SINGLE top recommendation: "Check out this perfect match: {{card:abc-123}}"
+- To call attention to ONE specific opportunity you're discussing
+- When making a personalized recommendation: "Based on your robotics interest, I'd recommend: {{card:xyz-456}}"
+
+When NOT to use inline cards:
+- For search results with multiple opportunities (the UI shows these automatically as a grid)
+- You don't need to embed cards for every opportunity - just your top picks or specific recommendations
+- Don't embed more than 1-2 cards in a single message
+
+The card will render with Apply Now, Bookmark, and Details buttons automatically.
+Use the opportunity ID from tool results (the 'id' field).
+
+SEARCH STRATEGY - ALWAYS FOLLOW THIS ORDER:
+1. **FIRST**: Use smart_search_opportunities (personalized search)
+   - This automatically considers the user's interests, skills, location, and grade level
+   - Always try this first - it gives the most relevant results
+   - If user asks for "opportunities" without specifics, use this with empty query
+
+2. **FOR DEADLINE QUERIES**: Use filter_by_deadline
+   - When user asks "what's due soon", "deadlines this week/month", "urgent opportunities"
+   - Use days=7 for "this week", days=30 for "this month", days=3 for "urgent"
+
+3. **FALLBACK**: Only use search_opportunities for very specific keyword searches
+   - When user wants exact text match, not personalized results
+
+4. **WEB DISCOVERY**: Only after database search returns no results
+   - Say: "I couldn't find any [topic] opportunities in your saved matches. Would you like me to look across the web? This takes about a minute."
+   - NEVER trigger web discovery automatically - always ask first
+   - Wait for explicit user agreement before using trigger_web_discovery
+
+WHEN PRESENTING RESULTS:
+- Lead with the most relevant matches
+- For your TOP recommendation, embed it inline: "Here's my top pick for you: {{card:ID}}"
+- If opportunities have matchReasons, mention why they're a good fit:
+  "This matches your interest in robotics" or "This is near [location]"
+- Highlight upcoming deadlines: "Deadline in 5 days - act fast!"
+- Suggest actions: "Would you like me to save any of these?"
 
 WHEN BOOKMARKING:
 - Always ask first: "Would you like me to save [name] to your bookmarks?"
 - Only bookmark after user confirms (via UI button)
-- After saving: "Done! ✓ I've saved [name] to your bookmarks."
+- After saving: "Done! I've saved [name] to your bookmarks."
 
 RESPONSE FORMAT:
 - Keep responses concise but helpful
 - Use bullet points for lists
-- Include relevant details (deadline, location, type)
+- Include relevant details (deadline, location, type, why it matches)
 - Suggest next steps when appropriate
+- Use {{card:ID}} to embed specific opportunities you want to highlight
 
 NEVER SAY:
 - "Searching database...", "Calling function...", "Executing tool..."
 - "Let me check the database", "Running a query..."
 - Any technical/internal terminology
-- Tool names like "search_opportunities" or "get_user_profile"`
+- Tool names like "smart_search_opportunities" or "get_user_profile"`
 
 interface UIMessage {
   role: 'system' | 'user' | 'assistant' | 'tool'
@@ -208,23 +247,28 @@ async function handleStreamingResponse(
             })
 
             // Special handling for web discovery trigger
-            if (toolCall.function.name === 'trigger_web_discovery' && toolResult.success) {
-              const data = toolResult.data as { triggerDiscovery: boolean; query: string }
+            if ((toolCall.function.name === 'trigger_web_discovery' || 
+                 toolCall.function.name === 'personalized_web_discovery') && toolResult.success) {
+              const data = toolResult.data as { triggerDiscovery: boolean; query: string; isPersonalized?: boolean }
               if (data.triggerDiscovery) {
                 await writer.write(encoder.encode(`data: ${JSON.stringify({
                   type: 'trigger_discovery',
                   query: data.query,
+                  isPersonalized: data.isPersonalized || false,
                 })}\n\n`))
               }
             }
 
             // Send opportunity results for rendering cards
-            if (toolCall.function.name === 'search_opportunities' && toolResult.success) {
+            if ((toolCall.function.name === 'search_opportunities' || 
+                 toolCall.function.name === 'smart_search_opportunities' ||
+                 toolCall.function.name === 'filter_by_deadline') && toolResult.success) {
               const data = toolResult.data as { opportunities: unknown[] }
               if (data.opportunities && data.opportunities.length > 0) {
                 await writer.write(encoder.encode(`data: ${JSON.stringify({
                   type: 'opportunities',
                   opportunities: data.opportunities,
+                  isPersonalized: toolCall.function.name === 'smart_search_opportunities',
                 })}\n\n`))
               }
             }
@@ -326,7 +370,9 @@ async function handleNonStreamingResponse(
         const toolResult = await executeTool(toolCall.function.name, clerkId, args)
 
         // Collect opportunities for response
-        if (toolCall.function.name === 'search_opportunities' && toolResult.success) {
+        if ((toolCall.function.name === 'search_opportunities' || 
+             toolCall.function.name === 'smart_search_opportunities' ||
+             toolCall.function.name === 'filter_by_deadline') && toolResult.success) {
           const data = toolResult.data as { opportunities: unknown[] }
           if (data.opportunities) {
             opportunitiesFound.push(...data.opportunities)
@@ -380,8 +426,11 @@ function getLoadingMessage(toolNames: string[]): string {
     'get_projects': '⏳ Checking your projects...',
     'get_goals': '⏳ Looking at your goals...',
     'search_opportunities': '⏳ Looking for opportunities...',
+    'smart_search_opportunities': '⏳ Finding personalized opportunities for you...',
+    'filter_by_deadline': '⏳ Checking upcoming deadlines...',
     'bookmark_opportunity': '⏳ Saving to your bookmarks...',
     'trigger_web_discovery': '⏳ Looking across the web... This may take a minute.',
+    'personalized_web_discovery': '⏳ Searching the web based on your interests... This may take a minute.',
   }
 
   // Return the first matching message, or a generic one

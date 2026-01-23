@@ -1,131 +1,142 @@
 "use server"
 
-import { getCurrentUser } from "./user"
+import { createClient, getCurrentUser } from "@/lib/supabase/server"
+
 import { getAnalyticsSummary } from "./analytics"
-import { prisma } from "@/lib/prisma"
 
 export async function getDashboardData() {
-  const [user, stats] = await Promise.all([
-    getCurrentUser(),
-    getAnalyticsSummary()
-  ])
+  const supabase = await createClient()
+  const [authUser, stats] = await Promise.all([getCurrentUser(), getAnalyticsSummary()])
 
-  // If user or stats is null, trigger sync flow in dashboard page
-  if (!user || !stats) {
+  if (!authUser || !stats) {
     return null
   }
 
-  // Calculate unread messages
-  const unreadMessages = await prisma.message.count({
-    where: {
-      receiverId: user.id,
-      unread: true
-    }
-  })
+  const { data: user, error: userError } = await supabase
+    .from("users")
+    .select("*")
+    .eq("id", authUser.id)
+    .single()
 
-  // Calculate pending connection requests
-  const pendingConnections = await prisma.connection.count({
-    where: {
-      receiverId: user.id,
-      status: "pending"
-    }
-  })
+  if (userError || !user) {
+    return null
+  }
 
-  // Calculate new opportunities (e.g. created in last 7 days)
+  const { count: unreadMessages } = await supabase
+    .from("messages")
+    .select("*", { count: "exact", head: true })
+    .eq("receiver_id", user.id)
+    .eq("unread", true)
+
+  const { count: pendingConnections } = await supabase
+    .from("connections")
+    .select("*", { count: "exact", head: true })
+    .eq("receiver_id", user.id)
+    .eq("status", "pending")
+
   const oneWeekAgo = new Date()
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
 
-  const newOpportunities = await prisma.opportunity.count({
-    where: {
-      createdAt: {
-        gte: oneWeekAgo
-      },
-      isActive: true
-    }
-  })
+  const { count: newOpportunities } = await supabase
+    .from("opportunities")
+    .select("*", { count: "exact", head: true })
+    .gte("created_at", oneWeekAgo.toISOString())
+    .eq("is_active", true)
 
-  // Fetch top opportunity match
-  const topMatch = await prisma.userOpportunity.findFirst({
-    where: {
-      userId: user.id,
-      opportunity: {
-        isActive: true,
-        isExpired: false
-      }
-    },
-    orderBy: {
-      matchScore: 'desc'
-    },
-    include: {
-      opportunity: true
-    }
-  })
+  const { data: userOpportunities } = await supabase
+    .from("user_opportunities")
+    .select(
+      `
+      *,
+      opportunities(*)
+    `
+    )
+    .eq("user_id", user.id)
+    .order("match_score", { ascending: false })
+    .limit(10)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const topMatch = userOpportunities?.find(
+    (uo: any) => uo.opportunities?.is_active && !uo.opportunities?.is_expired
+  )
 
   let spotlightOpportunity = null
-  if (topMatch) {
-    // Parse match reasons safely
+  if (topMatch?.opportunities) {
     let matchReasons: string[] = []
     try {
-      if (typeof topMatch.matchReasons === 'string') {
-        matchReasons = JSON.parse(topMatch.matchReasons)
-      } else if (Array.isArray(topMatch.matchReasons)) {
-        matchReasons = topMatch.matchReasons as string[]
+      if (typeof topMatch.match_reasons === "string") {
+        matchReasons = JSON.parse(topMatch.match_reasons)
+      } else if (Array.isArray(topMatch.match_reasons)) {
+        matchReasons = topMatch.match_reasons as string[]
       }
-    } catch (e) {
+    } catch {
       matchReasons = ["Based on your profile skills"]
     }
 
     spotlightOpportunity = {
-      ...topMatch.opportunity,
-      matchScore: topMatch.matchScore,
-      matchReasons
+      ...topMatch.opportunities,
+      matchScore: topMatch.match_score,
+      matchReasons,
     }
   } else {
-    // Fallback: Get most recent active opportunity if no matches found
-    const recentOpp = await prisma.opportunity.findFirst({
-      where: { isActive: true, isExpired: false },
-      orderBy: { createdAt: 'desc' }
-    })
+    const { data: recentOpp } = await supabase
+      .from("opportunities")
+      .select("*")
+      .eq("is_active", true)
+      .eq("is_expired", false)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single()
 
     if (recentOpp) {
       spotlightOpportunity = {
         ...recentOpp,
         matchScore: 0,
-        matchReasons: ["New opportunity"]
+        matchReasons: ["New opportunity"],
       }
     }
   }
 
-  // Calculate profile completeness
   let profileScore = 0
   if (user.avatar) profileScore += 10
   if (user.headline) profileScore += 10
   if (user.bio) profileScore += 20
   if (user.skills && user.skills.length > 0) profileScore += 20
-  if (user.completedProjects > 0) profileScore += 20
+  if (user.completed_projects > 0) profileScore += 20
   if (user.connections > 0) profileScore += 20
 
-  // Cap at 100
   const profileCompleteness = Math.min(profileScore, 100)
 
-  const recentActivities = await prisma.userActivity.findMany({
-    where: { userId: user.id },
-    orderBy: { date: 'desc' },
-    take: 10
-  })
+  const { data: recentActivities } = await supabase
+    .from("user_activities")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("date", { ascending: false })
+    .limit(10)
 
   return {
     user: {
-      ...user,
-      profileCompleteness
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      avatar: user.avatar,
+      headline: user.headline,
+      bio: user.bio,
+      skills: user.skills,
+      interests: user.interests,
+      connections: user.connections,
+      completedProjects: user.completed_projects,
+      profileViews: user.profile_views,
+      searchAppearances: user.search_appearances,
+      profileCompleteness,
     },
     dailyDigest: {
-      unreadMessages,
-      newOpportunities,
-      pendingConnections
+      unreadMessages: unreadMessages || 0,
+      newOpportunities: newOpportunities || 0,
+      pendingConnections: pendingConnections || 0,
     },
     stats,
     spotlightOpportunity,
-    recentActivities
+    recentActivities: recentActivities || [],
   }
 }

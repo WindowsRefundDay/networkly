@@ -101,12 +101,14 @@ export function AchievementsSection({ achievements = [] }: AchievementsSectionPr
   }
 
   const formatDate = (dateStr: string) => {
-    try {
-      const date = new Date(dateStr)
-      return date.toLocaleDateString("en-US", { month: "short", year: "numeric" })
-    } catch {
+    if (/(spring|summer|fall|winter)/i.test(dateStr)) {
       return dateStr
     }
+    const date = new Date(dateStr)
+    if (Number.isNaN(date.getTime())) {
+      return dateStr
+    }
+    return date.toLocaleDateString("en-US", { month: "short", year: "numeric" })
   }
 
   return (

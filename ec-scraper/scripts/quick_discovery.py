@@ -24,7 +24,7 @@ from src.search.semantic_filter import get_semantic_filter
 from src.agents.extractor import get_extractor
 from src.agents.query_generator import get_query_generator
 from src.agents.discovery import get_discovery_agent
-from src.crawlers.crawl4ai_client import get_crawler
+from src.crawlers.hybrid_crawler import get_hybrid_crawler
 from src.api.postgres_sync import PostgresSync
 from src.config import get_settings
 from src.embeddings import get_embeddings
@@ -162,7 +162,7 @@ async def main(query: str, user_profile_id: Optional[str] = None):
     # Initialize components
     search_client = get_searxng_client()
     query_generator = get_query_generator()
-    crawler = get_crawler()
+    crawler = get_hybrid_crawler()
     extractor = get_extractor()
     url_cache = get_url_cache()
     sync = PostgresSync(db_url)

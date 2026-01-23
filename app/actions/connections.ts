@@ -1,201 +1,162 @@
 "use server"
 
-import { prisma } from "@/lib/prisma"
-import { auth } from "@clerk/nextjs/server"
 import { revalidatePath } from "next/cache"
 
-// ============================================================================
-// GET CONNECTIONS
-// ============================================================================
+import { createClient, requireAuth } from "@/lib/supabase/server"
 
 export async function getConnections() {
-    const { userId } = await auth()
-    if (!userId) throw new Error("Unauthorized")
+  const authUser = await requireAuth()
+  const supabase = await createClient()
 
-    const user = await prisma.user.findUnique({
-        where: { clerkId: userId },
-    })
+  const { data: connections, error } = await supabase
+    .from("connections")
+    .select(
+      `
+            *,
+            requester:users!connections_requester_id_fkey (*),
+            receiver:users!connections_receiver_id_fkey (*)
+        `
+    )
+    .or(`requester_id.eq.${authUser.id},receiver_id.eq.${authUser.id}`)
+    .order("created_at", { ascending: false })
 
-    if (!user) throw new Error("User not found")
+  if (error) throw new Error(error.message)
 
-    const connections = await prisma.connection.findMany({
-        where: {
-            OR: [{ requesterId: user.id }, { receiverId: user.id }],
-        },
-        include: {
-            requester: true,
-            receiver: true,
-        },
-        orderBy: { createdAt: "desc" },
-    })
-
-    return connections.map((conn) => {
-        const otherUser = conn.requesterId === user.id ? conn.receiver : conn.requester
-        return {
-            id: conn.id,
-            name: otherUser.name,
-            headline: otherUser.headline,
-            avatar: otherUser.avatar,
-            mutualConnections: conn.mutualConnections,
-            matchReason: conn.matchReason,
-            status: conn.status as "connected" | "pending" | "suggested",
-            connectedDate: conn.connectedDate
-                ? conn.connectedDate.toLocaleDateString("en-US", { month: "short", year: "numeric" })
-                : null,
-        }
-    })
+  return (connections || []).map((conn) => {
+    const otherUser = conn.requester_id === authUser.id ? conn.receiver : conn.requester
+    return {
+      id: conn.id,
+      name: otherUser.name,
+      headline: otherUser.headline,
+      avatar: otherUser.avatar,
+      mutualConnections: conn.mutual_connections,
+      matchReason: conn.match_reason,
+      status: conn.status as "connected" | "pending" | "suggested",
+      connectedDate: conn.connected_date
+        ? new Date(conn.connected_date).toLocaleDateString("en-US", { month: "short", year: "numeric" })
+        : null,
+    }
+  })
 }
 
 export async function getSuggestedConnections() {
-    const { userId } = await auth()
-    if (!userId) throw new Error("Unauthorized")
+  const authUser = await requireAuth()
+  const supabase = await createClient()
 
-    const user = await prisma.user.findUnique({
-        where: { clerkId: userId },
-    })
+  const { data: existingConnections } = await supabase
+    .from("connections")
+    .select("requester_id, receiver_id")
+    .or(`requester_id.eq.${authUser.id},receiver_id.eq.${authUser.id}`)
 
-    if (!user) throw new Error("User not found")
+  const connectedUserIds = new Set(
+    (existingConnections || []).flatMap((c) => [c.requester_id, c.receiver_id])
+  )
+  connectedUserIds.add(authUser.id)
 
-    // Get users that are not already connected
-    const existingConnections = await prisma.connection.findMany({
-        where: {
-            OR: [{ requesterId: user.id }, { receiverId: user.id }],
-        },
-        select: {
-            requesterId: true,
-            receiverId: true,
-        },
-    })
+  const { data: suggestedUsers, error } = await supabase
+    .from("users")
+    .select("id, name, headline, avatar")
+    .not("id", "in", `(${Array.from(connectedUserIds).join(",")})`)
+    .limit(6)
 
-    const connectedUserIds = new Set(
-        existingConnections.flatMap((c) => [c.requesterId, c.receiverId])
-    )
-    connectedUserIds.add(user.id) // Exclude self
+  if (error) throw new Error(error.message)
 
-    const suggestedUsers = await prisma.user.findMany({
-        where: {
-            id: { notIn: Array.from(connectedUserIds) },
-        },
-        take: 6,
-    })
-
-    return suggestedUsers.map((u) => ({
-        id: u.id,
-        name: u.name,
-        headline: u.headline,
-        avatar: u.avatar,
-        mutualConnections: 0, // Would need to calculate in production
-        matchReason: "Suggested based on your profile",
-    }))
+  return (suggestedUsers || []).map((u) => ({
+    id: u.id,
+    name: u.name,
+    headline: u.headline,
+    avatar: u.avatar,
+    mutualConnections: 0,
+    matchReason: "Suggested based on your profile",
+  }))
 }
-
-// ============================================================================
-// SEND CONNECTION REQUEST
-// ============================================================================
 
 export async function sendConnectionRequest(receiverId: string) {
-    const { userId } = await auth()
-    if (!userId) throw new Error("Unauthorized")
+  const authUser = await requireAuth()
+  const supabase = await createClient()
 
-    const user = await prisma.user.findUnique({
-        where: { clerkId: userId },
+  const { data: connection, error } = await supabase
+    .from("connections")
+    .insert({
+      requester_id: authUser.id,
+      receiver_id: receiverId,
+      status: "pending",
     })
+    .select()
+    .single()
 
-    if (!user) throw new Error("User not found")
+  if (error) throw new Error(error.message)
 
-    const connection = await prisma.connection.create({
-        data: {
-            requesterId: user.id,
-            receiverId,
-            status: "pending",
-        },
-    })
-
-    revalidatePath("/network")
-    return connection
+  revalidatePath("/network")
+  return connection
 }
-
-// ============================================================================
-// ACCEPT CONNECTION REQUEST
-// ============================================================================
 
 export async function acceptConnectionRequest(connectionId: string) {
-    const { userId } = await auth()
-    if (!userId) throw new Error("Unauthorized")
+  const authUser = await requireAuth()
+  const supabase = await createClient()
 
-    const connection = await prisma.connection.update({
-        where: { id: connectionId },
-        data: {
-            status: "connected",
-            connectedDate: new Date(),
-        },
+  const { data: connection, error } = await supabase
+    .from("connections")
+    .update({
+      status: "accepted",
+      connected_date: new Date().toISOString(),
     })
+    .eq("id", connectionId)
+    .select()
+    .single()
 
-    revalidatePath("/network")
-    return connection
+  if (error) throw new Error(error.message)
+
+  revalidatePath("/network")
+  return connection
 }
-
-// ============================================================================
-// REMOVE CONNECTION
-// ============================================================================
 
 export async function removeConnection(connectionId: string) {
-    const { userId } = await auth()
-    if (!userId) throw new Error("Unauthorized")
+  const authUser = await requireAuth()
+  const supabase = await createClient()
 
-    await prisma.connection.delete({
-        where: { id: connectionId },
-    })
+  const { error } = await supabase
+    .from("connections")
+    .delete()
+    .eq("id", connectionId)
 
-    revalidatePath("/network")
+  if (error) throw new Error(error.message)
+
+  revalidatePath("/network")
 }
 
-// ============================================================================
-// GET NETWORK STATS
-// ============================================================================
-
 export async function getNetworkStats() {
-    const { userId } = await auth()
-    if (!userId) throw new Error("Unauthorized")
+  const authUser = await requireAuth()
+  const supabase = await createClient()
 
-    const user = await prisma.user.findUnique({
-        where: { clerkId: userId },
-        select: { id: true, profileViews: true },
-    })
+  const { data: user } = await supabase
+    .from("users")
+    .select("profile_views")
+    .eq("id", authUser.id)
+    .single()
 
-    if (!user) throw new Error("User not found")
+  const { count: totalConnections } = await supabase
+    .from("connections")
+    .select("*", { count: "exact", head: true })
+    .or(`requester_id.eq.${authUser.id},receiver_id.eq.${authUser.id}`)
+    .eq("status", "accepted")
 
-    // Count total connections (accepted)
-    const totalConnections = await prisma.connection.count({
-        where: {
-            OR: [{ requesterId: user.id }, { receiverId: user.id }],
-            status: "accepted",
-        },
-    })
+  const { count: pendingRequests } = await supabase
+    .from("connections")
+    .select("*", { count: "exact", head: true })
+    .eq("receiver_id", authUser.id)
+    .eq("status", "pending")
 
-    // Count pending requests (where user is the receiver)
-    const pendingRequests = await prisma.connection.count({
-        where: {
-            receiverId: user.id,
-            status: "pending",
-        },
-    })
+  const { count: unreadMessages } = await supabase
+    .from("messages")
+    .select("*", { count: "exact", head: true })
+    .eq("receiver_id", authUser.id)
+    .eq("unread", true)
 
-    // Count unread messages
-    const unreadMessages = await prisma.message.count({
-        where: {
-            receiverId: user.id,
-            unread: true,
-        },
-    })
-
-    // Get profile views from user record
-    const profileViews = user.profileViews
-
-    return {
-        totalConnections,
-        pendingRequests,
-        unreadMessages,
-        profileViews,
-    }
+  return {
+    totalConnections: totalConnections || 0,
+    pendingRequests: pendingRequests || 0,
+    unreadMessages: unreadMessages || 0,
+    profileViews: user?.profile_views || 0,
+  }
 }

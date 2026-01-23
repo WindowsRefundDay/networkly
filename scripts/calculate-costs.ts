@@ -16,7 +16,7 @@ import path from 'path'
 interface CostRecord {
   id: string
   timestamp: string
-  provider: 'openrouter' | 'groq' | 'gemini'
+  provider: 'openrouter' | 'gemini'
   model: string
   inputTokens: number
   outputTokens: number
@@ -158,7 +158,7 @@ async function main() {
   console.log('─'.repeat(60))
   const providersSorted = Object.entries(byProvider).sort((a, b) => b[1].cost - a[1].cost)
   for (const [provider, stats] of providersSorted) {
-    const providerIcon = provider === 'groq' ? '⚡' : provider === 'gemini' ? '✨' : '🔗'
+    const providerIcon = provider === 'gemini' ? '✨' : '🔗'
     console.log(`${providerIcon} ${provider.toUpperCase().padEnd(12)} ${formatCurrency(stats.cost).padStart(12)} │ ${formatNumber(stats.requests).padStart(6)} requests │ ${formatNumber(stats.inputTokens + stats.outputTokens).padStart(10)} tokens`)
   }
 
@@ -174,14 +174,11 @@ async function main() {
     console.log(`${shortModel.padEnd(32)} ${formatCurrency(stats.cost).padStart(12)} │ ${formatNumber(stats.requests).padStart(5)} reqs`)
   }
 
-  // Free vs Paid breakdown
-  const freeCost = (byProvider['groq']?.cost || 0)
-  const paidCost = totalCost - freeCost
-  
-  console.log('\n💵 FREE vs PAID')
+  // Cost breakdown
+  console.log('\n💵 COST BREAKDOWN')
   console.log('─'.repeat(60))
-  console.log(`Free (Groq):  ${formatCurrency(freeCost)} (${((freeCost / (totalCost || 1)) * 100).toFixed(1)}%)`)
-  console.log(`Paid:         ${formatCurrency(paidCost)} (${((paidCost / (totalCost || 1)) * 100).toFixed(1)}%)`)
+  console.log(`Gemini:       ${formatCurrency(byProvider['gemini']?.cost || 0)}`)
+  console.log(`OpenRouter:   ${formatCurrency(byProvider['openrouter']?.cost || 0)}`)
 
   // Recent activity
   console.log('\n⏱️  RECENT ACTIVITY')
