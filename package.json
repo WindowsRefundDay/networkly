@@ -3,23 +3,23 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "next build",
-    "dev": "next dev",
+    "build": "bun --bun next build",
+    "dev": "bun --bun next dev",
     "lint": "eslint .",
-    "start": "next start",
+    "start": "bun --bun next start",
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "db:generate": "prisma generate",
-    "db:push": "prisma db push",
-    "db:seed": "prisma db seed",
-    "db:studio": "prisma studio",
-    "postinstall": "prisma generate",
-    "costs": "npx tsx scripts/calculate-costs.ts",
+    "db:generate": "bunx --bun prisma generate",
+    "db:push": "bunx --bun prisma db push",
+    "db:seed": "bunx --bun prisma db seed",
+    "db:studio": "bunx --bun prisma studio",
+    "postinstall": "bunx --bun prisma generate",
+    "costs": "bun scripts/calculate-costs.ts",
     "costs:clear": "echo '{\"records\":[],\"lastUpdated\":\"\"}' > data/ai-costs.json && echo 'Cost data cleared!'"
   },
   "prisma": {
-    "seed": "npx tsx prisma/seed.ts"
+    "seed": "bun prisma/seed.ts"
   },
   "dependencies": {
     "@ai-sdk/react": "3.0.19",
@@ -72,6 +72,7 @@
     "react-day-picker": "9.8.0",
     "react-dom": "19.2.0",
     "react-hook-form": "^7.60.0",
+    "react-markdown": "^10.1.0",
     "react-resizable-panels": "^2.1.7",
     "recharts": "2.15.4",
     "sonner": "^1.7.4",
