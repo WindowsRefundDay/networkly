@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { User, Moon, Bell, Eye, Sparkles, Trash2, Loader2, Link2, Check, Search } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useUser } from "@clerk/nextjs"
+import { useSupabaseUser } from "@/hooks/use-supabase-user"
 import { getCurrentUser } from "@/app/actions/user"
 import { updateProfile } from "@/app/actions/profile"
 import { getPreferences, updatePreferences } from "@/app/actions/preferences"
@@ -39,7 +39,7 @@ interface UserData {
 
 export default function SettingsPage() {
   const { setTheme, theme } = useTheme()
-  const { user: clerkUser } = useUser()
+  const { user } = useSupabaseUser()
   const [isPending, startTransition] = useTransition()
   const [dbUser, setDbUser] = useState<UserData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -174,9 +174,17 @@ export default function SettingsPage() {
     })
   }
 
-  const userName = dbUser?.name || clerkUser?.fullName || clerkUser?.firstName || "User"
-  const userEmail = dbUser?.email || clerkUser?.primaryEmailAddress?.emailAddress || ""
-  const userAvatar = dbUser?.avatar || clerkUser?.imageUrl || "/placeholder.svg"
+  const userName =
+    dbUser?.name ||
+    (user?.user_metadata?.full_name as string | undefined) ||
+    (user?.user_metadata?.name as string | undefined) ||
+    user?.email?.split("@")[0] ||
+    "User"
+  const userEmail = dbUser?.email || user?.email || ""
+  const userAvatar =
+    dbUser?.avatar ||
+    (user?.user_metadata?.avatar_url as string | undefined) ||
+    "/placeholder.svg"
   const userInitials = userName
     .split(" ")
     .map((n) => n[0])

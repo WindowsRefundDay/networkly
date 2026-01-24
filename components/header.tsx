@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
-import { useUser, useClerk } from "@clerk/nextjs"
+import { useSupabaseUser } from "@/hooks/use-supabase-user"
 import { useHasMounted } from "@/hooks/use-has-mounted"
 import { SearchResultsDropdown } from "@/components/search/search-results-dropdown"
 import { globalSearch, type SearchResults } from "@/app/actions/search"
@@ -25,13 +25,16 @@ export function Header() {
   const [searchResults, setSearchResults] = useState<SearchResults | null>(null)
   const [isSearching, setIsSearching] = useState(false)
   const [isSearchOpen, setIsSearchOpen] = useState(false)
-  const { user } = useUser()
-  const { signOut } = useClerk()
+  const { user, signOut } = useSupabaseUser()
   const hasMounted = useHasMounted()
 
-  const userName = user?.fullName || user?.firstName || "User"
-  const userEmail = user?.primaryEmailAddress?.emailAddress || ""
-  const userAvatar = user?.imageUrl || "/placeholder.svg"
+  const userName =
+    (user?.user_metadata?.full_name as string | undefined) ||
+    (user?.user_metadata?.name as string | undefined) ||
+    user?.email?.split("@")[0] ||
+    "User"
+  const userEmail = user?.email || ""
+  const userAvatar = (user?.user_metadata?.avatar_url as string | undefined) || "/placeholder.svg"
   const userInitials = userName.split(" ").map(n => n[0]).join("").toUpperCase()
 
   const performSearch = useDebouncedCallback(async (query: string) => {
@@ -154,7 +157,10 @@ export function Header() {
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="text-destructive"
-                onClick={() => signOut({ redirectUrl: "/login" })}
+                onClick={async () => {
+                  await signOut()
+                  window.location.href = "/login"
+                }}
               >
                 Sign Out
               </DropdownMenuItem>

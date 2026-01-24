@@ -80,6 +80,42 @@ async function fetchCurrentUser() {
 
 export const getCurrentUser = cache(fetchCurrentUser)
 
+export async function ensureUserRecord() {
+  const supabase = await createClient()
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser()
+
+  if (!authUser) return null
+
+  const { data: existingUser } = await supabase
+    .from("users")
+    .select("id")
+    .eq("id", authUser.id)
+    .maybeSingle()
+
+  if (existingUser) {
+    return existingUser
+  }
+
+  const fallbackName = authUser.email?.split("@")[0] || "User"
+
+  const { data: createdUser, error } = await supabase
+    .from("users")
+    .insert({
+      id: authUser.id,
+      email: authUser.email!,
+      name: authUser.user_metadata?.full_name || fallbackName,
+      avatar: authUser.user_metadata?.avatar_url,
+    })
+    .select("id")
+    .single()
+
+  if (error) throw new Error(error.message)
+
+  return createdUser
+}
+
 export async function getUserAnalytics() {
   const supabase = await createClient()
   const {

@@ -13,22 +13,13 @@ export interface ToolResult {
   error?: string
 }
 
-// Get user's database ID from Clerk ID
-async function getUserDbId(clerkId: string): Promise<string | null> {
-  const user = await prisma.user.findUnique({
-    where: { clerkId },
-    select: { id: true }
-  })
-  return user?.id || null
-}
-
 /**
  * Get user profile with skills, interests, and goals
  */
-export async function getUserProfile(clerkId: string): Promise<ToolResult> {
+export async function getUserProfile(userId: string): Promise<ToolResult> {
   try {
     const user = await prisma.user.findUnique({
-      where: { clerkId },
+      where: { id: userId },
       select: {
         id: true,
         name: true,
@@ -78,10 +69,10 @@ export async function getUserProfile(clerkId: string): Promise<ToolResult> {
 /**
  * Get user's extracurricular activities
  */
-export async function getExtracurriculars(clerkId: string): Promise<ToolResult> {
+export async function getExtracurriculars(userId: string): Promise<ToolResult> {
   try {
     const user = await prisma.user.findUnique({
-      where: { clerkId },
+      where: { id: userId },
       select: { id: true }
     })
 
@@ -124,10 +115,10 @@ export async function getExtracurriculars(clerkId: string): Promise<ToolResult> 
 /**
  * Get user's saved/bookmarked opportunities
  */
-export async function getSavedOpportunities(clerkId: string): Promise<ToolResult> {
+export async function getSavedOpportunities(userId: string): Promise<ToolResult> {
   try {
     const user = await prisma.user.findUnique({
-      where: { clerkId },
+      where: { id: userId },
       select: { id: true }
     })
 
@@ -181,10 +172,10 @@ export async function getSavedOpportunities(clerkId: string): Promise<ToolResult
 /**
  * Get user's projects
  */
-export async function getProjects(clerkId: string): Promise<ToolResult> {
+export async function getProjects(userId: string): Promise<ToolResult> {
   try {
     const user = await prisma.user.findUnique({
-      where: { clerkId },
+      where: { id: userId },
       select: { id: true }
     })
 
@@ -229,10 +220,10 @@ export async function getProjects(clerkId: string): Promise<ToolResult> {
 /**
  * Get user's goals
  */
-export async function getGoals(clerkId: string): Promise<ToolResult> {
+export async function getGoals(userId: string): Promise<ToolResult> {
   try {
     const user = await prisma.user.findUnique({
-      where: { clerkId },
+      where: { id: userId },
       select: { id: true }
     })
 
@@ -273,7 +264,7 @@ export async function getGoals(clerkId: string): Promise<ToolResult> {
  * Search for opportunities in database
  */
 export async function searchOpportunities(
-  clerkId: string,
+  userId: string,
   params: { query: string; category?: string; type?: string; limit?: number }
 ): Promise<ToolResult> {
   try {
@@ -358,7 +349,7 @@ export async function searchOpportunities(
  * Automatically fetches user profile and filters/ranks by relevance
  */
 export async function smartSearchOpportunities(
-  clerkId: string,
+  userId: string,
   params: { query?: string; category?: string; type?: string; limit?: number }
 ): Promise<ToolResult> {
   try {
@@ -366,7 +357,7 @@ export async function smartSearchOpportunities(
 
     // First, get user profile for personalization
     const user = await prisma.user.findUnique({
-      where: { clerkId },
+      where: { id: userId },
       select: {
         id: true,
         location: true,
@@ -553,7 +544,7 @@ export async function smartSearchOpportunities(
  * Filter opportunities by deadline within X days
  */
 export async function filterByDeadline(
-  clerkId: string,
+  userId: string,
   params: { days: number; category?: string; type?: string; limit?: number }
 ): Promise<ToolResult> {
   try {
@@ -635,7 +626,7 @@ export async function filterByDeadline(
  * Returns a flag to trigger the discovery stream with profile-enhanced query
  */
 export async function personalizedWebDiscovery(
-  clerkId: string,
+  userId: string,
   params: { topic?: string; category?: string }
 ): Promise<ToolResult> {
   try {
@@ -643,7 +634,7 @@ export async function personalizedWebDiscovery(
 
     // Get user profile for building personalized query
     const user = await prisma.user.findUnique({
-      where: { clerkId },
+      where: { id: userId },
       select: {
         location: true,
         interests: true,
@@ -739,12 +730,12 @@ export async function personalizedWebDiscovery(
  * Bookmark an opportunity for the user
  */
 export async function bookmarkOpportunity(
-  clerkId: string,
+  userId: string,
   params: { opportunityId: string; opportunityTitle: string }
 ): Promise<ToolResult> {
   try {
     const user = await prisma.user.findUnique({
-      where: { clerkId },
+      where: { id: userId },
       select: { id: true }
     })
 
@@ -801,36 +792,36 @@ export async function bookmarkOpportunity(
  */
 export async function executeTool(
   toolName: string,
-  clerkId: string,
+  userId: string,
   params: Record<string, unknown> = {}
 ): Promise<ToolResult> {
   switch (toolName) {
     case 'get_user_profile':
-      return getUserProfile(clerkId)
+      return getUserProfile(userId)
     
     case 'get_extracurriculars':
-      return getExtracurriculars(clerkId)
+      return getExtracurriculars(userId)
     
     case 'get_saved_opportunities':
-      return getSavedOpportunities(clerkId)
+      return getSavedOpportunities(userId)
     
     case 'get_projects':
-      return getProjects(clerkId)
+      return getProjects(userId)
     
     case 'get_goals':
-      return getGoals(clerkId)
+      return getGoals(userId)
     
     case 'search_opportunities':
-      return searchOpportunities(clerkId, params as { query: string; category?: string; type?: string; limit?: number })
+      return searchOpportunities(userId, params as { query: string; category?: string; type?: string; limit?: number })
     
     case 'smart_search_opportunities':
-      return smartSearchOpportunities(clerkId, params as { query?: string; category?: string; type?: string; limit?: number })
+      return smartSearchOpportunities(userId, params as { query?: string; category?: string; type?: string; limit?: number })
     
     case 'filter_by_deadline':
-      return filterByDeadline(clerkId, params as { days: number; category?: string; type?: string; limit?: number })
+      return filterByDeadline(userId, params as { days: number; category?: string; type?: string; limit?: number })
     
     case 'bookmark_opportunity':
-      return bookmarkOpportunity(clerkId, params as { opportunityId: string; opportunityTitle: string })
+      return bookmarkOpportunity(userId, params as { opportunityId: string; opportunityTitle: string })
     
     case 'trigger_web_discovery':
       // This is handled specially in the chat route - returns a flag
@@ -843,7 +834,7 @@ export async function executeTool(
       }
     
     case 'personalized_web_discovery':
-      return personalizedWebDiscovery(clerkId, params as { topic?: string; category?: string })
+      return personalizedWebDiscovery(userId, params as { topic?: string; category?: string })
     
     default:
       return { success: false, error: `Unknown tool: ${toolName}` }

@@ -18,7 +18,7 @@ import {
   ChevronRight
 } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { useUser } from "@clerk/nextjs"
+import { useSupabaseUser } from "@/hooks/use-supabase-user"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useTheme } from "next-themes"
@@ -42,13 +42,17 @@ interface SidebarProps {
 
 export function Sidebar({ isCollapsed = false, toggleCollapse }: SidebarProps) {
   const pathname = usePathname()
-  const { user } = useUser()
+  const { user } = useSupabaseUser()
   const { theme } = useTheme()
   const hasMounted = useHasMounted()
 
 
-  const userName = user?.fullName || user?.firstName || "User"
-  const userAvatar = user?.imageUrl || "/placeholder.svg"
+  const userName =
+    (user?.user_metadata?.full_name as string | undefined) ||
+    (user?.user_metadata?.name as string | undefined) ||
+    user?.email?.split("@")[0] ||
+    "User"
+  const userAvatar = (user?.user_metadata?.avatar_url as string | undefined) || "/placeholder.svg"
   const userInitials = userName.split(" ").map(n => n[0]).join("").toUpperCase()
 
   // Full logo for expanded sidebar
@@ -154,7 +158,7 @@ export function Sidebar({ isCollapsed = false, toggleCollapse }: SidebarProps) {
           {!isCollapsed && (
             <div className="flex-1 truncate">
               <p className="text-sm font-medium text-foreground">{userName}</p>
-              <p className="truncate text-xs text-muted-foreground">{user?.primaryEmailAddress?.emailAddress || ""}</p>
+              <p className="truncate text-xs text-muted-foreground">{user?.email || ""}</p>
             </div>
           )}
         </div>

@@ -23,7 +23,6 @@
   },
   "dependencies": {
     "@ai-sdk/react": "3.0.19",
-    "@clerk/nextjs": "^6.36.6",
     "@google/generative-ai": "^0.24.1",
     "@hookform/resolvers": "^3.10.0",
     "@prisma/client": "5.22.0",

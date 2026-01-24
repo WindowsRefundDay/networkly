@@ -9,10 +9,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@clerk/nextjs/server'
 
 import { getAIManager, type Message, type CompletionResult } from '@/lib/ai'
 import { AI_TOOLS, executeTool, type ToolResult } from '@/lib/ai/tools'
+import { createClient } from '@/lib/supabase/server'
 
 export const maxDuration = 60
 
@@ -121,8 +121,11 @@ interface ChatRequest {
 export async function POST(req: NextRequest) {
   try {
     // Authenticate user
-    const { userId: clerkId } = await auth()
-    if (!clerkId) {
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -139,7 +142,7 @@ export async function POST(req: NextRequest) {
 
     // Handle special confirmation actions from UI
     if (confirmBookmark) {
-      const result = await executeTool('bookmark_opportunity', clerkId, confirmBookmark)
+      const result = await executeTool('bookmark_opportunity', user.id, confirmBookmark)
       return NextResponse.json({
         type: 'bookmark_result',
         success: result.success,
@@ -172,11 +175,11 @@ export async function POST(req: NextRequest) {
 
     // Streaming response with tool calling support
     if (shouldStream) {
-      return handleStreamingResponse(ai, aiMessages, clerkId)
+      return handleStreamingResponse(ai, aiMessages, user.id)
     }
 
     // Non-streaming with tool calling loop
-    return handleNonStreamingResponse(ai, aiMessages, clerkId)
+    return handleNonStreamingResponse(ai, aiMessages, user.id)
 
   } catch (error) {
     console.error('[Chat API Error]', error)
@@ -196,7 +199,7 @@ export async function POST(req: NextRequest) {
 async function handleStreamingResponse(
   ai: ReturnType<typeof getAIManager>,
   messages: Message[],
-  clerkId: string
+  userId: string
 ): Promise<NextResponse> {
   const encoder = new TextEncoder()
   const stream = new TransformStream()
@@ -238,7 +241,7 @@ async function handleStreamingResponse(
           
           for (const toolCall of result.toolCalls) {
             const args = JSON.parse(toolCall.function.arguments || '{}')
-            const toolResult = await executeTool(toolCall.function.name, clerkId, args)
+            const toolResult = await executeTool(toolCall.function.name, userId, args)
             
             toolResults.push({
               toolCallId: toolCall.id,
@@ -344,7 +347,7 @@ async function handleStreamingResponse(
 async function handleNonStreamingResponse(
   ai: ReturnType<typeof getAIManager>,
   messages: Message[],
-  clerkId: string
+  userId: string
 ): Promise<NextResponse> {
   let currentMessages = [...messages]
   let iterations = 0
@@ -367,7 +370,7 @@ async function handleNonStreamingResponse(
     if (result.toolCalls && result.toolCalls.length > 0) {
       for (const toolCall of result.toolCalls) {
         const args = JSON.parse(toolCall.function.arguments || '{}')
-        const toolResult = await executeTool(toolCall.function.name, clerkId, args)
+        const toolResult = await executeTool(toolCall.function.name, userId, args)
 
         // Collect opportunities for response
         if ((toolCall.function.name === 'search_opportunities' || 

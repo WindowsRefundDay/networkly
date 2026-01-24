@@ -6,28 +6,16 @@ import { ActivityFeed } from "@/components/dashboard/new/activity-feed"
 import { OpportunitySpotlight } from "@/components/dashboard/new/opportunity-spotlight"
 import { getDashboardData } from "@/app/actions/dashboard"
 import { redirect } from "next/navigation"
-import { syncUserFromClerk } from "@/app/actions/user"
-import { currentUser } from "@clerk/nextjs/server"
+import { ensureUserRecord } from "@/app/actions/user"
 
 export default async function DashboardPage() {
   let data = await getDashboardData()
   
   if (!data) {
-    // If no user data, try to sync from Clerk
-    const clerkUser = await currentUser()
-    
-    if (!clerkUser) {
+    const ensuredUser = await ensureUserRecord()
+    if (!ensuredUser) {
       redirect("/login")
     }
-
-    // Sync user
-    await syncUserFromClerk({
-      id: clerkUser.id,
-      emailAddresses: clerkUser.emailAddresses,
-      firstName: clerkUser.firstName,
-      lastName: clerkUser.lastName,
-      imageUrl: clerkUser.imageUrl,
-    })
 
     // Retry fetching dashboard data
     data = await getDashboardData()

@@ -1,7 +1,7 @@
-import { auth } from "@clerk/nextjs/server"
 import { NextResponse } from "next/server"
 import fs from "fs/promises"
 import path from "path"
+import { createClient } from "@/lib/supabase/server"
 
 const CONFIG_FILE = path.join(process.cwd(), "data", "admin-config.json")
 
@@ -24,9 +24,12 @@ async function ensureConfigFile() {
 }
 
 export async function GET() {
-  const { userId } = await auth()
-  
-  if (!userId) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
@@ -43,9 +46,12 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const { userId } = await auth()
-  
-  if (!userId) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 

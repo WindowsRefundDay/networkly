@@ -36,40 +36,6 @@ vi.mock("next/headers", () => ({
   }),
 }))
 
-// Mock Clerk auth
-vi.mock("@clerk/nextjs/server", () => ({
-  auth: vi.fn(() => Promise.resolve({ userId: "test-clerk-id" })),
-  currentUser: vi.fn(() =>
-    Promise.resolve({
-      id: "test-clerk-id",
-      emailAddresses: [{ emailAddress: "test@example.com" }],
-      firstName: "Test",
-      lastName: "User",
-    })
-  ),
-}))
-
-vi.mock("@clerk/nextjs", () => ({
-  useAuth: () => ({
-    isLoaded: true,
-    isSignedIn: true,
-    userId: "test-clerk-id",
-  }),
-  useUser: () => ({
-    isLoaded: true,
-    isSignedIn: true,
-    user: {
-      id: "test-clerk-id",
-      firstName: "Test",
-      lastName: "User",
-      emailAddresses: [{ emailAddress: "test@example.com" }],
-    },
-  }),
-  ClerkProvider: ({ children }: { children: React.ReactNode }) => children,
-  SignedIn: ({ children }: { children: React.ReactNode }) => children,
-  SignedOut: ({ children }: { children: React.ReactNode }) => null,
-}))
-
 // Mock sonner toast
 vi.mock("sonner", () => ({
   toast: {

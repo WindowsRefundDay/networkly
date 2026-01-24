@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Sparkles, Send, User, Save, RotateCcw, History, X } from 'lucide-react'
-import { useUser } from '@clerk/nextjs'
+import { useSupabaseUser } from '@/hooks/use-supabase-user'
 
 import { OpportunityGrid, type InlineOpportunity } from './opportunity-card-inline'
 import { SimpleLoading, DiscoveryLoading, TypingIndicator } from './simple-loading'
@@ -75,10 +75,14 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
 
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
-  const { user } = useUser()
+  const { user } = useSupabaseUser()
 
-  const userName = user?.fullName || user?.firstName || 'User'
-  const userAvatar = user?.imageUrl || '/placeholder.svg'
+  const userName =
+    (user?.user_metadata?.full_name as string | undefined) ||
+    (user?.user_metadata?.name as string | undefined) ||
+    user?.email?.split("@")[0] ||
+    'User'
+  const userAvatar = (user?.user_metadata?.avatar_url as string | undefined) || '/placeholder.svg'
 
   // Build a global opportunity cache from all messages
   const globalOpportunityCache = useMemo(() => {

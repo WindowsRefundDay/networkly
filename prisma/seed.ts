@@ -48,7 +48,6 @@ async function main() {
     const alexUser = await prisma.user.create({
         data: {
             id: "1",
-            clerkId: "user_alex_chen", // This will be replaced with real Clerk ID
             email: currentUser.email,
             name: currentUser.name,
             avatar: currentUser.avatar,
@@ -75,7 +74,6 @@ async function main() {
                 const user = await prisma.user.create({
                     data: {
                         id: conn.id,
-                        clerkId: `user_${conn.id}`,
                         email: `${conn.name.toLowerCase().replace(" ", ".")}@example.com`,
                         name: conn.name,
                         avatar: conn.avatar,

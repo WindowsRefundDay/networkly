@@ -23,6 +23,10 @@ Networkly is an AI-powered professional networking platform designed to help stu
 
 ## Getting Started
 
+## Linux Home Server
+
+See the production home server guide: `docs/LINUX_HOME_SERVER.md`.
+
 ### Prerequisites
 
 - **[Bun](https://bun.sh)** v1.0 or higher

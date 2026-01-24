@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { MapPin, GraduationCap, Pencil, Share2, MessageCircle, CheckCircle2, X, Loader2, Check } from "lucide-react"
-import { useUser } from "@clerk/nextjs"
+import { useSupabaseUser } from "@/hooks/use-supabase-user"
 import { useRouter } from "next/navigation"
 import { ShareProfileDialog } from "./dialogs"
 import { updateProfile } from "@/app/actions/profile"
@@ -49,7 +49,7 @@ const GRADE_LEVELS = [
 ]
 
 export function ProfileHeader({ user: dbUser, userProfile }: ProfileHeaderProps) {
-  const { user: clerkUser } = useUser()
+  const { user } = useSupabaseUser()
   const router = useRouter()
   const [shareDialogOpen, setShareDialogOpen] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
@@ -62,9 +62,17 @@ export function ProfileHeader({ user: dbUser, userProfile }: ProfileHeaderProps)
     userProfile?.grade_level?.toString() || ""
   )
 
-  // Use database user if provided, otherwise fallback to Clerk user
-  const userName = dbUser?.name || clerkUser?.fullName || clerkUser?.firstName || "User"
-  const userAvatar = dbUser?.avatar || clerkUser?.imageUrl || "/placeholder.svg"
+  // Use database user if provided, otherwise fallback to auth user metadata
+  const userName =
+    dbUser?.name ||
+    (user?.user_metadata?.full_name as string | undefined) ||
+    (user?.user_metadata?.name as string | undefined) ||
+    user?.email?.split("@")[0] ||
+    "User"
+  const userAvatar =
+    dbUser?.avatar ||
+    (user?.user_metadata?.avatar_url as string | undefined) ||
+    "/placeholder.svg"
   const userInitials = userName.split(" ").map(n => n[0]).join("").toUpperCase()
   const headline = dbUser?.headline || "High School Student"
   const location = dbUser?.location || ""

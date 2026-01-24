@@ -1,14 +1,17 @@
-import { auth } from "@clerk/nextjs/server"
 import { NextResponse } from "next/server"
 import { exec } from "child_process"
 import { promisify } from "util"
+import { createClient } from "@/lib/supabase/server"
 
 const execAsync = promisify(exec)
 
 export async function POST() {
-  const { userId } = await auth()
-  
-  if (!userId) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
