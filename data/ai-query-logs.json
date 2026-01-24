@@ -6,6 +6,28 @@
       "model": "gemini-2.5-flash",
       "prompt": "You are Networkly AI, a friendly career assistant for students and young professionals.\n\nPERSONALITY:\n- Speak naturally, like a helpful friend\n- Be warm, encouraging, and actionable\n- Never mention te",
       "success": true,
+      "latencyMs": 2155,
+      "tokensUsed": 1451,
+      "id": "h2wwop",
+      "timestamp": "2026-01-24T01:51:06.049Z"
+    },
+    {
+      "useCase": "chat",
+      "provider": "gemini",
+      "model": "gemini-2.5-flash",
+      "prompt": "You are Networkly AI, a friendly career assistant for students and young professionals.\n\nPERSONALITY:\n- Speak naturally, like a helpful friend\n- Be warm, encouraging, and actionable\n- Never mention te",
+      "success": true,
+      "latencyMs": 2657,
+      "tokensUsed": 1170,
+      "id": "6yvbxf",
+      "timestamp": "2026-01-24T01:50:29.484Z"
+    },
+    {
+      "useCase": "chat",
+      "provider": "gemini",
+      "model": "gemini-2.5-flash",
+      "prompt": "You are Networkly AI, a friendly career assistant for students and young professionals.\n\nPERSONALITY:\n- Speak naturally, like a helpful friend\n- Be warm, encouraging, and actionable\n- Never mention te",
+      "success": true,
       "latencyMs": 1728,
       "tokensUsed": 938,
       "id": "31a6r",

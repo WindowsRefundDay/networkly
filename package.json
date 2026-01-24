@@ -10,22 +10,15 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "db:generate": "bunx --bun prisma generate",
-    "db:push": "bunx --bun prisma db push",
-    "db:seed": "bunx --bun prisma db seed",
-    "db:studio": "bunx --bun prisma studio",
-    "postinstall": "bunx --bun prisma generate",
+    "db:seed": "bun scripts/seed-opportunities.ts",
+    "db:init-opportunities": "bun scripts/init-opportunities.ts",
     "costs": "bun scripts/calculate-costs.ts",
     "costs:clear": "echo '{\"records\":[],\"lastUpdated\":\"\"}' > data/ai-costs.json && echo 'Cost data cleared!'"
-  },
-  "prisma": {
-    "seed": "bun prisma/seed.ts"
   },
   "dependencies": {
     "@ai-sdk/react": "3.0.19",
     "@google/generative-ai": "^0.24.1",
     "@hookform/resolvers": "^3.10.0",
-    "@prisma/client": "5.22.0",
     "@radix-ui/react-accordion": "1.2.2",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-aspect-ratio": "1.1.1",
@@ -68,7 +61,6 @@
     "lucide-react": "^0.454.0",
     "next": "16.0.10",
     "next-themes": "^0.4.6",
-    "prisma": "5.22.0",
     "react": "19.2.0",
     "react-day-picker": "9.8.0",
     "react-dom": "19.2.0",

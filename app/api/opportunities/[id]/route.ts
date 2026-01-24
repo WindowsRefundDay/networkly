@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@/lib/supabase/server'
 
 /**
  * GET /api/opportunities/[id]
@@ -21,30 +21,15 @@ export async function GET(
       )
     }
 
-    const opportunity = await prisma.opportunity.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        title: true,
-        company: true,
-        location: true,
-        type: true,
-        category: true,
-        deadline: true,
-        description: true,
-        skills: true,
-        url: true,
-        sourceUrl: true,
-        remote: true,
-        salary: true,
-        duration: true,
-        requirements: true,
-        isActive: true,
-        isExpired: true,
-      },
-    })
+    const supabase = await createClient()
+    const { data: opportunity, error } = await supabase
+      .from('opportunities')
+      .select('id, title, company, location, type, category, deadline, description, skills, url, source_url, remote, salary, duration, requirements, is_active, is_expired')
+      .eq('id', id)
+      .eq('is_active', true)
+      .single()
 
-    if (!opportunity) {
+    if (error || !opportunity) {
       return NextResponse.json(
         { error: 'Opportunity not found' },
         { status: 404 }
@@ -70,7 +55,7 @@ export async function GET(
       }
     }
 
-    // Transform to InlineOpportunity format
+    // Transform to InlineOpportunity format (map snake_case to camelCase)
     const response = {
       id: opportunity.id,
       title: opportunity.title,
@@ -87,15 +72,15 @@ export async function GET(
         : null,
       description: opportunity.description,
       skills: opportunity.skills,
-      url: opportunity.url || opportunity.sourceUrl || null,
+      url: opportunity.url || opportunity.source_url || null,
       urgency,
       daysUntilDeadline,
       remote: opportunity.remote,
       salary: opportunity.salary,
       duration: opportunity.duration,
       requirements: opportunity.requirements,
-      isActive: opportunity.isActive,
-      isExpired: opportunity.isExpired,
+      isActive: opportunity.is_active,
+      isExpired: opportunity.is_expired,
     }
 
     return NextResponse.json(response)

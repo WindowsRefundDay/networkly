@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
 import { createClient } from "@/lib/supabase/server"
 
 export async function GET() {
@@ -14,7 +13,8 @@ export async function GET() {
 
   try {
     const startTime = Date.now()
-    await prisma.$queryRaw`SELECT 1`
+    // Test Supabase connection with a simple query
+    await supabase.from("users").select("id").limit(1)
     const dbLatency = Date.now() - startTime
 
     const apiEndpoints = [

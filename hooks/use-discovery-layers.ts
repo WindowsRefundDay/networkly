@@ -74,6 +74,9 @@ function getLayerName(id: LayerId): string {
   return names[id]
 }
 
+// Maximum age for a "running" state to be considered valid (3 minutes)
+const MAX_RUNNING_STATE_AGE_MS = 180_000;
+
 export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): UseDiscoveryLayersReturn {
   const { onOpportunityFound, onComplete, persistState = true } = options
   
@@ -84,8 +87,23 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
         const stored = sessionStorage.getItem(STORAGE_KEY)
         if (stored) {
           const parsed = JSON.parse(stored) as DiscoveryState
+          
           // Only restore if it was running (not complete)
           if (parsed.status === 'running') {
+            // STALE STATE GUARD: Don't restore if too old (no active connection)
+            const stateAge = Date.now() - parsed.startTime
+            if (stateAge > MAX_RUNNING_STATE_AGE_MS) {
+              // Clear stale state and return null
+              sessionStorage.removeItem(STORAGE_KEY)
+              return null
+            }
+            // Note: Even if we restore this, there's no active EventSource
+            // Mark it as complete to prevent showing stuck UI
+            return { ...parsed, status: 'complete', endTime: Date.now() }
+          }
+          
+          // Restore completed states for display
+          if (parsed.status === 'complete') {
             return parsed
           }
         }
@@ -474,11 +492,13 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
     const es = new EventSource(`/api/discovery/stream?query=${encodeURIComponent(query)}`)
     eventSourceRef.current = es
     
-    // Timeout after 90 seconds
+    // Timeout after 3 minutes (aligned with server-side: 2.5 min + buffer)
+    const CLIENT_TIMEOUT_MS = 180_000; // 3 minutes
     timeoutRef.current = setTimeout(() => {
       es.close()
+      processEvent({ type: 'error', message: 'Discovery timed out' } as DiscoveryEvent)
       processEvent({ type: 'complete', count: 0 } as DiscoveryEvent)
-    }, 90_000)
+    }, CLIENT_TIMEOUT_MS)
     
     es.onmessage = (event) => {
       try {
@@ -489,12 +509,44 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
       }
     }
     
-    es.onerror = () => {
-      cleanup()
-      setState((prev) => {
-        if (!prev || prev.status === 'complete') return prev
-        return { ...prev, status: 'complete', endTime: Date.now() }
-      })
+    // Track retry attempts
+    let retryCount = 0
+    const MAX_RETRIES = 2
+    const RETRY_DELAY_MS = 2000
+    
+    es.onerror = (err) => {
+      // EventSource fires onerror on connection issues
+      // Check if the connection is actually closed (readyState === 2)
+      if (es.readyState === EventSource.CLOSED) {
+        if (retryCount < MAX_RETRIES) {
+          retryCount++
+          console.log(`[Discovery] Connection lost, retry ${retryCount}/${MAX_RETRIES}...`)
+          
+          // Close current connection
+          es.close()
+          
+          // Retry after delay
+          setTimeout(() => {
+            if (eventSourceRef.current === es) {
+              // Re-initiate connection
+              const newEs = new EventSource(`/api/discovery/stream?query=${encodeURIComponent(query)}`)
+              eventSourceRef.current = newEs
+              
+              newEs.onmessage = es.onmessage
+              newEs.onerror = es.onerror
+            }
+          }, RETRY_DELAY_MS * retryCount)
+        } else {
+          // Exhausted retries
+          console.error('[Discovery] Connection failed after retries')
+          cleanup()
+          setState((prev) => {
+            if (!prev || prev.status === 'complete') return prev
+            return { ...prev, status: 'complete', endTime: Date.now() }
+          })
+        }
+      }
+      // If readyState is CONNECTING (0), EventSource will auto-retry
     }
   }, [cleanup, processEvent])
 

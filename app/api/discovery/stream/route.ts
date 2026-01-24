@@ -119,30 +119,72 @@ export async function GET(req: NextRequest) {
         cleanup();
     });
 
-    // Set up 2-minute timeout to kill the process if it takes too long
-    const PROCESS_TIMEOUT_MS = 120_000; // 2 minutes
-    const timeoutId = setTimeout(() => {
+    // Set up timeout to kill the process if it takes too long
+    // Quick discovery profile: ~2 minutes max (aligned with scraper settings)
+    // This covers: query gen (~5s) + search (~20s) + semantic filter (~10s) + crawl (~60s) + extract (~30s)
+    const QUICK_DISCOVERY_TIMEOUT_MS = 150_000; // 2.5 minutes (with buffer)
+    const timeoutId = setTimeout(async () => {
         if (!processEnded) {
             console.log("[Discovery] Process timeout reached, killing Python process");
+            // Notify client of timeout before cleanup
+            const timeoutEvent = `data: ${JSON.stringify({ 
+                type: "error", 
+                message: "Discovery timed out after 2.5 minutes",
+                source: "timeout" 
+            })}\n\n`;
+            await safeWrite(timeoutEvent);
             cleanup();
         }
-    }, PROCESS_TIMEOUT_MS);
+    }, QUICK_DISCOVERY_TIMEOUT_MS);
 
-    // Handle process output
+    // Handle process output - only emit valid JSON events
     pythonProcess.stdout.on("data", async (data) => {
         if (writerClosed) return;
         const lines = data.toString().split("\n");
         for (const line of lines) {
-            if (line.trim() && !writerClosed) {
-                // Format as SSE event
-                const event = `data: ${line.trim()}\n\n`;
-                await safeWrite(event);
+            const trimmed = line.trim();
+            if (!trimmed || writerClosed) continue;
+            
+            // Only forward valid JSON to prevent client-side parse errors
+            if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+                try {
+                    // Validate JSON before sending
+                    JSON.parse(trimmed);
+                    const event = `data: ${trimmed}\n\n`;
+                    await safeWrite(event);
+                } catch {
+                    // Invalid JSON - log it but don't send
+                    console.warn("[Discovery] Skipping invalid JSON:", trimmed.slice(0, 100));
+                }
+            } else {
+                // Non-JSON output (debug logs) - log server-side only
+                console.log("[Discovery]", trimmed);
             }
         }
     });
 
-    pythonProcess.stderr.on("data", (data) => {
-        console.error(`[Discovery Error] ${data}`);
+    // Forward stderr messages as error events to the client
+    pythonProcess.stderr.on("data", async (data) => {
+        const message = data.toString().trim();
+        console.error(`[Discovery Error] ${message}`);
+        
+        // Forward significant errors to the client
+        if (message && !writerClosed) {
+            // Filter out noisy debug messages that start with common prefixes
+            const isImportantError = !message.startsWith("[DEBUG]") && 
+                                      !message.startsWith("[INFO]") &&
+                                      !message.includes("DeprecationWarning") &&
+                                      !message.includes("FutureWarning");
+            
+            if (isImportantError) {
+                const errorEvent = `data: ${JSON.stringify({ 
+                    type: "error", 
+                    message: message.slice(0, 200),
+                    source: "stderr" 
+                })}\n\n`;
+                await safeWrite(errorEvent);
+            }
+        }
     });
 
     pythonProcess.on("close", async (code) => {

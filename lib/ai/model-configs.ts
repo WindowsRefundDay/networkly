@@ -62,6 +62,26 @@ export interface ProviderModelConfig {
 // ============================================================================
 
 export const GEMINI_MODELS: Record<string, ModelConfig> = {
+  'gemini-3-pro-preview': {
+    id: 'gemini-3-pro-preview',
+    name: 'Gemini 3 Pro Preview',
+    contextWindow: 1048576,
+    maxOutputTokens: 65536,
+    defaultTemperature: 0.7,
+    speedTier: 'medium',
+    qualityTier: 'premium',
+    isFree: false,
+  },
+  'gemini-3-flash-preview': {
+    id: 'gemini-3-flash-preview',
+    name: 'Gemini 3 Flash Preview',
+    contextWindow: 1048576,
+    maxOutputTokens: 65536,
+    defaultTemperature: 0.7,
+    speedTier: 'fast',
+    qualityTier: 'premium',
+    isFree: false,
+  },
   'gemini-2.5-pro': {
     id: 'gemini-2.5-pro',
     name: 'Gemini 2.5 Pro',
@@ -82,6 +102,16 @@ export const GEMINI_MODELS: Record<string, ModelConfig> = {
     qualityTier: 'premium',
     isFree: false,
   },
+  'gemini-2.5-flash-lite': {
+    id: 'gemini-2.5-flash-lite',
+    name: 'Gemini 2.5 Flash Lite',
+    contextWindow: 1048576,
+    maxOutputTokens: 65536,
+    defaultTemperature: 0.7,
+    speedTier: 'fast',
+    qualityTier: 'standard',
+    isFree: false,
+  },
   'gemini-2.0-flash': {
     id: 'gemini-2.0-flash',
     name: 'Gemini 2.0 Flash',
@@ -96,56 +126,56 @@ export const GEMINI_MODELS: Record<string, ModelConfig> = {
 
 export const GEMINI_USE_CASES: Record<UseCase, UseCaseModelMapping> = {
   chat: {
-    primary: 'gemini-2.5-flash',
-    fallbacks: ['gemini-2.5-pro', 'gemini-2.0-flash'],
+    primary: 'gemini-2.5-flash-lite',
+    fallbacks: ['gemini-2.5-flash', 'gemini-3-flash-preview', 'gemini-2.5-pro'],
     temperature: 0.7,
     maxTokens: 2048,
   },
   analysis: {
-    primary: 'gemini-2.5-flash',
-    fallbacks: ['gemini-2.5-pro', 'gemini-2.0-flash'],
+    primary: 'gemini-3-flash-preview',
+    fallbacks: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite'],
     temperature: 0.3,
     maxTokens: 4096,
   },
   'code-generation': {
-    primary: 'gemini-2.5-flash',
-    fallbacks: ['gemini-2.5-pro', 'gemini-2.0-flash'],
+    primary: 'gemini-3-flash-preview',
+    fallbacks: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite'],
     temperature: 0.2,
     maxTokens: 8192,
   },
   summarization: {
-    primary: 'gemini-2.5-flash',
-    fallbacks: ['gemini-2.5-pro', 'gemini-2.0-flash'],
+    primary: 'gemini-2.5-flash-lite',
+    fallbacks: ['gemini-2.5-flash', 'gemini-3-flash-preview', 'gemini-2.5-pro'],
     temperature: 0.3,
     maxTokens: 1024,
   },
   extraction: {
-    primary: 'gemini-2.5-flash',
-    fallbacks: ['gemini-2.5-pro', 'gemini-2.0-flash'],
+    primary: 'gemini-2.5-flash-lite',
+    fallbacks: ['gemini-2.5-flash', 'gemini-3-flash-preview', 'gemini-2.5-pro'],
     temperature: 0,
     maxTokens: 2048,
   },
   vision: {
-    primary: 'gemini-2.5-flash',
-    fallbacks: ['gemini-2.5-pro', 'gemini-2.0-flash'],
+    primary: 'gemini-2.5-flash-lite',
+    fallbacks: ['gemini-2.5-flash', 'gemini-3-flash-preview', 'gemini-2.5-pro'],
     temperature: 0.5,
     maxTokens: 2048,
   },
   'fast-response': {
-    primary: 'gemini-2.5-flash',
-    fallbacks: ['gemini-2.0-flash', 'gemini-2.5-pro'],
+    primary: 'gemini-2.5-flash-lite',
+    fallbacks: ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-3-flash-preview'],
     temperature: 0.5,
     maxTokens: 512,
   },
   'high-quality': {
-    primary: 'gemini-2.5-pro',
-    fallbacks: ['gemini-2.5-flash', 'gemini-2.0-flash'],
+    primary: 'gemini-3-flash-preview',
+    fallbacks: ['gemini-3-pro-preview', 'gemini-2.5-pro', 'gemini-2.5-flash'],
     temperature: 0.7,
     maxTokens: 4096,
   },
   'cost-effective': {
-    primary: 'gemini-2.5-flash',
-    fallbacks: ['gemini-2.0-flash', 'gemini-2.5-pro'],
+    primary: 'gemini-2.5-flash-lite',
+    fallbacks: ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-3-flash-preview'],
     temperature: 0.7,
     maxTokens: 1024,
   },
@@ -157,7 +187,7 @@ export const GEMINI_CONFIG: ProviderModelConfig = {
   isFree: false,
   models: GEMINI_MODELS,
   useCases: GEMINI_USE_CASES,
-  defaultModel: 'gemini-2.5-flash',
+  defaultModel: 'gemini-2.5-flash-lite',
 }
 
 // ============================================================================
@@ -232,73 +262,75 @@ export function getFreeModels(): ModelConfig[] {
 /**
  * Agent-Specific Model Recommendations (Gemini)
  * 
- * Based on Gemini 2.5 model capabilities:
- * - gemini-2.5-pro: Best quality, 1M context, strong reasoning
+ * Based on latest Gemini model capabilities:
+ * - gemini-3-pro-preview: Best quality, complex reasoning
+ * - gemini-3-flash-preview: Fast, high quality, great balance
+ * - gemini-2.5-flash-lite: Most cost-effective, fast
  * - gemini-2.5-flash: Fast, high quality, great balance
- * - gemini-2.0-flash: Fastest, good for simple tasks
+ * - gemini-2.5-pro: Best quality, 1M context, strong reasoning
  */
 export const AGENT_MODEL_RECOMMENDATIONS = {
   /** Planning and orchestration - needs strong reasoning */
   planner: {
-    model: 'gemini-2.5-pro',
+    model: 'gemini-3-flash-preview',
     reason: 'Best reasoning and planning capabilities',
-    fallback: 'gemini-2.5-flash',
+    fallback: 'gemini-2.5-pro',
   },
   
   /** Code generation and modification - best at code */
   coder: {
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3-flash-preview',
     reason: 'Strong coding with fast response times',
-    fallback: 'gemini-2.5-pro',
+    fallback: 'gemini-2.5-flash',
   },
   
   /** Research and analysis - needs long context */
   researcher: {
-    model: 'gemini-2.5-pro',
+    model: 'gemini-3-flash-preview',
     reason: '1M context window for long documents',
-    fallback: 'gemini-2.5-flash',
+    fallback: 'gemini-2.5-pro',
   },
   
   /** Quick decisions and routing - fastest production model */
   router: {
-    model: 'gemini-2.5-flash',
+    model: 'gemini-2.5-flash-lite',
     reason: 'Fast inference for quick decisions',
-    fallback: 'gemini-2.0-flash',
+    fallback: 'gemini-2.5-flash',
   },
   
   /** Tool use and function calling - optimized for agentic workflows */
   toolUser: {
-    model: 'gemini-2.5-flash',
+    model: 'gemini-2.5-flash-lite',
     reason: 'Excellent function calling support',
-    fallback: 'gemini-2.5-pro',
+    fallback: 'gemini-3-flash-preview',
   },
   
   /** Content generation and writing - creative excellence */
   writer: {
-    model: 'gemini-2.5-pro',
+    model: 'gemini-3-flash-preview',
     reason: 'Best quality for creative writing',
-    fallback: 'gemini-2.5-flash',
+    fallback: 'gemini-2.5-pro',
   },
   
   /** Data extraction and parsing - structured output */
   extractor: {
-    model: 'gemini-2.5-flash',
+    model: 'gemini-2.5-flash-lite',
     reason: 'Fast structured extraction',
-    fallback: 'gemini-2.5-pro',
+    fallback: 'gemini-2.5-flash',
   },
   
   /** Summarization - needs speed */
   summarizer: {
-    model: 'gemini-2.5-flash',
+    model: 'gemini-2.5-flash-lite',
     reason: 'Fast and effective summarization',
-    fallback: 'gemini-2.0-flash',
+    fallback: 'gemini-2.5-flash',
   },
   
   /** Safety and content moderation */
   moderator: {
-    model: 'gemini-2.5-flash',
+    model: 'gemini-2.5-flash-lite',
     reason: 'Built-in safety features',
-    fallback: 'gemini-2.5-pro',
+    fallback: 'gemini-2.5-flash',
   },
 } as const
 

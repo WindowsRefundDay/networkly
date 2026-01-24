@@ -52,7 +52,7 @@ export async function OpportunityCard() {
                 </span>
               </div>
               <div className="flex flex-wrap gap-1 pt-1">
-                {opp.skills.slice(0, 3).map((skill) => (
+                {opp.skills.slice(0, 3).map((skill: string) => (
                   <Badge key={skill} variant="secondary" className="text-xs">
                     {skill}
                   </Badge>

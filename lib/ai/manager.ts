@@ -41,46 +41,46 @@ try {
   logQueryFn = async () => {}
 }
 
-// Use case to model mapping defaults - Using Gemini 2.5 STABLE models only
-// Model IDs: gemini-2.5-pro, gemini-2.5-flash (gemini-2.5-flash-lite does NOT exist)
-// NO preview suffixes - these are production-ready stable models
+// Use case to model mapping defaults - Using latest Gemini models
+// Default: gemini-2.5-flash-lite (most cost-effective)
+// Heavy tasks: gemini-3-flash-preview (latest high-quality)
 const DEFAULT_USE_CASE_MODELS_INTERNAL: Record<UseCase, { primary: string; fallbacks: string[] }> = {
   'chat': {
-    // gemini-2.5-flash - best balance of speed/quality/cost with tool calling
-    primary: 'gemini-2.5-flash',
-    fallbacks: ['gemini-2.5-pro', 'gemini-2.0-flash'],
+    // gemini-2.5-flash-lite - most cost-effective with good quality
+    primary: 'gemini-2.5-flash-lite',
+    fallbacks: ['gemini-2.5-flash', 'gemini-3-flash-preview', 'gemini-2.5-pro'],
   },
   'analysis': {
-    primary: 'gemini-2.5-flash',
-    fallbacks: ['gemini-2.5-pro', 'gemini-2.0-flash'],
+    primary: 'gemini-3-flash-preview',
+    fallbacks: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite'],
   },
   'code-generation': {
-    primary: 'gemini-2.5-flash',
-    fallbacks: ['gemini-2.5-pro', 'gemini-2.0-flash'],
+    primary: 'gemini-3-flash-preview',
+    fallbacks: ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash-lite'],
   },
   'summarization': {
-    primary: 'gemini-2.5-flash',
-    fallbacks: ['gemini-2.5-pro', 'gemini-2.0-flash'],
+    primary: 'gemini-2.5-flash-lite',
+    fallbacks: ['gemini-2.5-flash', 'gemini-3-flash-preview', 'gemini-2.5-pro'],
   },
   'extraction': {
-    primary: 'gemini-2.5-flash',
-    fallbacks: ['gemini-2.5-pro', 'gemini-2.0-flash'],
+    primary: 'gemini-2.5-flash-lite',
+    fallbacks: ['gemini-2.5-flash', 'gemini-3-flash-preview', 'gemini-2.5-pro'],
   },
   'vision': {
-    primary: 'gemini-2.5-flash',
-    fallbacks: ['gemini-2.5-pro', 'gemini-2.0-flash'],
+    primary: 'gemini-2.5-flash-lite',
+    fallbacks: ['gemini-2.5-flash', 'gemini-3-flash-preview', 'gemini-2.5-pro'],
   },
   'fast-response': {
-    primary: 'gemini-2.5-flash',
-    fallbacks: ['gemini-2.0-flash', 'gemini-2.5-pro'],
+    primary: 'gemini-2.5-flash-lite',
+    fallbacks: ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-3-flash-preview'],
   },
   'high-quality': {
-    primary: 'gemini-2.5-pro',
-    fallbacks: ['gemini-2.5-flash', 'gemini-2.0-flash'],
+    primary: 'gemini-3-flash-preview',
+    fallbacks: ['gemini-3-pro-preview', 'gemini-2.5-pro', 'gemini-2.5-flash'],
   },
   'cost-effective': {
-    primary: 'gemini-2.5-flash',
-    fallbacks: ['gemini-2.0-flash', 'gemini-2.5-pro'],
+    primary: 'gemini-2.5-flash-lite',
+    fallbacks: ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-3-flash-preview'],
   },
 }
 
@@ -211,7 +211,7 @@ const DEFAULT_USE_CASE_MODELS_INTERNAL: Record<UseCase, { primary: string; fallb
         name: 'gemini',
         apiKey: geminiKey,
         baseUrl: 'https://generativelanguage.googleapis.com',
-        defaultModel: process.env.GEMINI_DEFAULT_MODEL || 'gemini-2.5-flash',
+        defaultModel: process.env.GEMINI_DEFAULT_MODEL || 'gemini-2.5-flash-lite',
         enabled: true,
         timeout: parseInt(process.env.AI_TIMEOUT || '60000', 10),
         maxRetries: parseInt(process.env.AI_MAX_RETRIES || '3', 10),

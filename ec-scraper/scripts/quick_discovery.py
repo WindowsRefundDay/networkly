@@ -26,7 +26,7 @@ from src.agents.query_generator import get_query_generator
 from src.agents.discovery import get_discovery_agent
 from src.crawlers.hybrid_crawler import get_hybrid_crawler
 from src.api.postgres_sync import PostgresSync
-from src.config import get_settings
+from src.config import get_settings, get_discovery_profile, QUICK_PROFILE
 from src.embeddings import get_embeddings
 from src.db.vector_db import get_vector_db
 from src.db.url_cache import get_url_cache
@@ -126,15 +126,22 @@ async def fetch_user_profile(user_profile_id: str, db_url: str) -> Optional[Dict
         return None
 
 
-async def main(query: str, user_profile_id: Optional[str] = None):
+async def main(query: str, user_profile_id: Optional[str] = None, profile: str = "quick"):
     """
     Main discovery function.
     
     Args:
         query: Search query / focus area
         user_profile_id: Optional user ID for personalized discovery
+        profile: Discovery profile - 'quick' (on-demand) or 'daily' (batch)
     """
-    emit_event("layer_start", {"layer": "query_generation", "message": f"Analyzing: '{query}'"})
+    # Get discovery profile settings
+    discovery_profile = get_discovery_profile(profile)
+    emit_event("layer_start", {
+        "layer": "query_generation", 
+        "message": f"Analyzing: '{query}'",
+        "profile": discovery_profile.name
+    })
     
     # Get database URL
     db_url = os.getenv("DATABASE_URL")
@@ -158,6 +165,10 @@ async def main(query: str, user_profile_id: Optional[str] = None):
     
     # Get settings (defaults to Google Gemini)
     settings = get_settings()
+    
+    # Log profile settings
+    sys.stderr.write(f"[Discovery] Using profile: {discovery_profile.name} - {discovery_profile.description}\n")
+    sys.stderr.write(f"[Discovery] Max queries: {discovery_profile.max_queries}, Semantic threshold: {discovery_profile.semantic_threshold}\n")
 
     # Initialize components
     search_client = get_searxng_client()
@@ -220,7 +231,8 @@ async def main(query: str, user_profile_id: Optional[str] = None):
         emit_event("reasoning", {"layer": "query_generation", "thought": "Using AI to generate diverse queries..."})
         
         try:
-            search_queries = await query_generator.generate_queries(query, count=10)
+            # Use profile setting for max queries
+            search_queries = await query_generator.generate_queries(query, count=discovery_profile.max_queries)
         except Exception as e:
             # Fallback to template-based queries
             current_year = datetime.now().year
@@ -300,12 +312,16 @@ async def main(query: str, user_profile_id: Optional[str] = None):
         semantic_filter = get_semantic_filter()
         emit_event("reasoning", {"layer": "semantic_filter", "thought": "Computing embeddings for relevance scoring..."})
         
-        # Filter using embeddings (one batch API call for ALL results)
-        semantic_scored_urls = await semantic_filter.filter_results(all_results, max_results=40)
+        # Filter using embeddings with profile threshold (one batch API call for ALL results)
+        semantic_scored_urls = await semantic_filter.filter_results(
+            all_results, 
+            max_results=discovery_profile.max_crawl_urls,
+            threshold_override=discovery_profile.semantic_threshold
+        )
         
         emit_event("layer_complete", {
             "layer": "semantic_filter",
-            "stats": {"input": len(all_results), "output": len(semantic_scored_urls), "threshold": 0.6}
+            "stats": {"input": len(all_results), "output": len(semantic_scored_urls), "threshold": discovery_profile.semantic_threshold}
         })
         
         # Log top results for debugging
@@ -327,8 +343,8 @@ async def main(query: str, user_profile_id: Optional[str] = None):
     # Filter out already-seen URLs using cache (check within last 7 days)
     unseen_urls = url_cache.filter_unseen(filtered_urls, within_days=7)
     
-    # Process more URLs for personalized searches
-    max_urls = 25 if user_profile else 35
+    # Use profile settings for max URLs (personalized gets slightly fewer)
+    max_urls = min(discovery_profile.max_crawl_urls, 25 if user_profile else discovery_profile.max_crawl_urls)
     urls_to_process = unseen_urls[:max_urls]
     
     # Start parallel crawl layer
@@ -338,17 +354,20 @@ async def main(query: str, user_profile_id: Optional[str] = None):
     for url in urls_to_process:
         emit_event("analyzing", {"url": url})
     
+    # Use profile settings for concurrency
+    max_concurrent = discovery_profile.max_concurrent_crawls
+    
     # Emit parallel status
     emit_event("parallel_status", {
         "layer": "parallel_crawl",
-        "active": min(10, len(urls_to_process)),
+        "active": min(max_concurrent, len(urls_to_process)),
         "completed": 0,
         "failed": 0,
-        "pending": max(0, len(urls_to_process) - 10)
+        "pending": max(0, len(urls_to_process) - max_concurrent)
     })
     
     # Process URLs in PARALLEL using crawl_batch for crawling
-    crawl_results = await crawler.crawl_batch(urls_to_process, max_concurrent=10)
+    crawl_results = await crawler.crawl_batch(urls_to_process, max_concurrent=max_concurrent)
     
     # Count crawl results
     crawl_success = sum(1 for r in crawl_results if r.success)
@@ -509,11 +528,17 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Quick opportunity discovery with optional personalization")
     parser.add_argument("query", help="Search query / focus area")
     parser.add_argument("--user-profile-id", help="User ID for personalized discovery", default=None)
+    parser.add_argument(
+        "--profile",
+        choices=["quick", "daily"],
+        default="quick",
+        help="Discovery profile: 'quick' for on-demand (stricter), 'daily' for batch (broader)"
+    )
     
     args = parser.parse_args()
     
     try:
-        asyncio.run(main(args.query, args.user_profile_id))
+        asyncio.run(main(args.query, args.user_profile_id, args.profile))
     except Exception as e:
         print(json.dumps({"type": "error", "message": str(e)}))
         sys.exit(1)

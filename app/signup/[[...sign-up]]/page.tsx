@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 
 import { createClient } from "@/lib/supabase/client"
+import { ensureUserRecord } from "@/app/actions/user"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
@@ -40,24 +41,16 @@ export default function SignupPage() {
             return
         }
 
+        // Create user record in public.users table
+        try {
+            await ensureUserRecord()
+        } catch (e) {
+            // Non-blocking - callback will also try to create the record
+            console.warn("Could not create user record immediately:", e)
+        }
+
         router.push(redirect)
         router.refresh()
-    }
-
-    const handleGoogleSignup = async () => {
-        setLoading(true)
-        setError("")
-        const { error: oauthError } = await supabase.auth.signInWithOAuth({
-            provider: "google",
-            options: {
-                redirectTo: `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirect)}`,
-            },
-        })
-
-        if (oauthError) {
-            setError(oauthError.message)
-            setLoading(false)
-        }
     }
 
     return (
@@ -123,8 +116,11 @@ export default function SignupPage() {
                             <span className="bg-card px-2 text-muted-foreground">or continue with</span>
                         </div>
                     </div>
-                    <Button variant="outline" className="w-full" onClick={handleGoogleSignup} disabled={loading}>
-                        Continue with Google
+                    <Button variant="outline" className="w-full" disabled>
+                        <span className="flex flex-col items-center gap-1">
+                            <span className="line-through">Continue with Google</span>
+                            <span className="text-xs text-muted-foreground">Coming soon</span>
+                        </span>
                     </Button>
                 </div>
 

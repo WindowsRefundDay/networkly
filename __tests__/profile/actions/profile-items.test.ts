@@ -94,6 +94,7 @@ describe("Profile Items Actions", () => {
       })
 
       it("should throw error when insert fails", async () => {
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => {})
         vi.mocked(requireAuth).mockResolvedValueOnce({ id: "user-1" } as any)
         queryMocks.achievements.single.mockResolvedValueOnce({
           data: null,
@@ -105,6 +106,7 @@ describe("Profile Items Actions", () => {
         await expect(
           addAchievement({ title: "Award", category: "Academic", date: "2024-01-15", icon: "trophy" })
         ).rejects.toThrow("Failed to add achievement")
+      consoleError.mockRestore()
       })
     })
 

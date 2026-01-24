@@ -88,14 +88,16 @@ export async function triggerDiscovery(
             stderr += data.toString();
         });
 
-        // Timeout after 90 seconds (increased from 60)
+        // Timeout after 2.5 minutes (aligned with SSE streaming route)
+        // Quick discovery: query gen + search + filter + crawl + extract
+        const QUICK_DISCOVERY_TIMEOUT_MS = 150_000;
         const timeout = setTimeout(() => {
             pythonProcess.kill();
             resolve({
                 success: false,
-                message: "Discovery timed out. Please try again.",
+                message: "Discovery timed out after 2.5 minutes. Please try again.",
             });
-        }, 90000);
+        }, QUICK_DISCOVERY_TIMEOUT_MS);
 
         pythonProcess.on("close", (code) => {
             clearTimeout(timeout);
@@ -190,14 +192,16 @@ export async function triggerBatchDiscovery(
             stderr += data.toString();
         });
 
-        // Timeout after 5 minutes
+        // Timeout after 10 minutes (aligned with daily profile settings)
+        // Daily batch discovery: broader search, more URLs, longer crawl
+        const BATCH_DISCOVERY_TIMEOUT_MS = 600_000; // 10 minutes
         const timeout = setTimeout(() => {
             pythonProcess.kill();
             resolve({
                 success: false,
-                message: "Batch discovery timed out.",
+                message: "Batch discovery timed out after 10 minutes.",
             });
-        }, 300000);
+        }, BATCH_DISCOVERY_TIMEOUT_MS);
 
         pythonProcess.on("close", (code) => {
             clearTimeout(timeout);

@@ -5,7 +5,7 @@
  * Results are formatted for the AI to interpret and respond naturally.
  */
 
-import { prisma } from '@/lib/prisma'
+import { createClient } from '@/lib/supabase/server'
 
 export interface ToolResult {
   success: boolean
@@ -18,32 +18,25 @@ export interface ToolResult {
  */
 export async function getUserProfile(userId: string): Promise<ToolResult> {
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        name: true,
-        headline: true,
-        bio: true,
-        location: true,
-        skills: true,
-        interests: true,
-        university: true,
-        graduationYear: true,
-        userProfile: {
-          select: {
-            career_goals: true,
-            grade_level: true,
-            preferred_opportunity_types: true,
-            academic_strengths: true,
-          }
-        }
-      }
-    })
+    const supabase = await createClient()
+    
+    // Get user data
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id, name, headline, bio, location, skills, interests, university, graduation_year')
+      .eq('id', userId)
+      .single()
 
-    if (!user) {
+    if (userError || !user) {
       return { success: false, error: 'User not found' }
     }
+
+    // Get user profile data
+    const { data: userProfile } = await supabase
+      .from('user_profiles')
+      .select('career_goals, grade_level, preferred_opportunity_types, academic_strengths')
+      .eq('user_id', userId)
+      .single()
 
     return {
       success: true,
@@ -54,11 +47,11 @@ export async function getUserProfile(userId: string): Promise<ToolResult> {
         skills: user.skills,
         interests: user.interests,
         university: user.university,
-        graduationYear: user.graduationYear,
-        careerGoals: user.userProfile?.career_goals,
-        gradeLevel: user.userProfile?.grade_level,
-        preferredTypes: user.userProfile?.preferred_opportunity_types,
-        academicStrengths: user.userProfile?.academic_strengths,
+        graduationYear: user.graduation_year,
+        careerGoals: userProfile?.career_goals,
+        gradeLevel: userProfile?.grade_level,
+        preferredTypes: userProfile?.preferred_opportunity_types,
+        academicStrengths: userProfile?.academic_strengths,
       }
     }
   } catch (error) {
@@ -71,38 +64,39 @@ export async function getUserProfile(userId: string): Promise<ToolResult> {
  */
 export async function getExtracurriculars(userId: string): Promise<ToolResult> {
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true }
-    })
+    const supabase = await createClient()
+    
+    // Check if user exists
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', userId)
+      .single()
 
-    if (!user) {
+    if (userError || !user) {
       return { success: false, error: 'User not found' }
     }
 
-    const ecs = await prisma.extracurricular.findMany({
-      where: { userId: user.id },
-      select: {
-        id: true,
-        title: true,
-        organization: true,
-        type: true,
-        startDate: true,
-        endDate: true,
-        description: true,
-      },
-      orderBy: { startDate: 'desc' }
-    })
+    // Get extracurriculars
+    const { data: ecs, error: ecsError } = await supabase
+      .from('extracurriculars')
+      .select('id, title, organization, type, start_date, end_date, description')
+      .eq('user_id', userId)
+      .order('start_date', { ascending: false })
+
+    if (ecsError) {
+      return { success: false, error: 'Failed to get activities' }
+    }
 
     return {
       success: true,
       data: {
-        count: ecs.length,
-        activities: ecs.map(ec => ({
+        count: ecs?.length || 0,
+        activities: (ecs || []).map(ec => ({
           title: ec.title,
           organization: ec.organization,
           type: ec.type,
-          period: `${ec.startDate} - ${ec.endDate}`,
+          period: `${ec.start_date} - ${ec.end_date}`,
           description: ec.description,
         }))
       }
@@ -117,51 +111,60 @@ export async function getExtracurriculars(userId: string): Promise<ToolResult> {
  */
 export async function getSavedOpportunities(userId: string): Promise<ToolResult> {
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true }
-    })
+    const supabase = await createClient()
+    
+    // Check if user exists
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', userId)
+      .single()
 
-    if (!user) {
+    if (userError || !user) {
       return { success: false, error: 'User not found' }
     }
 
-    const saved = await prisma.userOpportunity.findMany({
-      where: {
-        userId: user.id,
-        status: 'saved'
-      },
-      include: {
-        opportunity: {
-          select: {
-            id: true,
-            title: true,
-            company: true,
-            location: true,
-            type: true,
-            category: true,
-            deadline: true,
-            remote: true,
-          }
-        }
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 20
-    })
+    // Get saved opportunities with opportunity details
+    const { data: saved, error: savedError } = await supabase
+      .from('user_opportunities')
+      .select(`
+        created_at,
+        opportunities (
+          id,
+          title,
+          company,
+          location,
+          type,
+          category,
+          deadline,
+          location_type
+        )
+      `)
+      .eq('user_id', userId)
+      .eq('status', 'saved')
+      .order('created_at', { ascending: false })
+      .limit(20)
+
+    if (savedError) {
+      return { success: false, error: 'Failed to get saved opportunities' }
+    }
 
     return {
       success: true,
       data: {
-        count: saved.length,
-        opportunities: saved.map(s => ({
-          id: s.opportunity.id,
-          title: s.opportunity.title,
-          organization: s.opportunity.company,
-          location: s.opportunity.remote ? 'Remote' : s.opportunity.location,
-          type: s.opportunity.type,
-          category: s.opportunity.category,
-          deadline: s.opportunity.deadline?.toLocaleDateString() || null,
-        }))
+        count: saved?.length || 0,
+        opportunities: (saved || []).map(s => {
+          const opp = s.opportunities as any
+          return {
+            id: opp.id,
+            title: opp.title,
+            organization: opp.company,
+            location: opp.location_type === 'Remote' || opp.location_type === 'online' ? 'Remote' : opp.location,
+            type: opp.type,
+            category: opp.category,
+            deadline: opp.deadline ? new Date(opp.deadline).toLocaleDateString() : null,
+          }
+        })
       }
     }
   } catch (error) {
@@ -174,35 +177,36 @@ export async function getSavedOpportunities(userId: string): Promise<ToolResult>
  */
 export async function getProjects(userId: string): Promise<ToolResult> {
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true }
-    })
+    const supabase = await createClient()
+    
+    // Check if user exists
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', userId)
+      .single()
 
-    if (!user) {
+    if (userError || !user) {
       return { success: false, error: 'User not found' }
     }
 
-    const projects = await prisma.project.findMany({
-      where: { ownerId: user.id },
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        status: true,
-        category: true,
-        tags: true,
-        progress: true,
-      },
-      orderBy: { updatedAt: 'desc' },
-      take: 10
-    })
+    // Get projects
+    const { data: projects, error: projectsError } = await supabase
+      .from('projects')
+      .select('id, title, description, status, category, tags, progress')
+      .eq('owner_id', userId)
+      .order('updated_at', { ascending: false })
+      .limit(10)
+
+    if (projectsError) {
+      return { success: false, error: 'Failed to get projects' }
+    }
 
     return {
       success: true,
       data: {
-        count: projects.length,
-        projects: projects.map(p => ({
+        count: projects?.length || 0,
+        projects: (projects || []).map(p => ({
           title: p.title,
           description: p.description?.slice(0, 100) + (p.description && p.description.length > 100 ? '...' : ''),
           status: p.status,
@@ -222,35 +226,38 @@ export async function getProjects(userId: string): Promise<ToolResult> {
  */
 export async function getGoals(userId: string): Promise<ToolResult> {
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true }
-    })
+    const supabase = await createClient()
+    
+    // Check if user exists
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', userId)
+      .single()
 
-    if (!user) {
+    if (userError || !user) {
       return { success: false, error: 'User not found' }
     }
 
-    const goals = await prisma.userGoal.findMany({
-      where: {
-        userId: user.id,
-        isActive: true
-      },
-      select: {
-        id: true,
-        goalText: true,
-        roadmap: true,
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 5
-    })
+    // Get goals
+    const { data: goals, error: goalsError } = await supabase
+      .from('user_goals')
+      .select('id, goal_text, roadmap')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(5)
+
+    if (goalsError) {
+      return { success: false, error: 'Failed to get goals' }
+    }
 
     return {
       success: true,
       data: {
-        count: goals.length,
-        goals: goals.map(g => ({
-          goal: g.goalText,
+        count: goals?.length || 0,
+        goals: (goals || []).map(g => ({
+          goal: g.goal_text,
           roadmap: g.roadmap,
         }))
       }
@@ -268,73 +275,59 @@ export async function searchOpportunities(
   params: { query: string; category?: string; type?: string; limit?: number }
 ): Promise<ToolResult> {
   try {
+    const supabase = await createClient()
     const { query, category, type, limit = 5 } = params
     const searchTerms = query.toLowerCase().split(' ').filter(t => t.length > 2)
 
-    const opportunities = await prisma.opportunity.findMany({
-      where: {
-        isActive: true,
-        AND: [
-          // Category filter
-          category ? { category: { contains: category, mode: 'insensitive' } } : {},
-          // Type filter
-          type ? { type: { contains: type, mode: 'insensitive' } } : {},
-          // Search in title, description, company, skills
-          {
-            OR: [
-              { title: { contains: query, mode: 'insensitive' } },
-              { description: { contains: query, mode: 'insensitive' } },
-              { company: { contains: query, mode: 'insensitive' } },
-              { category: { contains: query, mode: 'insensitive' } },
-              // Check if any search term matches
-              ...searchTerms.map(term => ({
-                OR: [
-                  { title: { contains: term, mode: 'insensitive' as const } },
-                  { description: { contains: term, mode: 'insensitive' as const } },
-                  { skills: { hasSome: [term] } },
-                ]
-              }))
-            ]
-          }
-        ]
-      },
-      select: {
-        id: true,
-        title: true,
-        company: true,
-        location: true,
-        type: true,
-        category: true,
-        deadline: true,
-        remote: true,
-        description: true,
-        skills: true,
-        url: true,
-        sourceUrl: true,
-      },
-      orderBy: [
-        { deadline: 'asc' },
-        { createdAt: 'desc' }
-      ],
-      take: limit
-    })
+    // Build the query
+    let dbQuery = supabase
+      .from('opportunities')
+      .select('id, title, company, location, type, category, deadline, location_type, description, skills, url, source_url')
+      .eq('is_active', true)
+
+    // Apply category filter
+    if (category) {
+      dbQuery = dbQuery.ilike('category', `%${category}%`)
+    }
+
+    // Apply type filter
+    if (type) {
+      dbQuery = dbQuery.ilike('type', `%${type}%`)
+    }
+
+    // Apply search filter - use OR for title, company, category, description
+    if (query) {
+      const searchPattern = `%${query}%`
+      dbQuery = dbQuery.or(`title.ilike.${searchPattern},company.ilike.${searchPattern},category.ilike.${searchPattern},description.ilike.${searchPattern}`)
+    }
+
+    // Order and limit
+    const { data: opportunities, error } = await dbQuery
+      .order('deadline', { ascending: true, nullsFirst: false })
+      .order('created_at', { ascending: false })
+      .limit(limit)
+
+    if (error) {
+      console.error('[searchOpportunities]', error)
+      return { success: false, error: 'Failed to search opportunities' }
+    }
 
     return {
       success: true,
       data: {
-        count: opportunities.length,
+        count: opportunities?.length || 0,
         query: query,
-        opportunities: opportunities.map(o => ({
+        opportunities: (opportunities || []).map(o => ({
           id: o.id,
           title: o.title,
           organization: o.company,
-          location: o.remote ? 'Remote' : o.location,
+          location: o.location_type === 'Remote' || o.location_type === 'online' ? 'Remote' : o.location,
           type: o.type,
           category: o.category,
-          deadline: o.deadline?.toLocaleDateString() || null,
+          deadline: o.deadline ? new Date(o.deadline).toLocaleDateString() : null,
           description: o.description?.slice(0, 150) + (o.description && o.description.length > 150 ? '...' : ''),
-          skills: o.skills.slice(0, 5),
-          url: o.url || o.sourceUrl || null,
+          skills: Array.isArray(o.skills) ? o.skills.slice(0, 5) : [],
+          url: o.url || o.source_url || null,
         }))
       }
     }
@@ -353,119 +346,88 @@ export async function smartSearchOpportunities(
   params: { query?: string; category?: string; type?: string; limit?: number }
 ): Promise<ToolResult> {
   try {
+    const supabase = await createClient()
     const { query = '', category, type, limit = 10 } = params
 
     // First, get user profile for personalization
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        location: true,
-        skills: true,
-        interests: true,
-        userProfile: {
-          select: {
-            grade_level: true,
-            preferred_opportunity_types: true,
-            academic_strengths: true,
-          }
-        }
-      }
-    })
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id, location, skills, interests')
+      .eq('id', userId)
+      .single()
 
-    if (!user) {
+    if (userError || !user) {
       return { success: false, error: 'User not found' }
     }
+
+    // Get user profile
+    const { data: userProfile } = await supabase
+      .from('user_profiles')
+      .select('grade_level, preferred_opportunity_types, academic_strengths')
+      .eq('user_id', userId)
+      .single()
 
     // Build search terms from query + user profile
     const userInterests = user.interests || []
     const userSkills = user.skills || []
-    const preferredTypes = user.userProfile?.preferred_opportunity_types || []
-    const academicStrengths = user.userProfile?.academic_strengths || []
+    const preferredTypes = userProfile?.preferred_opportunity_types || []
+    const academicStrengths = userProfile?.academic_strengths || []
     
     // Combine all terms for matching
     const allTerms = [
       ...query.toLowerCase().split(' ').filter(t => t.length > 2),
-      ...userInterests.map(i => i.toLowerCase()),
-      ...userSkills.map(s => s.toLowerCase()),
-      ...academicStrengths.map(s => s.toLowerCase()),
+      ...userInterests.map((i: string) => i.toLowerCase()),
+      ...userSkills.map((s: string) => s.toLowerCase()),
+      ...academicStrengths.map((s: string) => s.toLowerCase()),
     ].slice(0, 20) // Limit to prevent huge queries
 
-    // Build where clause
-    const whereClause: Record<string, unknown> = {
-      isActive: true,
-    }
-
-    const andConditions: Record<string, unknown>[] = []
+    // Build query
+    let dbQuery = supabase
+      .from('opportunities')
+      .select('id, title, company, location, type, category, deadline, location_type, description, skills, url, source_url')
+      .eq('is_active', true)
 
     // Category filter
     if (category) {
-      andConditions.push({ category: { contains: category, mode: 'insensitive' } })
+      dbQuery = dbQuery.ilike('category', `%${category}%`)
     }
 
     // Type filter - from param or user preferences
     if (type) {
-      andConditions.push({ type: { contains: type, mode: 'insensitive' } })
+      dbQuery = dbQuery.ilike('type', `%${type}%`)
     } else if (preferredTypes.length > 0) {
-      andConditions.push({
-        OR: preferredTypes.map(t => ({ type: { contains: t, mode: 'insensitive' } }))
-      })
+      // Build OR condition for preferred types
+      const typePattern = preferredTypes.map((t: string) => `type.ilike.%${t}%`).join(',')
+      dbQuery = dbQuery.or(typePattern)
     }
 
     // Search by terms (query + profile interests/skills)
-    if (allTerms.length > 0) {
-      andConditions.push({
-        OR: [
-          ...allTerms.slice(0, 10).map(term => ({
-            OR: [
-              { title: { contains: term, mode: 'insensitive' } },
-              { description: { contains: term, mode: 'insensitive' } },
-              { company: { contains: term, mode: 'insensitive' } },
-              { category: { contains: term, mode: 'insensitive' } },
-              { skills: { hasSome: [term] } },
-            ]
-          }))
-        ]
-      })
-    }
-
-    if (andConditions.length > 0) {
-      whereClause.AND = andConditions
+    if (allTerms.length > 0 || query) {
+      const searchPattern = query ? `%${query}%` : `%${allTerms[0]}%`
+      dbQuery = dbQuery.or(`title.ilike.${searchPattern},company.ilike.${searchPattern},category.ilike.${searchPattern},description.ilike.${searchPattern}`)
     }
 
     // Fetch opportunities
-    const opportunities = await prisma.opportunity.findMany({
-      where: whereClause,
-      select: {
-        id: true,
-        title: true,
-        company: true,
-        location: true,
-        type: true,
-        category: true,
-        deadline: true,
-        remote: true,
-        description: true,
-        skills: true,
-        url: true,
-        sourceUrl: true,
-      },
-      orderBy: [
-        { deadline: 'asc' },
-        { createdAt: 'desc' }
-      ],
-      take: limit * 2 // Fetch extra for ranking
-    })
+    const { data: opportunities, error } = await dbQuery
+      .order('deadline', { ascending: true, nullsFirst: false })
+      .order('created_at', { ascending: false })
+      .limit(limit * 2) // Fetch extra for ranking
+
+    if (error) {
+      console.error('[smartSearchOpportunities]', error)
+      return { success: false, error: 'Failed to search opportunities' }
+    }
 
     // Score and rank opportunities by profile match
-    const scoredOpportunities = opportunities.map(opp => {
+    const scoredOpportunities = (opportunities || []).map(opp => {
       let score = 0
       const matchReasons: string[] = []
 
       // Check skill matches
-      const oppSkillsLower = opp.skills.map(s => s.toLowerCase())
-      const skillMatches = userSkills.filter(s => 
-        oppSkillsLower.some(os => os.includes(s.toLowerCase()) || s.toLowerCase().includes(os))
+      const oppSkills = Array.isArray(opp.skills) ? opp.skills : []
+      const oppSkillsLower = oppSkills.map((s: string) => s.toLowerCase())
+      const skillMatches = userSkills.filter((s: string) => 
+        oppSkillsLower.some((os: string) => os.includes(s.toLowerCase()) || s.toLowerCase().includes(os))
       )
       if (skillMatches.length > 0) {
         score += skillMatches.length * 10
@@ -475,7 +437,7 @@ export async function smartSearchOpportunities(
       // Check interest matches
       const titleLower = opp.title.toLowerCase()
       const descLower = (opp.description || '').toLowerCase()
-      const interestMatches = userInterests.filter(i => 
+      const interestMatches = userInterests.filter((i: string) => 
         titleLower.includes(i.toLowerCase()) || descLower.includes(i.toLowerCase())
       )
       if (interestMatches.length > 0) {
@@ -484,7 +446,8 @@ export async function smartSearchOpportunities(
       }
 
       // Location match
-      if (opp.remote) {
+      const isRemote = opp.location_type === 'Remote' || opp.location_type === 'online'
+      if (isRemote) {
         score += 5
         matchReasons.push('Remote-friendly')
       } else if (user.location && opp.location?.toLowerCase().includes(user.location.toLowerCase())) {
@@ -494,7 +457,7 @@ export async function smartSearchOpportunities(
 
       // Deadline urgency bonus (sooner = higher priority)
       if (opp.deadline) {
-        const daysUntil = Math.ceil((opp.deadline.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+        const daysUntil = Math.ceil((new Date(opp.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
         if (daysUntil > 0 && daysUntil <= 14) {
           score += 5
           matchReasons.push('Deadline soon')
@@ -522,13 +485,13 @@ export async function smartSearchOpportunities(
           id: o.id,
           title: o.title,
           organization: o.company,
-          location: o.remote ? 'Remote' : o.location,
+          location: o.location_type === 'Remote' || o.location_type === 'online' ? 'Remote' : o.location,
           type: o.type,
           category: o.category,
-          deadline: o.deadline?.toLocaleDateString() || null,
+          deadline: o.deadline ? new Date(o.deadline).toLocaleDateString() : null,
           description: o.description?.slice(0, 150) + (o.description && o.description.length > 150 ? '...' : ''),
-          skills: o.skills.slice(0, 5),
-          url: o.url || o.sourceUrl || null,
+          skills: Array.isArray(o.skills) ? o.skills.slice(0, 5) : [],
+          url: o.url || o.source_url || null,
           matchReasons: o.matchReasons.slice(0, 2),
           matchScore: o.score,
         }))
@@ -548,69 +511,59 @@ export async function filterByDeadline(
   params: { days: number; category?: string; type?: string; limit?: number }
 ): Promise<ToolResult> {
   try {
+    const supabase = await createClient()
     const { days, category, type, limit = 10 } = params
 
     const now = new Date()
     const futureDate = new Date(now.getTime() + days * 24 * 60 * 60 * 1000)
 
-    const whereClause: Record<string, unknown> = {
-      isActive: true,
-      deadline: {
-        gte: now,
-        lte: futureDate,
-      }
-    }
+    // Build query
+    let dbQuery = supabase
+      .from('opportunities')
+      .select('id, title, company, location, type, category, deadline, location_type, description, skills, url, source_url')
+      .eq('is_active', true)
+      .gte('deadline', now.toISOString())
+      .lte('deadline', futureDate.toISOString())
 
     if (category) {
-      whereClause.category = { contains: category, mode: 'insensitive' }
+      dbQuery = dbQuery.ilike('category', `%${category}%`)
     }
     if (type) {
-      whereClause.type = { contains: type, mode: 'insensitive' }
+      dbQuery = dbQuery.ilike('type', `%${type}%`)
     }
 
-    const opportunities = await prisma.opportunity.findMany({
-      where: whereClause,
-      select: {
-        id: true,
-        title: true,
-        company: true,
-        location: true,
-        type: true,
-        category: true,
-        deadline: true,
-        remote: true,
-        description: true,
-        skills: true,
-        url: true,
-        sourceUrl: true,
-      },
-      orderBy: { deadline: 'asc' },
-      take: limit
-    })
+    const { data: opportunities, error } = await dbQuery
+      .order('deadline', { ascending: true })
+      .limit(limit)
+
+    if (error) {
+      console.error('[filterByDeadline]', error)
+      return { success: false, error: 'Failed to filter by deadline' }
+    }
 
     return {
       success: true,
       data: {
-        count: opportunities.length,
+        count: opportunities?.length || 0,
         timeframe: `next ${days} days`,
-        opportunities: opportunities.map(o => {
+        opportunities: (opportunities || []).map(o => {
           const daysUntil = o.deadline 
-            ? Math.ceil((o.deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+            ? Math.ceil((new Date(o.deadline).getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
             : null
 
           return {
             id: o.id,
             title: o.title,
             organization: o.company,
-            location: o.remote ? 'Remote' : o.location,
+            location: o.location_type === 'Remote' || o.location_type === 'online' ? 'Remote' : o.location,
             type: o.type,
             category: o.category,
-            deadline: o.deadline?.toLocaleDateString() || null,
+            deadline: o.deadline ? new Date(o.deadline).toLocaleDateString() : null,
             daysUntilDeadline: daysUntil,
             urgency: daysUntil !== null && daysUntil <= 3 ? 'urgent' : daysUntil !== null && daysUntil <= 7 ? 'soon' : 'upcoming',
             description: o.description?.slice(0, 150) + (o.description && o.description.length > 150 ? '...' : ''),
-            skills: o.skills.slice(0, 5),
-            url: o.url || o.sourceUrl || null,
+            skills: Array.isArray(o.skills) ? o.skills.slice(0, 5) : [],
+            url: o.url || o.source_url || null,
           }
         })
       }
@@ -630,28 +583,26 @@ export async function personalizedWebDiscovery(
   params: { topic?: string; category?: string }
 ): Promise<ToolResult> {
   try {
+    const supabase = await createClient()
     const { topic, category } = params
 
     // Get user profile for building personalized query
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        location: true,
-        interests: true,
-        skills: true,
-        userProfile: {
-          select: {
-            grade_level: true,
-            preferred_opportunity_types: true,
-            academic_strengths: true,
-          }
-        }
-      }
-    })
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('location, interests, skills')
+      .eq('id', userId)
+      .single()
 
-    if (!user) {
+    if (userError || !user) {
       return { success: false, error: 'User not found' }
     }
+
+    // Get user profile
+    const { data: userProfile } = await supabase
+      .from('user_profiles')
+      .select('grade_level, preferred_opportunity_types, academic_strengths')
+      .eq('user_id', userId)
+      .single()
 
     // Build a smart search query from user profile
     const queryParts: string[] = []
@@ -673,7 +624,7 @@ export async function personalizedWebDiscovery(
     }
 
     // Add grade level context
-    const gradeLevel = user.userProfile?.grade_level
+    const gradeLevel = userProfile?.grade_level
     if (gradeLevel) {
       // grade_level is a number representing grade (9-12 for high school, 13+ for college)
       if (typeof gradeLevel === 'number') {
@@ -693,7 +644,7 @@ export async function personalizedWebDiscovery(
     }
 
     // Add preferred types
-    const preferredTypes = user.userProfile?.preferred_opportunity_types || []
+    const preferredTypes = userProfile?.preferred_opportunity_types || []
     if (preferredTypes.length > 0) {
       queryParts.push(preferredTypes[0])
     }
@@ -734,45 +685,48 @@ export async function bookmarkOpportunity(
   params: { opportunityId: string; opportunityTitle: string }
 ): Promise<ToolResult> {
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true }
-    })
+    const supabase = await createClient()
+    
+    // Check if user exists
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', userId)
+      .single()
 
-    if (!user) {
+    if (userError || !user) {
       return { success: false, error: 'User not found' }
     }
 
     // Check if opportunity exists
-    const opportunity = await prisma.opportunity.findUnique({
-      where: { id: params.opportunityId },
-      select: { id: true, title: true }
-    })
+    const { data: opportunity, error: oppError } = await supabase
+      .from('opportunities')
+      .select('id, title')
+      .eq('id', params.opportunityId)
+      .single()
 
-    if (!opportunity) {
+    if (oppError || !opportunity) {
       return { success: false, error: 'Opportunity not found' }
     }
 
     // Upsert the bookmark
-    await prisma.userOpportunity.upsert({
-      where: {
-        userId_opportunityId: {
-          userId: user.id,
-          opportunityId: params.opportunityId
-        }
-      },
-      update: {
+    const { error: upsertError } = await supabase
+      .from('user_opportunities')
+      .upsert({
+        user_id: userId,
+        opportunity_id: params.opportunityId,
         status: 'saved',
-        updatedAt: new Date()
-      },
-      create: {
-        userId: user.id,
-        opportunityId: params.opportunityId,
-        status: 'saved',
-        matchScore: 0,
-        matchReasons: []
-      }
-    })
+        match_score: 0,
+        match_reasons: [],
+        updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'user_id,opportunity_id'
+      })
+
+    if (upsertError) {
+      console.error('[bookmarkOpportunity]', upsertError)
+      return { success: false, error: 'Failed to bookmark opportunity' }
+    }
 
     return {
       success: true,

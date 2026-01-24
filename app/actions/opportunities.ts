@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import { createClient, requireAuth } from "@/lib/supabase/server"
+import { triggerDiscovery } from "@/app/actions/discovery"
 
 function formatDate(date: Date): string {
   return date.toLocaleDateString("en-US", {
@@ -90,6 +91,141 @@ export async function getOpportunities(filters?: {
       saved: userOpp?.status === "saved",
     }
   })
+}
+
+export interface SearchOpportunitiesResult {
+  opportunities: Awaited<ReturnType<typeof getOpportunities>>
+  discoveryTriggered: boolean
+  newOpportunitiesFound: number
+}
+
+export async function searchOpportunities(
+  query: string,
+  filters?: {
+    type?: string
+    category?: string
+    remote?: boolean
+  }
+): Promise<SearchOpportunitiesResult> {
+  const supabase = await createClient()
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser()
+
+  const sanitizedQuery = query.trim()
+
+  // If no query, return all opportunities (same as getOpportunities)
+  if (!sanitizedQuery) {
+    const opportunities = await getOpportunities(filters)
+    return { opportunities, discoveryTriggered: false, newOpportunitiesFound: 0 }
+  }
+
+  // Build the search query with ilike on title and company
+  const searchPattern = `%${sanitizedQuery}%`
+
+  let dbQuery = supabase
+    .from("opportunities")
+    .select("*")
+    .eq("is_active", true)
+    .or(`title.ilike.${searchPattern},company.ilike.${searchPattern},category.ilike.${searchPattern}`)
+
+  // Apply filters
+  if (filters?.type) dbQuery = dbQuery.eq("type", filters.type)
+  if (filters?.category) dbQuery = dbQuery.eq("category", filters.category)
+  if (filters?.remote !== undefined) dbQuery = dbQuery.eq("remote", filters.remote)
+
+  const { data: opportunities, error } = await dbQuery.order("deadline", { ascending: true })
+
+  if (error) throw new Error(error.message)
+
+  // Get user opportunities for match scores
+  let userOpportunities: Record<string, { match_score: number; match_reasons: unknown; status: string }> =
+    {}
+
+  if (authUser) {
+    const { data: userOpps } = await supabase
+      .from("user_opportunities")
+      .select("opportunity_id, match_score, match_reasons, status")
+      .eq("user_id", authUser.id)
+
+    userOpportunities = (userOpps || []).reduce((acc, uo) => {
+      acc[uo.opportunity_id] = {
+        match_score: uo.match_score,
+        match_reasons: uo.match_reasons,
+        status: uo.status,
+      }
+      return acc
+    }, {} as Record<string, { match_score: number; match_reasons: unknown; status: string }>)
+  }
+
+  const mapOpportunity = (opp: (typeof opportunities)[number]) => {
+    const userOpp = userOpportunities[opp.id]
+    return {
+      id: opp.id,
+      url: opp.url,
+      title: opp.title,
+      company: opp.company,
+      location: opp.location,
+      type: opp.type,
+      category: opp.category,
+      matchScore: userOpp?.match_score || 0,
+      matchReasons: userOpp?.match_reasons || [],
+      deadline: opp.deadline ? formatDate(new Date(opp.deadline)) : null,
+      postedDate: getRelativeTime(new Date(opp.posted_date)),
+      logo: opp.logo,
+      skills: opp.skills,
+      description: opp.description,
+      salary: opp.salary,
+      duration: opp.duration,
+      remote: opp.remote,
+      applicants: opp.applicants,
+      requirements: opp.requirements,
+      extractionConfidence: opp.extraction_confidence,
+      status: userOpp?.status || null,
+      saved: userOpp?.status === "saved",
+    }
+  }
+
+  // If we have results, return them
+  if (opportunities && opportunities.length > 0) {
+    return {
+      opportunities: opportunities.map(mapOpportunity),
+      discoveryTriggered: false,
+      newOpportunitiesFound: 0,
+    }
+  }
+
+  // No results and query is long enough: trigger discovery
+  if (sanitizedQuery.length >= 3) {
+    const discoveryResult = await triggerDiscovery(sanitizedQuery)
+
+    if (discoveryResult.success && discoveryResult.newOpportunities && discoveryResult.newOpportunities > 0) {
+      // Re-run search to pick up newly discovered opportunities
+      const { data: newOpportunities, error: newError } = await dbQuery
+
+      if (newError) throw new Error(newError.message)
+
+      return {
+        opportunities: (newOpportunities || []).map(mapOpportunity),
+        discoveryTriggered: true,
+        newOpportunitiesFound: discoveryResult.newOpportunities,
+      }
+    }
+
+    // Discovery ran but found nothing new
+    return {
+      opportunities: [],
+      discoveryTriggered: true,
+      newOpportunitiesFound: 0,
+    }
+  }
+
+  // Query too short for discovery, return empty
+  return {
+    opportunities: [],
+    discoveryTriggered: false,
+    newOpportunitiesFound: 0,
+  }
 }
 
 export async function getCuratedOpportunities() {

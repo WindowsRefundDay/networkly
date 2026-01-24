@@ -9,13 +9,13 @@ import asyncio
 import re
 from typing import List, Optional
 from dataclasses import dataclass
-from urllib.parse import urlparse
 
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
 from crawl4ai.async_configs import CacheMode
 
 from .scrapy_spider import ScrapyRunner
-from ..config import get_settings
+from ..config import get_settings, is_blocked_domain, is_js_heavy_domain, get_domain
+from ..utils.retry import retry_async, CRAWL_RETRY_CONFIG
 
 
 @dataclass
@@ -30,21 +30,6 @@ class CrawlResult:
     crawler_used: Optional[str] = None  # 'scrapy' or 'crawl4ai'
 
 
-# Domains that require JavaScript rendering
-JS_HEAVY_DOMAINS = {
-    "indeed.com", "glassdoor.com", "lever.co", "workday.com",
-    "salesforce.com", "greenhouse.io", "ziprecruiter.com",
-    "bamboohr.com", "smartrecruiters.com", "ultipro.com",
-    "myworkdayjobs.com", "recruiting.ultipro.com",
-}
-
-# Blocked domains (no-opportunity content)
-BLOCKED_DOMAINS = {
-    "linkedin.com", "facebook.com", "twitter.com", "tiktok.com",
-    "instagram.com", "youtube.com", "pinterest.com",
-}
-
-
 class HybridCrawler:
     """
     Hybrid crawler using Scrapy for speed, Crawl4AI for JS-heavy sites.
@@ -55,6 +40,7 @@ class HybridCrawler:
     def __init__(self):
         self.settings = get_settings()
         self.scrapy_runner = ScrapyRunner()
+        self._crawl_timeout = self.settings.crawl_timeout_seconds
 
         self._browser_config = BrowserConfig(
             headless=True,
@@ -70,48 +56,39 @@ class HybridCrawler:
             delay_before_return_html=1.0,
         )
 
-    def _get_domain(self, url: str) -> str:
-        """Extract domain from URL."""
-        try:
-            parsed = urlparse(url)
-            domain = parsed.netloc.lower()
-            if domain.startswith("www."):
-                domain = domain[4:]
-            return domain
-        except Exception:
-            return "unknown"
-
-    def _needs_js_rendering(self, url: str) -> bool:
-        """Check if URL needs JavaScript rendering."""
-        domain = self._get_domain(url)
-        return any(js_domain in domain for js_domain in JS_HEAVY_DOMAINS)
-
-    def _is_blocked(self, url: str) -> bool:
-        """Check if URL is blocked."""
-        domain = self._get_domain(url)
-        return any(blocked in domain for blocked in BLOCKED_DOMAINS)
-
     async def crawl(self, url: str) -> CrawlResult:
-        if self._is_blocked(url):
+        """Crawl a URL with automatic routing and retry logic."""
+        # Use centralized blocklist check
+        if is_blocked_domain(url):
             return CrawlResult(
                 url=url,
                 success=False,
-                error=f"Domain blocked: {self._get_domain(url)}",
+                error=f"Domain blocked: {get_domain(url)}",
             )
 
-        if self._needs_js_rendering(url):
+        # Use centralized JS-heavy check
+        if is_js_heavy_domain(url):
             return await self._crawl_with_crawl4ai(url)
 
         return await self._crawl_with_scrapy(url)
 
     async def _crawl_with_scrapy(self, url: str) -> CrawlResult:
-        try:
-            results = await self.scrapy_runner.run_crawl_spider([url])
-
+        """Crawl with Scrapy, falling back to Crawl4AI on failure."""
+        async def do_scrapy_crawl():
+            results = await asyncio.wait_for(
+                self.scrapy_runner.run_crawl_spider([url]),
+                timeout=self._crawl_timeout
+            )
             if not results:
-                return await self._crawl_with_crawl4ai(url)
-
-            result = results[0]
+                raise ValueError("No results from Scrapy")
+            return results[0]
+        
+        try:
+            result = await retry_async(
+                do_scrapy_crawl,
+                config=CRAWL_RETRY_CONFIG,
+                operation_name=f"Scrapy crawl {get_domain(url)}",
+            )
             return CrawlResult(
                 url=url,
                 success=result.get('success', False),
@@ -119,13 +96,25 @@ class HybridCrawler:
                 title=result.get('title'),
                 crawler_used='scrapy',
             )
-        except Exception as e:
+        except Exception:
+            # Fallback to Crawl4AI
             return await self._crawl_with_crawl4ai(url)
 
     async def _crawl_with_crawl4ai(self, url: str) -> CrawlResult:
-        try:
+        """Crawl with Crawl4AI (browser-based) with retry logic."""
+        async def do_crawl4ai():
             async with AsyncWebCrawler(config=self._browser_config) as crawler:
-                result = await crawler.arun(url=url, config=self._crawl_config)
+                return await crawler.arun(url=url, config=self._crawl_config)
+        
+        try:
+            result = await asyncio.wait_for(
+                retry_async(
+                    do_crawl4ai,
+                    config=CRAWL_RETRY_CONFIG,
+                    operation_name=f"Crawl4AI {get_domain(url)}",
+                ),
+                timeout=self._crawl_timeout
+            )
 
             if result.success:
                 markdown = self._clean_markdown(result.markdown or "")
@@ -144,6 +133,13 @@ class HybridCrawler:
                     error=result.error_message or "Crawl4AI failed",
                     crawler_used='crawl4ai',
                 )
+        except asyncio.TimeoutError:
+            return CrawlResult(
+                url=url,
+                success=False,
+                error=f"Crawl timed out after {self._crawl_timeout}s",
+                crawler_used='crawl4ai',
+            )
         except Exception as e:
             return CrawlResult(
                 url=url,

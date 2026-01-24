@@ -42,6 +42,9 @@ class ResearchState(TypedDict):
     # Extracted opportunities with embeddings
     extracted_opportunities: List[Dict[str, Any]]
     enriched_opportunities: List[Dict[str, Any]]
+    
+    # Drop reason tracking for diagnostics
+    stats: Dict[str, int]  # Counters: crawl_failed, extraction_rejected, timeout, blocked, etc.
 
 
 # User Profile Structure (for reference):
@@ -268,7 +271,7 @@ class DiscoveryAgent:
         graph.add_node("searcher", self._searcher_node)      # SearXNG search
         graph.add_node("evaluator", self._evaluator_node)    # URL evaluation
         graph.add_node("extractor", self._extractor_node)    # Content extraction with Crawl4AI + Gemini
-        graph.add_node("embedder", self._embedder_node)      # Vector embedding with text-embedding-005
+        graph.add_node("embedder", self._embedder_node)      # Vector embedding with text-embedding-004
         graph.add_node("saver", self._saver_node)            # Save to pending queue
 
         # Conditional entry point: profiler if user_profile exists, else planner
@@ -453,19 +456,42 @@ class DiscoveryAgent:
         
         urls = state.get("evaluated_urls", [])
         if not urls:
-            return {"extracted_opportunities": []}
+            return {"extracted_opportunities": [], "stats": state.get("stats", {})}
         
         crawler = get_crawler()
         extractor = get_extractor()
+        
+        # Initialize stats tracking
+        stats = dict(state.get("stats", {}))
+        stats.setdefault("urls_attempted", 0)
+        stats.setdefault("crawl_failed", 0)
+        stats.setdefault("crawl_timeout", 0)
+        stats.setdefault("crawl_blocked", 0)
+        stats.setdefault("extraction_rejected", 0)
+        stats.setdefault("extraction_error", 0)
+        stats.setdefault("extraction_success", 0)
         
         extracted_opportunities = []
         max_urls = 10 if state.get("is_personalized") else 15
         
         for url in urls[:max_urls]:
+            stats["urls_attempted"] += 1
             try:
                 # Crawl webpage
                 crawl_result = await crawler.crawl(url)
-                if not crawl_result.success or not crawl_result.markdown:
+                if not crawl_result.success:
+                    # Categorize crawl failure
+                    error_msg = (crawl_result.error or "").lower()
+                    if "timeout" in error_msg:
+                        stats["crawl_timeout"] += 1
+                    elif "blocked" in error_msg:
+                        stats["crawl_blocked"] += 1
+                    else:
+                        stats["crawl_failed"] += 1
+                    continue
+                
+                if not crawl_result.markdown:
+                    stats["crawl_failed"] += 1
                     continue
                 
                 # Extract structured data
@@ -476,23 +502,35 @@ class DiscoveryAgent:
                 )
                 
                 if result.success and result.opportunity_card:
+                    stats["extraction_success"] += 1
                     extracted_opportunities.append({
                         "url": url,
                         "data": result.opportunity_card.model_dump(),
                         "confidence": result.confidence,
                     })
                     sys.stderr.write(f"[Extractor] ✓ Extracted: {result.opportunity_card.title}\n")
+                else:
+                    stats["extraction_rejected"] += 1
                     
+            except asyncio.TimeoutError:
+                stats["crawl_timeout"] += 1
+                sys.stderr.write(f"[Extractor] Timeout processing {url}\n")
             except Exception as e:
+                stats["extraction_error"] += 1
                 sys.stderr.write(f"[Extractor] Error processing {url}: {e}\n")
-                continue
         
-        sys.stderr.write(f"[Extractor] Extracted {len(extracted_opportunities)} opportunities\n")
+        # Log summary
+        sys.stderr.write(
+            f"[Extractor] Summary: {stats['extraction_success']}/{stats['urls_attempted']} extracted | "
+            f"crawl_failed={stats['crawl_failed']} timeout={stats['crawl_timeout']} "
+            f"blocked={stats['crawl_blocked']} rejected={stats['extraction_rejected']} "
+            f"errors={stats['extraction_error']}\n"
+        )
         
-        return {"extracted_opportunities": extracted_opportunities}
+        return {"extracted_opportunities": extracted_opportunities, "stats": stats}
 
     async def _embedder_node(self, state: ResearchState) -> dict:
-        """Generate embeddings using text-embedding-005."""
+        """Generate embeddings using text-embedding-004."""
         from ..embeddings import get_embeddings
         
         opportunities = state.get("extracted_opportunities", [])
@@ -537,7 +575,7 @@ class DiscoveryAgent:
             text_to_embed = f"{data.get('title', '')} {data.get('summary', '')} Tags: {tags_str}"
             
             try:
-                # Generate embedding using text-embedding-005
+                # Generate embedding using text-embedding-004
                 embedding = embeddings_client.generate_for_indexing(text_to_embed)
                 
                 enriched_opportunities.append({
@@ -623,14 +661,32 @@ class DiscoveryAgent:
             "is_personalized": user_profile is not None,
             "extracted_opportunities": [],
             "enriched_opportunities": [],
+            "stats": {},
         }
 
         final_state = await self._graph.ainvoke(initial_state)
+        
+        # Log final run summary
+        stats = final_state.get("stats", {})
+        if stats:
+            sys.stderr.write(
+                f"\n[Discovery] Run complete for '{focus_area}':\n"
+                f"  URLs discovered: {len(final_state.get('discovered_urls', []))}\n"
+                f"  URLs attempted: {stats.get('urls_attempted', 0)}\n"
+                f"  Extraction success: {stats.get('extraction_success', 0)}\n"
+                f"  Drop reasons:\n"
+                f"    - Crawl failed: {stats.get('crawl_failed', 0)}\n"
+                f"    - Crawl timeout: {stats.get('crawl_timeout', 0)}\n"
+                f"    - Domain blocked: {stats.get('crawl_blocked', 0)}\n"
+                f"    - Content rejected: {stats.get('extraction_rejected', 0)}\n"
+                f"    - Extraction error: {stats.get('extraction_error', 0)}\n"
+            )
         
         return {
             "evaluated_urls": final_state.get("evaluated_urls", []),
             "enriched_opportunities": final_state.get("enriched_opportunities", []),
             "is_personalized": final_state.get("is_personalized", False),
+            "stats": stats,
         }
 
 

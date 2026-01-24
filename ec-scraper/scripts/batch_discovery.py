@@ -32,26 +32,28 @@ from src.agents.extractor import get_extractor
 from src.crawlers.hybrid_crawler import get_hybrid_crawler
 from src.db.url_cache import get_url_cache
 from src.api.postgres_sync import PostgresSync
-from src.config import get_settings
+from src.config import get_settings, get_discovery_profile, DAILY_PROFILE
 from src.embeddings import get_embeddings
 from src.db.vector_db import get_vector_db
 from src.db.models import OpportunityTiming
 
 
 class BatchDiscovery:
-    """Orchestrates discovery from multiple sources."""
+    """Orchestrates discovery from multiple sources using the DAILY profile."""
     
-    def __init__(self, db_url: str, verbose: bool = True):
+    def __init__(self, db_url: str, verbose: bool = True, profile: str = "daily"):
         """
         Initialize batch discovery.
         
         Args:
             db_url: PostgreSQL database URL
             verbose: If True, print progress messages
+            profile: Discovery profile ('daily' for batch, 'quick' for on-demand)
         """
         self.db_url = db_url
         self.verbose = verbose
         self.settings = get_settings()
+        self.profile = get_discovery_profile(profile)
         
         # Initialize components
         self.url_cache = get_url_cache()
@@ -70,6 +72,9 @@ class BatchDiscovery:
             "successful": 0,
             "failed": 0,
         }
+        
+        if verbose:
+            print(f"[BatchDiscovery] Using profile: {self.profile.name} - {self.profile.description}", flush=True)
     
     def log(self, message: str):
         """Log message if verbose enabled."""
@@ -193,10 +198,13 @@ class BatchDiscovery:
         Returns:
             Dictionary with processing statistics
         """
-        self.log(f"⚙️  Processing {len(urls)} URLs in parallel...")
+        self.log(f"⚙️  Processing {len(urls)} URLs in parallel (profile: {self.profile.name})...")
         
-        # Crawl in parallel
-        crawl_results = await self.crawler.crawl_batch(list(urls), max_concurrent=10)
+        # Crawl in parallel using profile settings
+        crawl_results = await self.crawler.crawl_batch(
+            list(urls), 
+            max_concurrent=self.profile.max_concurrent_crawls
+        )
         
         # Extract in parallel
         extraction_semaphore = asyncio.Semaphore(8)
@@ -241,7 +249,7 @@ class BatchDiscovery:
                         return {"success": False, "error": "Expired one-time"}
                     
                     # Save to database
-                    await sync.upsert_opportunity(ec)
+                    await sync.upsert_opportunity(opp)
                     
                     # Mark as successful
                     self.url_cache.mark_seen(crawl_result.url, "success", expires_days=opp.recheck_days, notes=opp.title)

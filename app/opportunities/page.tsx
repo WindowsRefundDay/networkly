@@ -1,17 +1,19 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, useRef, useCallback } from "react"
 import { useSearchParams } from "next/navigation"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Search, Sparkles, Bookmark, Send, Filter, Loader2, Briefcase, Target } from "lucide-react"
+import { Search, Sparkles, Bookmark, Send, Filter, Loader2, Briefcase, Target, Globe } from "lucide-react"
 import { OpportunityList } from "@/components/opportunities/opportunity-list"
 import { OpportunityDetailPanel } from "@/components/opportunities/opportunity-detail-panel"
 import { GoalDashboard } from "@/components/opportunities/goal-dashboard"
-import { getOpportunities } from "@/app/actions/opportunities"
+import { DiscoveryTriggerCard } from "@/components/opportunities/discovery-trigger-card"
+import { getOpportunities, searchOpportunities } from "@/app/actions/opportunities"
 import { useHasMounted } from "@/hooks/use-has-mounted"
+import { useDebouncedCallback } from "@/hooks/use-debounced-callback"
 
 interface Opportunity {
   id: string
@@ -45,35 +47,47 @@ export default function OpportunitiesPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [typeFilter, setTypeFilter] = useState("all")
   const [opportunities, setOpportunities] = useState<Opportunity[]>([])
+  const [searchResults, setSearchResults] = useState<Opportunity[] | null>(null)
   const [selectedOpportunity, setSelectedOpportunity] = useState<Opportunity | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isSearching, setIsSearching] = useState(false)
+  const [discoveryStatus, setDiscoveryStatus] = useState<{
+    triggered: boolean
+    newFound: number
+  } | null>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("all")
   const hasMounted = useHasMounted()
   const searchParams = useSearchParams()
 
+  // Track queries that have already triggered discovery to prevent repeated scrapes
+  const discoveredQueriesRef = useRef<Set<string>>(new Set())
+
+  const mapOpportunity = useCallback((opp: any): Opportunity => ({
+    id: opp.id,
+    title: opp.title,
+    company: opp.company,
+    location: opp.location,
+    type: opp.type,
+    matchScore: opp.matchScore || 0,
+    matchReasons: opp.matchReasons || [],
+    deadline: opp.deadline,
+    postedDate: opp.postedDate,
+    logo: opp.logo,
+    skills: opp.skills || [],
+    description: opp.description,
+    salary: opp.salary,
+    duration: opp.duration,
+    remote: opp.remote || false,
+    applicants: opp.applicants || 0,
+    saved: opp.saved || false,
+  }), [])
+
+  // Initial load: fetch all opportunities
   useEffect(() => {
     async function fetchOpportunities() {
       const data = await getOpportunities()
-      const mapped = data.map((opp: any) => ({
-        id: opp.id,
-        title: opp.title,
-        company: opp.company,
-        location: opp.location,
-        type: opp.type,
-        matchScore: opp.matchScore || 0,
-        matchReasons: opp.matchReasons || [],
-        deadline: opp.deadline,
-        postedDate: opp.postedDate,
-        logo: opp.logo,
-        skills: opp.skills || [],
-        description: opp.description,
-        salary: opp.salary,
-        duration: opp.duration,
-        remote: opp.remote || false,
-        applicants: opp.applicants || 0,
-        saved: opp.saved || false,
-      }))
+      const mapped = data.map(mapOpportunity)
       setOpportunities(mapped)
       setLoading(false)
 
@@ -88,9 +102,79 @@ export default function OpportunitiesPage() {
       }
     }
     fetchOpportunities()
-  }, [searchParams])
+  }, [searchParams, mapOpportunity])
 
-  const filteredOpportunities = useMemo(() => {
+  // Debounced search that triggers discovery if no results
+  const performSearch = useDebouncedCallback(async (query: string, type: string) => {
+    const trimmedQuery = query.trim()
+    
+    // If no query, clear search results and use client-side filtering
+    if (!trimmedQuery) {
+      setSearchResults(null)
+      setDiscoveryStatus(null)
+      setIsSearching(false)
+      return
+    }
+
+    // Check if we've already triggered discovery for this query
+    const queryKey = `${trimmedQuery.toLowerCase()}:${type}`
+    const alreadyDiscovered = discoveredQueriesRef.current.has(queryKey)
+
+    setIsSearching(true)
+    setDiscoveryStatus(null)
+
+    try {
+      const result = await searchOpportunities(trimmedQuery, {
+        type: type !== "all" ? type : undefined,
+      })
+
+      const mapped = result.opportunities.map(mapOpportunity)
+      setSearchResults(mapped)
+
+      // Track discovery status
+      if (result.discoveryTriggered && !alreadyDiscovered) {
+        discoveredQueriesRef.current.add(queryKey)
+        setDiscoveryStatus({
+          triggered: true,
+          newFound: result.newOpportunitiesFound,
+        })
+      }
+
+      // If discovery found new opportunities, also refresh the main list
+      if (result.newOpportunitiesFound > 0) {
+        const refreshedData = await getOpportunities()
+        setOpportunities(refreshedData.map(mapOpportunity))
+      }
+    } catch (error) {
+      console.error("[OpportunitiesPage] Search error:", error)
+      setSearchResults(null)
+    } finally {
+      setIsSearching(false)
+    }
+  }, 500)
+
+  // Handle search query changes
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value)
+    performSearch(value, typeFilter)
+  }
+
+  // Handle type filter changes
+  const handleTypeFilterChange = (value: string) => {
+    setTypeFilter(value)
+    if (searchQuery.trim()) {
+      performSearch(searchQuery, value)
+    }
+  }
+
+  // Determine which opportunities to display
+  const displayedOpportunities = useMemo(() => {
+    // If we have search results from the server, use those
+    if (searchResults !== null) {
+      return searchResults
+    }
+
+    // Otherwise, filter client-side
     return opportunities.filter((opp) => {
       const matchesSearch =
         searchQuery === "" ||
@@ -102,7 +186,10 @@ export default function OpportunitiesPage() {
 
       return matchesSearch && matchesType
     })
-  }, [opportunities, searchQuery, typeFilter])
+  }, [opportunities, searchResults, searchQuery, typeFilter])
+
+  // For backward compatibility with the rest of the component
+  const filteredOpportunities = displayedOpportunities
 
   const savedOpportunities = useMemo(() => opportunities.filter(o => o.saved), [opportunities])
 
@@ -117,6 +204,14 @@ export default function OpportunitiesPage() {
     setSelectedOpportunity(opp)
     setIsDetailOpen(true)
   }
+
+  const handleDiscoveryComplete = useCallback(async (count: number) => {
+    if (count > 0) {
+      const data = await getOpportunities()
+      const mapped = data.map(mapOpportunity)
+      setOpportunities(mapped)
+    }
+  }, [mapOpportunity])
 
   const EmptyState = ({ type }: { type: "all" | "saved" | "applied" }) => {
     const configs = {
@@ -169,7 +264,16 @@ export default function OpportunitiesPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Opportunities</h1>
-          <p className="text-muted-foreground">Discover {filteredOpportunities.length} opportunities curated for you</p>
+          <p className="text-muted-foreground">
+            {isSearching ? (
+              <span className="flex items-center gap-2">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Searching...
+              </span>
+            ) : (
+              `Discover ${filteredOpportunities.length} opportunities curated for you`
+            )}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <div className="relative flex-1 sm:w-64">
@@ -177,11 +281,11 @@ export default function OpportunitiesPage() {
             <Input
               placeholder="Search opportunities..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               className="pl-10"
             />
           </div>
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <Select value={typeFilter} onValueChange={handleTypeFilterChange}>
             <SelectTrigger className="w-[180px]">
               <Filter className="h-4 w-4 mr-2" />
               <SelectValue placeholder="All Types" />
@@ -197,6 +301,27 @@ export default function OpportunitiesPage() {
           </Select>
         </div>
       </div>
+
+      {/* Discovery status feedback */}
+      {discoveryStatus?.triggered && (
+        <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 border border-primary/20 text-sm">
+          <Globe className="h-4 w-4 text-primary" />
+          {discoveryStatus.newFound > 0 ? (
+            <span>
+              Searched the web and found <strong>{discoveryStatus.newFound}</strong> new{" "}
+              {discoveryStatus.newFound === 1 ? "opportunity" : "opportunities"}!
+            </span>
+          ) : (
+            <span>Searched the web but no new opportunities matched your query.</span>
+          )}
+          <button
+            onClick={() => setDiscoveryStatus(null)}
+            className="ml-auto text-muted-foreground hover:text-foreground"
+          >
+            &times;
+          </button>
+        </div>
+      )}
 
       {/* Main Grid Layout - Matches Projects page */}
       <div className="grid gap-6 lg:grid-cols-4">
@@ -218,7 +343,7 @@ export default function OpportunitiesPage() {
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="all" className="mt-6">
+              <TabsContent value="all" className="mt-6 space-y-8">
                 {filteredOpportunities.length === 0 ? (
                   searchQuery || typeFilter !== "all" ? (
                     <div className="text-center py-8 text-muted-foreground">No opportunities match your search.</div>
@@ -233,6 +358,12 @@ export default function OpportunitiesPage() {
                     selectedId={selectedOpportunity?.id}
                   />
                 )}
+                
+                <DiscoveryTriggerCard
+                  initialQuery={searchQuery}
+                  onComplete={handleDiscoveryComplete}
+                  className="mt-8"
+                />
               </TabsContent>
 
               <TabsContent value="saved" className="mt-6">

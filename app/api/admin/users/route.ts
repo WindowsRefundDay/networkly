@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
 import { createClient } from "@/lib/supabase/server"
 
 export async function GET() {
@@ -13,27 +12,40 @@ export async function GET() {
   }
 
   try {
-    const users = await prisma.user.findMany({
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        createdAt: true,
-        lastLoginAt: true,
-        profileViews: true,
-        connections: true,
-      },
-      orderBy: {
-        createdAt: 'desc'
-      },
-      take: 100
-    })
+    // Fetch users from Supabase users table
+    const { data: users, error: usersError } = await supabase
+      .from("users")
+      .select("id, email, name, created_at, last_login_at, profile_views, connections")
+      .order("created_at", { ascending: false })
+      .limit(100)
     
-    const totalCount = await prisma.user.count()
+    if (usersError) {
+      throw usersError
+    }
+    
+    // Get total count
+    const { count: totalCount, error: countError } = await supabase
+      .from("users")
+      .select("*", { count: "exact", head: true })
+    
+    if (countError) {
+      throw countError
+    }
+    
+    // Map snake_case to camelCase for API compatibility
+    const mappedUsers = (users || []).map(u => ({
+      id: u.id,
+      email: u.email,
+      name: u.name,
+      createdAt: u.created_at,
+      lastLoginAt: u.last_login_at,
+      profileViews: u.profile_views,
+      connections: u.connections,
+    }))
     
     return NextResponse.json({
-      users,
-      total: totalCount
+      users: mappedUsers,
+      total: totalCount || 0
     })
   } catch (error) {
     return NextResponse.json({ 

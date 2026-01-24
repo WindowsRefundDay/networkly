@@ -20,6 +20,11 @@ dependencies = [
     "scrapy>=2.11.0",
     "twisted>=23.10.0",
     "markdownify>=0.11.6",
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "aiohttp>=3.9.0",
+    "supabase>=2.0.0",
+    "numpy>=1.24.0",
 ]
 
 [project.optional-dependencies]

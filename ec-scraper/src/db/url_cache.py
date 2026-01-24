@@ -1,59 +1,54 @@
-"""URL cache for deduplication and scheduled rechecks."""
+"""URL cache for deduplication and scheduled rechecks.
+
+Migrated from SQLite to Supabase url_cache table.
+"""
 
 import asyncio
-import sqlite3
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import List, Optional, Tuple
 from urllib.parse import urlparse
+
+from supabase import create_client, Client
+from postgrest.exceptions import APIError
 
 from ..config import get_settings
 
 
 class URLCache:
-    """SQLite-based URL cache to avoid re-processing and schedule rechecks."""
+    """Supabase-based URL cache to avoid re-processing and schedule rechecks."""
     
     def __init__(self, db_path: Optional[str] = None):
         """
         Initialize the URL cache.
         
         Args:
-            db_path: Path to SQLite database file. If None, uses settings default.
+            db_path: Deprecated (kept for API compatibility). Uses Supabase instead.
         """
         settings = get_settings()
-        if db_path is None:
-            # Use separate cache database
-            cache_dir = Path(settings.sqlite_path).parent
-            db_path = str(cache_dir / "url_cache.db")
         
-        self.db_path = db_path
-        self._ensure_db()
+        # Get Supabase credentials
+        self.supabase_url = settings.SUPABASE_URL or settings.DATABASE_URL
+        self.supabase_key = settings.SUPABASE_SERVICE_ROLE_KEY
+        
+        if not self.supabase_url or not self.supabase_key:
+            # Fallback to env vars
+            import os
+            self.supabase_url = os.getenv('SUPABASE_URL') or os.getenv('NEXT_PUBLIC_SUPABASE_URL')
+            self.supabase_key = os.getenv('SUPABASE_SERVICE_ROLE_KEY') or os.getenv('SUPABASE_SECRET_KEY')
+        
+        if not self.supabase_url or not self.supabase_key:
+            raise ValueError(
+                "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY required for URL cache. "
+                "Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables."
+            )
+        
+        self._client: Optional[Client] = None
     
-    def _ensure_db(self):
-        """Create database tables if they don't exist."""
-        Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
-        
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS url_cache (
-                    url TEXT PRIMARY KEY,
-                    domain TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    first_seen TIMESTAMP NOT NULL,
-                    last_checked TIMESTAMP NOT NULL,
-                    next_recheck TIMESTAMP,
-                    check_count INTEGER DEFAULT 0,
-                    success_count INTEGER DEFAULT 0,
-                    notes TEXT
-                )
-            """)
-            
-            # Create indexes for performance
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_domain ON url_cache(domain)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_status ON url_cache(status)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_next_recheck ON url_cache(next_recheck)")
-            
-            conn.commit()
+    def _get_client(self) -> Client:
+        """Get or create Supabase client."""
+        if self._client is None:
+            self._client = create_client(self.supabase_url, self.supabase_key)
+        return self._client
     
     def _get_domain(self, url: str) -> str:
         """Extract domain from URL."""
@@ -77,20 +72,17 @@ class URLCache:
         Returns:
             True if URL exists in cache (and within specified time window)
         """
-        with sqlite3.connect(self.db_path) as conn:
-            if within_days is None:
-                result = conn.execute(
-                    "SELECT 1 FROM url_cache WHERE url = ?",
-                    (url,)
-                ).fetchone()
-                return result is not None
-            else:
-                cutoff = datetime.utcnow() - timedelta(days=within_days)
-                result = conn.execute(
-                    "SELECT 1 FROM url_cache WHERE url = ? AND last_checked >= ?",
-                    (url, cutoff)
-                ).fetchone()
-                return result is not None
+        client = self._get_client()
+        now = datetime.utcnow()
+        
+        query = client.table("url_cache").select("url").eq("url", url).limit(1)
+        
+        if within_days is not None:
+            cutoff = (now - timedelta(days=within_days)).isoformat()
+            query = query.gte("last_checked", cutoff)
+        
+        result = query.execute()
+        return len(result.data) > 0 if result.data else False
     
     def mark_seen(
         self,
@@ -108,42 +100,46 @@ class URLCache:
             expires_days: Days until this URL should be rechecked
             notes: Optional notes about the URL
         """
+        client = self._get_client()
         domain = self._get_domain(url)
         now = datetime.utcnow()
-        next_recheck = now + timedelta(days=expires_days)
+        next_recheck = (now + timedelta(days=expires_days)).isoformat()
         
-        with sqlite3.connect(self.db_path) as conn:
-            # Check if URL exists
-            existing = conn.execute(
-                "SELECT check_count, success_count FROM url_cache WHERE url = ?",
-                (url,)
-            ).fetchone()
+        # Check if URL exists
+        existing = client.table("url_cache").select("check_count, success_count").eq("url", url).limit(1).execute()
+        
+        check_count = 1
+        success_count = 1 if status == "success" else 0
+        
+        if existing.data and len(existing.data) > 0:
+            existing_data = existing.data[0]
+            check_count = (existing_data.get("check_count") or 0) + 1
+            success_count = existing_data.get("success_count") or 0
+            if status == "success":
+                success_count += 1
             
-            if existing:
-                check_count, success_count = existing
-                check_count += 1
-                if status == "success":
-                    success_count += 1
-                
-                conn.execute("""
-                    UPDATE url_cache
-                    SET status = ?,
-                        last_checked = ?,
-                        next_recheck = ?,
-                        check_count = ?,
-                        success_count = ?,
-                        notes = ?
-                    WHERE url = ?
-                """, (status, now, next_recheck, check_count, success_count, notes, url))
-            else:
-                success_count = 1 if status == "success" else 0
-                conn.execute("""
-                    INSERT INTO url_cache
-                    (url, domain, status, first_seen, last_checked, next_recheck, check_count, success_count, notes)
-                    VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
-                """, (url, domain, status, now, now, next_recheck, success_count, notes))
-            
-            conn.commit()
+            # Update existing
+            client.table("url_cache").update({
+                "status": status,
+                "last_checked": now.isoformat(),
+                "next_recheck": next_recheck,
+                "check_count": check_count,
+                "success_count": success_count,
+                "notes": notes,
+            }).eq("url", url).execute()
+        else:
+            # Insert new
+            client.table("url_cache").insert({
+                "url": url,
+                "domain": domain,
+                "status": status,
+                "first_seen": now.isoformat(),
+                "last_checked": now.isoformat(),
+                "next_recheck": next_recheck,
+                "check_count": check_count,
+                "success_count": success_count,
+                "notes": notes,
+            }).execute()
     
     def get_pending_rechecks(self, limit: int = 100) -> List[Tuple[str, str]]:
         """
@@ -155,20 +151,14 @@ class URLCache:
         Returns:
             List of (url, status) tuples for URLs due for recheck
         """
-        now = datetime.utcnow()
+        client = self._get_client()
+        now = datetime.utcnow().isoformat()
         
-        with sqlite3.connect(self.db_path) as conn:
-            results = conn.execute("""
-                SELECT url, status
-                FROM url_cache
-                WHERE next_recheck IS NOT NULL
-                  AND next_recheck <= ?
-                  AND status IN ('success', 'failed')
-                ORDER BY next_recheck ASC
-                LIMIT ?
-            """, (now, limit)).fetchall()
-            
-            return results
+        result = client.table("url_cache").select("url, status").not_.is_("next_recheck", "null").lte("next_recheck", now).in_("status", ["success", "failed"]).order("next_recheck", desc=False).limit(limit).execute()
+        
+        if result.data:
+            return [(row["url"], row["status"]) for row in result.data]
+        return []
     
     def get_stats(self) -> dict:
         """
@@ -177,36 +167,41 @@ class URLCache:
         Returns:
             Dictionary with cache statistics
         """
-        with sqlite3.connect(self.db_path) as conn:
-            total = conn.execute("SELECT COUNT(*) FROM url_cache").fetchone()[0]
-            
-            status_counts = dict(conn.execute("""
-                SELECT status, COUNT(*)
-                FROM url_cache
-                GROUP BY status
-            """).fetchall())
-            
-            pending_rechecks = conn.execute("""
-                SELECT COUNT(*)
-                FROM url_cache
-                WHERE next_recheck IS NOT NULL
-                  AND next_recheck <= ?
-            """, (datetime.utcnow(),)).fetchone()[0]
-            
-            top_domains = conn.execute("""
-                SELECT domain, COUNT(*) as count
-                FROM url_cache
-                GROUP BY domain
-                ORDER BY count DESC
-                LIMIT 10
-            """).fetchall()
-            
-            return {
-                "total_urls": total,
-                "by_status": status_counts,
-                "pending_rechecks": pending_rechecks,
-                "top_domains": [{"domain": d, "count": c} for d, c in top_domains],
-            }
+        client = self._get_client()
+        now = datetime.utcnow().isoformat()
+        
+        # Get total count
+        total_result = client.table("url_cache").select("url", count="exact").execute()
+        total = total_result.count if hasattr(total_result, 'count') else len(total_result.data) if total_result.data else 0
+        
+        # Get status counts (group by status)
+        status_result = client.table("url_cache").select("status").execute()
+        status_counts = {}
+        if status_result.data:
+            for row in status_result.data:
+                status = row.get("status", "unknown")
+                status_counts[status] = status_counts.get(status, 0) + 1
+        
+        # Get pending rechecks count
+        pending_result = client.table("url_cache").select("url", count="exact").not_.is_("next_recheck", "null").lte("next_recheck", now).execute()
+        pending_rechecks = pending_result.count if hasattr(pending_result, 'count') else len(pending_result.data) if pending_result.data else 0
+        
+        # Get top domains (approximate - Supabase doesn't have easy GROUP BY)
+        domains_result = client.table("url_cache").select("domain").limit(1000).execute()
+        domain_counts = {}
+        if domains_result.data:
+            for row in domains_result.data:
+                domain = row.get("domain", "unknown")
+                domain_counts[domain] = domain_counts.get(domain, 0) + 1
+        
+        top_domains = sorted(domain_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+        
+        return {
+            "total_urls": total,
+            "by_status": status_counts,
+            "pending_rechecks": pending_rechecks,
+            "top_domains": [{"domain": d, "count": c} for d, c in top_domains],
+        }
     
     def clear_old_entries(self, days: int = 90):
         """
@@ -215,22 +210,18 @@ class URLCache:
         Args:
             days: Remove entries older than this many days
         """
-        cutoff = datetime.utcnow() - timedelta(days=days)
+        client = self._get_client()
+        cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
         
-        with sqlite3.connect(self.db_path) as conn:
-            deleted = conn.execute("""
-                DELETE FROM url_cache
-                WHERE last_checked < ?
-                  AND status IN ('failed', 'blocked', 'invalid')
-            """, (cutoff,)).rowcount
-            
-            conn.commit()
-            
-            return deleted
+        # Delete old failed/blocked/invalid entries
+        result = client.table("url_cache").delete().lt("last_checked", cutoff).in_("status", ["failed", "blocked", "invalid"]).execute()
+        return len(result.data) if result.data else 0
     
     def filter_unseen(self, urls: List[str], within_days: Optional[int] = None) -> List[str]:
         """
         Filter a list of URLs to only include unseen ones.
+        
+        Uses batch query for efficiency (O(1) DB calls instead of O(n)).
         
         Args:
             urls: List of URLs to check
@@ -242,12 +233,81 @@ class URLCache:
         if not urls:
             return []
         
-        unseen = []
-        for url in urls:
-            if not self.is_seen(url, within_days):
-                unseen.append(url)
+        # Use batch lookup for efficiency
+        seen_urls = self.batch_check_seen(urls, within_days)
+        return [url for url in urls if url not in seen_urls]
+    
+    def batch_check_seen(
+        self,
+        urls: List[str],
+        within_days: Optional[int] = None
+    ) -> set:
+        """
+        Batch check which URLs have been seen.
         
-        return unseen
+        Uses a single DB query for all URLs (efficient).
+        
+        Args:
+            urls: List of URLs to check
+            within_days: If specified, only returns URLs checked within this window
+            
+        Returns:
+            Set of URLs that have been seen
+        """
+        if not urls:
+            return set()
+        
+        client = self._get_client()
+        
+        # Supabase IN clause for multiple URLs
+        query = client.table("url_cache").select("url").in_("url", urls)
+        
+        if within_days is not None:
+            cutoff = (datetime.utcnow() - timedelta(days=within_days)).isoformat()
+            query = query.gte("last_checked", cutoff)
+        
+        result = query.execute()
+        if result.data:
+            return {row["url"] for row in result.data}
+        return set()
+    
+    def batch_mark_seen(
+        self,
+        url_statuses: List[Tuple[str, str]],
+        expires_days: int = 30,
+    ):
+        """
+        Mark multiple URLs as seen in a single transaction.
+        
+        Args:
+            url_statuses: List of (url, status) tuples
+            expires_days: Days until URLs should be rechecked
+        """
+        if not url_statuses:
+            return
+        
+        client = self._get_client()
+        now = datetime.utcnow()
+        next_recheck = (now + timedelta(days=expires_days)).isoformat()
+        
+        # Prepare batch insert/update data
+        records = []
+        for url, status in url_statuses:
+            domain = self._get_domain(url)
+            records.append({
+                "url": url,
+                "domain": domain,
+                "status": status,
+                "first_seen": now.isoformat(),
+                "last_checked": now.isoformat(),
+                "next_recheck": next_recheck,
+                "check_count": 1,
+                "success_count": 1 if status == "success" else 0,
+                "notes": None,
+            })
+        
+        # Use upsert for batch insert/update
+        client.table("url_cache").upsert(records, on_conflict="url").execute()
 
 
 # Singleton

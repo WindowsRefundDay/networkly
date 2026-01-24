@@ -7,6 +7,14 @@ import { AIInsights } from "@/components/analytics/ai-insights"
 import { GoalsProgress } from "@/components/analytics/goals-progress"
 import { ActivityHeatmap } from "@/components/analytics/activity-heatmap"
 
+const defaultStats = {
+  profileViews: { value: 0, change: "+0%", trend: "up" },
+  searchAppearances: { value: 0, change: "+0%", trend: "up" },
+  connections: { value: 0, change: "+0%", trend: "up" },
+  applications: { value: 0, change: "+0", trend: "up" },
+  projects: { value: 0, change: "+0", trend: "up" },
+}
+
 export default async function AnalyticsPage() {
   const statsData = await getAnalyticsSummary()
   const profileViewsData = await getProfileViewsData()
@@ -19,7 +27,7 @@ export default async function AnalyticsPage() {
         <p className="text-muted-foreground">Track your career growth and network engagement</p>
       </div>
 
-      <AnalyticsSummary statsData={statsData} />
+      <AnalyticsSummary statsData={statsData ?? defaultStats} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <ProfileViewsChart data={profileViewsData} />

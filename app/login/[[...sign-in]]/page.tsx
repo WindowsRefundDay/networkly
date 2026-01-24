@@ -1,9 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 
 import { createClient } from "@/lib/supabase/client"
+import { ensureUserRecord } from "@/app/actions/user"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
@@ -12,7 +13,6 @@ export default function LoginPage() {
     const [password, setPassword] = useState("")
     const [error, setError] = useState("")
     const [loading, setLoading] = useState(false)
-    const router = useRouter()
     const searchParams = useSearchParams()
     const redirect = searchParams.get("redirect") || "/dashboard"
     const supabase = createClient()
@@ -22,33 +22,31 @@ export default function LoginPage() {
         setLoading(true)
         setError("")
 
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-        })
+        try {
+            const { error: signInError } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            })
 
-        if (signInError) {
-            setError(signInError.message)
-            setLoading(false)
-            return
-        }
+            if (signInError) {
+                setError(signInError.message)
+                setLoading(false)
+                return
+            }
 
-        router.push(redirect)
-        router.refresh()
-    }
+            const ensureUserPromise = ensureUserRecord().catch((e) => {
+                console.warn("Could not ensure user record:", e)
+            })
 
-    const handleGoogleLogin = async () => {
-        setLoading(true)
-        setError("")
-        const { error: oauthError } = await supabase.auth.signInWithOAuth({
-            provider: "google",
-            options: {
-                redirectTo: `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirect)}`,
-            },
-        })
+            await Promise.race([
+                ensureUserPromise,
+                new Promise((resolve) => setTimeout(resolve, 2000)),
+            ])
 
-        if (oauthError) {
-            setError(oauthError.message)
+            window.location.href = redirect
+        } catch (e) {
+            console.error("Login error:", e)
+            setError("An unexpected error occurred. Please try again.")
             setLoading(false)
         }
     }
@@ -103,8 +101,11 @@ export default function LoginPage() {
                             <span className="bg-card px-2 text-muted-foreground">or continue with</span>
                         </div>
                     </div>
-                    <Button variant="outline" className="w-full" onClick={handleGoogleLogin} disabled={loading}>
-                        Continue with Google
+                    <Button variant="outline" className="w-full" disabled>
+                        <span className="flex flex-col items-center gap-1">
+                            <span className="line-through">Continue with Google</span>
+                            <span className="text-xs text-muted-foreground">Coming soon</span>
+                        </span>
                     </Button>
                 </div>
 

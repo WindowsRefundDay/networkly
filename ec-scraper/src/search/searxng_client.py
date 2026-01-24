@@ -3,11 +3,12 @@
 import asyncio
 import sys
 from dataclasses import dataclass
-from typing import List, Optional, Set
+from typing import List, Optional
 from urllib.parse import urlparse
 import aiohttp
 
-from ..config import get_settings
+from ..config import get_settings, is_blocked_domain, get_domain
+from ..utils.retry import retry_async, SEARCH_RETRY_CONFIG
 
 
 @dataclass
@@ -19,79 +20,6 @@ class SearchResult:
     snippet: str
     engine: str
     score: float = 0.0
-
-
-# Domain blocklist - sites that never contain high school opportunities
-# Grouped by category for maintainability
-BLOCKED_DOMAINS: Set[str] = {
-    # Chinese/Asian language sites (non-English)
-    'zhihu.com', 'baidu.com', 'weixin.qq.com', 'sina.com', 'sina.com.cn',
-    'bilibili.com', 'douban.com', 'csdn.net', '163.com', 'sohu.com',
-    'weibo.com', 'taobao.com', 'alibaba.com', 'jd.com', 'tmall.com',
-    'qq.com', 'tencent.com', 'youku.com', 'iqiyi.com', 'cctv.com',
-    'cnblogs.com', 'jianshu.com', 'zhaopin.com', '51job.com',
-    'naver.com', 'daum.net',  # Korean
-    'rakuten.co.jp', 'yahoo.co.jp', 'livedoor.jp',  # Japanese
-    
-    # Social media (no program listings)
-    'reddit.com', 'facebook.com', 'twitter.com', 'instagram.com',
-    'youtube.com', 'tiktok.com', 'snapchat.com', 'pinterest.com',
-    'tumblr.com', 'discord.com', 'threads.net', 'x.com',
-    
-    # Job boards (adult jobs, not HS programs)
-    'indeed.com', 'glassdoor.com', 'ziprecruiter.com', 'monster.com',
-    'careerbuilder.com', 'simplyhired.com', 'workday.com', 'lever.co',
-    'greenhouse.io', 'hire.withgoogle.com',
-    
-    # Reference/dictionary sites (no program info)
-    'wikipedia.org', 'wiktionary.org', 'merriam-webster.com',
-    'dictionary.com', 'thesaurus.com', 'britannica.com',
-    'quora.com', 'answers.com', 'ask.com',
-    
-    # News aggregators (articles, not programs)
-    'news.google.com', 'news.yahoo.com', 'msn.com',
-    'huffpost.com', 'buzzfeed.com', 'vice.com',
-    
-    # Shopping sites
-    'amazon.com', 'ebay.com', 'walmart.com', 'target.com',
-    'etsy.com', 'aliexpress.com', 'wish.com',
-    
-    # Entertainment
-    'netflix.com', 'hulu.com', 'spotify.com', 'soundcloud.com',
-    'twitch.tv', 'imdb.com', 'rottentomatoes.com',
-    
-    # File sharing / forums
-    'mega.nz', 'dropbox.com', 'drive.google.com',
-    'stackexchange.com', 'stackoverflow.com',
-    
-    # Other non-opportunity sites
-    'medium.com',  # Blog platform (articles, not programs)
-    'substack.com', 'ghost.io',
-    'yelp.com', 'tripadvisor.com',
-    'weather.com', 'accuweather.com',
-}
-
-
-def is_blocked_domain(url: str) -> bool:
-    """Check if a URL is from a blocked domain."""
-    try:
-        domain = urlparse(url).netloc.lower()
-        # Remove www. prefix
-        if domain.startswith('www.'):
-            domain = domain[4:]
-        
-        # Check exact match
-        if domain in BLOCKED_DOMAINS:
-            return True
-        
-        # Check if it's a subdomain of blocked domain
-        for blocked in BLOCKED_DOMAINS:
-            if domain.endswith('.' + blocked):
-                return True
-        
-        return False
-    except Exception:
-        return False
 
 
 class SearXNGClient:
@@ -130,7 +58,8 @@ class SearXNGClient:
         """
         settings = get_settings()
         self.base_url = base_url or getattr(settings, 'searxng_url', 'http://localhost:8080')
-        self.timeout = aiohttp.ClientTimeout(total=30)
+        # Use centralized timeout from settings
+        self.timeout = aiohttp.ClientTimeout(total=settings.search_timeout_seconds)
         self._result_cache = {}  # Simple in-memory cache for deduplication
     
     def expand_query(self, query: str) -> List[str]:
@@ -206,6 +135,59 @@ class SearXNGClient:
         
         return deduplicated
     
+    async def _execute_single_search(
+        self,
+        search_query: str,
+        params: dict,
+        max_results: int,
+    ) -> List[SearchResult]:
+        """Execute a single search query with retry logic."""
+        results = []
+        
+        async def do_search() -> dict:
+            async with aiohttp.ClientSession(timeout=self.timeout) as session:
+                async with session.get(
+                    f"{self.base_url}/search",
+                    params=params,
+                ) as response:
+                    if response.status != 200:
+                        raise aiohttp.ClientError(f"SearXNG returned status {response.status}")
+                    return await response.json()
+        
+        try:
+            data = await retry_async(
+                do_search,
+                config=SEARCH_RETRY_CONFIG,
+                operation_name=f"SearXNG search '{search_query[:30]}...'",
+            )
+            
+            # Check for regular results
+            for item in data.get('results', [])[:max_results]:
+                results.append(SearchResult(
+                    url=item.get('url', ''),
+                    title=item.get('title', ''),
+                    snippet=item.get('content', ''),
+                    engine=item.get('engine', 'unknown'),
+                    score=item.get('score', 0.0),
+                ))
+
+            # Also check infoboxes (Wikipedia returns these)
+            for infobox in data.get('infoboxes', []):
+                urls = infobox.get('urls', [])
+                for url_info in urls[:3]:  # Get first 3 URLs from infobox
+                    results.append(SearchResult(
+                        url=url_info.get('url', ''),
+                        title=f"{infobox.get('infobox', 'Wikipedia')}: {url_info.get('title', 'Link')}",
+                        snippet=infobox.get('content', ''),
+                        engine=infobox.get('engine', 'wikipedia'),
+                        score=0.9,  # Higher score for infobox results
+                    ))
+                    
+        except Exception as e:
+            sys.stderr.write(f"[SearXNG] Search failed after retries: {e}\n")
+        
+        return results
+
     async def search(
         self,
         query: str,
@@ -216,7 +198,7 @@ class SearXNGClient:
         expand_query: bool = False,
     ) -> List[SearchResult]:
         """
-        Perform a search using SearXNG.
+        Perform a search using SearXNG with retry logic.
         
         Args:
             query: The search query
@@ -258,44 +240,8 @@ class SearXNGClient:
             if excluded:
                 params['disabled_engines'] = ','.join(excluded)
             
-            try:
-                async with aiohttp.ClientSession(timeout=self.timeout) as session:
-                    async with session.get(
-                        f"{self.base_url}/search",
-                        params=params,
-                    ) as response:
-                        if response.status != 200:
-                            sys.stderr.write(f"SearXNG error: {response.status}\n")
-                            continue
-
-                        data = await response.json()
-
-                        # Check for regular results
-                        for item in data.get('results', [])[:max_results]:
-                            all_results.append(SearchResult(
-                                url=item.get('url', ''),
-                                title=item.get('title', ''),
-                                snippet=item.get('content', ''),
-                                engine=item.get('engine', 'unknown'),
-                                score=item.get('score', 0.0),
-                            ))
-
-                        # Also check infoboxes (Wikipedia returns these)
-                        for infobox in data.get('infoboxes', []):
-                            urls = infobox.get('urls', [])
-                            for url_info in urls[:3]:  # Get first 3 URLs from infobox
-                                all_results.append(SearchResult(
-                                    url=url_info.get('url', ''),
-                                    title=f"{infobox.get('infobox', 'Wikipedia')}: {url_info.get('title', 'Link')}",
-                                    snippet=infobox.get('content', ''),
-                                    engine=infobox.get('engine', 'wikipedia'),
-                                    score=0.9,  # Higher score for infobox results
-                                ))
-                        
-            except aiohttp.ClientError as e:
-                sys.stderr.write(f"SearXNG connection error: {e}\n")
-            except Exception as e:
-                sys.stderr.write(f"SearXNG search error: {e}\n")
+            results = await self._execute_single_search(search_query, params, max_results)
+            all_results.extend(results)
         
         # Deduplicate and limit results
         deduplicated = self.deduplicate_results(all_results)

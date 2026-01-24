@@ -2,37 +2,14 @@
 
 import asyncio
 import re
-from urllib.parse import urlparse
 from typing import Optional, List
 from dataclasses import dataclass
 
 from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig
 from crawl4ai.async_configs import CacheMode
 
-from ..config import get_settings
-
-
-# Domains that typically block crawlers or require login
-BLOCKED_DOMAINS = {
-    "linkedin.com",
-    "facebook.com",
-    "instagram.com",
-    "twitter.com",
-    "x.com",
-    "tiktok.com",
-}
-
-# Domains that need extra wait time for JS rendering
-SLOW_RENDER_DOMAINS = {
-    "indeed.com",
-    "glassdoor.com",
-    "ziprecruiter.com",
-    "monster.com",
-    "lever.co",
-    "greenhouse.io",
-    "workday.com",
-    "salesforce.com",
-}
+from ..config import get_settings, is_blocked_domain, is_slow_render_domain, get_domain
+from ..utils.retry import retry_async, CRAWL_RETRY_CONFIG
 
 
 @dataclass
@@ -81,33 +58,12 @@ class Crawl4AIClient:
             verbose=False,
         )
         
-        # Global timeout for entire crawl operation (prevents hanging)
-        self._global_timeout = 20  # seconds
-
-    def _get_domain(self, url: str) -> str:
-        """Extract domain from URL."""
-        try:
-            parsed = urlparse(url)
-            domain = parsed.netloc.lower()
-            if domain.startswith("www."):
-                domain = domain[4:]
-            return domain
-        except Exception:
-            return ""
-
-    def _is_blocked_domain(self, url: str) -> bool:
-        """Check if URL is from a blocked domain."""
-        domain = self._get_domain(url)
-        return any(blocked in domain for blocked in BLOCKED_DOMAINS)
-
-    def _needs_slow_config(self, url: str) -> bool:
-        """Check if URL needs slower crawl config for JS rendering."""
-        domain = self._get_domain(url)
-        return any(slow in domain for slow in SLOW_RENDER_DOMAINS)
+        # Global timeout from settings
+        self._global_timeout = self.settings.crawl_timeout_seconds
 
     async def crawl(self, url: str) -> CrawlResult:
         """
-        Crawl a single URL with global timeout protection.
+        Crawl a single URL with retry logic and global timeout protection.
         
         Args:
             url: The URL to crawl
@@ -115,21 +71,21 @@ class Crawl4AIClient:
         Returns:
             CrawlResult with markdown content or error
         """
-        # Check for blocked domains first (fast fail)
-        if self._is_blocked_domain(url):
+        # Check for blocked domains first using centralized blocklist (fast fail)
+        if is_blocked_domain(url):
             return CrawlResult(
                 url=url,
                 success=False,
-                error=f"Domain blocked: {self._get_domain(url)}",
+                error=f"Domain blocked: {get_domain(url)}",
             )
 
-        # Choose config based on domain
-        config = self._slow_crawl_config if self._needs_slow_config(url) else self._crawl_config
+        # Choose config based on domain using centralized check
+        config = self._slow_crawl_config if is_slow_render_domain(url) else self._crawl_config
         
         # Wrap in global timeout to prevent hanging
         try:
             return await asyncio.wait_for(
-                self._do_crawl(url, config),
+                self._do_crawl_with_retry(url, config),
                 timeout=self._global_timeout
             )
         except asyncio.TimeoutError:
@@ -139,14 +95,18 @@ class Crawl4AIClient:
                 error=f"Crawl timed out after {self._global_timeout}s",
             )
 
-    async def _do_crawl(self, url: str, config: CrawlerRunConfig) -> CrawlResult:
-        """Perform the actual crawl with given config."""
-        try:
+    async def _do_crawl_with_retry(self, url: str, config: CrawlerRunConfig) -> CrawlResult:
+        """Perform the actual crawl with retry logic."""
+        async def do_crawl():
             async with AsyncWebCrawler(config=self._browser_config) as crawler:
-                result = await crawler.arun(
-                    url=url,
-                    config=config,
-                )
+                return await crawler.arun(url=url, config=config)
+        
+        try:
+            result = await retry_async(
+                do_crawl,
+                config=CRAWL_RETRY_CONFIG,
+                operation_name=f"Crawl4AI {get_domain(url)}",
+            )
 
             if result.success:
                 markdown = result.markdown or ""

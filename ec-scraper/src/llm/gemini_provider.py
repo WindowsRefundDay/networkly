@@ -1,6 +1,8 @@
-"""Gemini LLM Provider implementation."""
+"""Gemini LLM Provider implementation with fallback and timeout handling."""
 
+import asyncio
 import json
+import sys
 from typing import Any, Optional, Type
 
 from google import genai
@@ -11,8 +13,17 @@ from ..config import get_settings
 from .provider import GenerationConfig, LLMProvider
 
 
+# Error messages that indicate model is unavailable
+MODEL_UNAVAILABLE_ERRORS = (
+    "does not exist",
+    "do not have access",
+    "not found",
+    "invalid model",
+)
+
+
 class GeminiProvider(LLMProvider):
-    """Gemini API implementation of LLM provider."""
+    """Gemini API implementation of LLM provider with fallback support."""
     
     def __init__(self):
         """Initialize Gemini provider."""
@@ -20,36 +31,101 @@ class GeminiProvider(LLMProvider):
         self.client = genai.Client(api_key=settings.GOOGLE_API_KEY)
         self.model = settings.gemini_pro_model
         self.fast_model = settings.gemini_flash_model
+        self._llm_timeout = settings.llm_timeout_seconds
+        # Track which models have failed to avoid repeated failures
+        self._unavailable_models: set = set()
     
     @property
     def name(self) -> str:
         return "gemini"
     
-    def _get_model(self, config: Optional[GenerationConfig] = None) -> str:
-        """Get model name based on config."""
+    def _get_model(self, config: Optional[GenerationConfig] = None, fallback: bool = False) -> str:
+        """Get model name based on config, with fallback support."""
+        if fallback:
+            # Always return main model as fallback
+            return self.model
+        
         if config and config.use_fast_model:
+            # Skip fast model if we know it's unavailable
+            if self.fast_model in self._unavailable_models:
+                return self.model
             return self.fast_model
         return self.model
+    
+    def _is_model_unavailable_error(self, error: Exception) -> bool:
+        """Check if error indicates model is unavailable."""
+        error_str = str(error).lower()
+        return any(msg in error_str for msg in MODEL_UNAVAILABLE_ERRORS)
+    
+    async def _generate_with_timeout(
+        self,
+        model: str,
+        prompt: str,
+        cfg: GenerationConfig,
+    ) -> Any:
+        """Execute generation with timeout protection."""
+        return await asyncio.wait_for(
+            self.client.aio.models.generate_content(
+                model=model,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    temperature=cfg.temperature,
+                    max_output_tokens=cfg.max_output_tokens,
+                ),
+            ),
+            timeout=self._llm_timeout,
+        )
+    
+    async def _generate_structured_with_timeout(
+        self,
+        model: str,
+        prompt: str,
+        schema: Type[BaseModel],
+        cfg: GenerationConfig,
+    ) -> Any:
+        """Execute structured generation with timeout protection."""
+        return await asyncio.wait_for(
+            self.client.aio.models.generate_content(
+                model=model,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=schema,
+                    temperature=cfg.temperature,
+                    max_output_tokens=cfg.max_output_tokens,
+                ),
+            ),
+            timeout=self._llm_timeout,
+        )
     
     async def generate(
         self,
         prompt: str,
         config: Optional[GenerationConfig] = None,
     ) -> str:
-        """Generate text response using Gemini."""
+        """Generate text response using Gemini with fallback on model errors."""
         cfg = config or GenerationConfig()
         model = self._get_model(config)
         
-        response = await self.client.aio.models.generate_content(
-            model=model,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                temperature=cfg.temperature,
-                max_output_tokens=cfg.max_output_tokens,
-            ),
-        )
-        
-        return response.text.strip()
+        try:
+            response = await self._generate_with_timeout(model, prompt, cfg)
+            return response.text.strip()
+        except asyncio.TimeoutError:
+            raise TimeoutError(f"LLM generation timed out after {self._llm_timeout}s")
+        except Exception as e:
+            # Check if we should fallback to main model
+            if self._is_model_unavailable_error(e) and model != self.model:
+                sys.stderr.write(
+                    f"[GeminiProvider] Model '{model}' unavailable, falling back to '{self.model}'\n"
+                )
+                self._unavailable_models.add(model)
+                # Retry with fallback model
+                try:
+                    response = await self._generate_with_timeout(self.model, prompt, cfg)
+                    return response.text.strip()
+                except asyncio.TimeoutError:
+                    raise TimeoutError(f"LLM generation timed out after {self._llm_timeout}s")
+            raise
     
     async def generate_structured(
         self,
@@ -57,20 +133,30 @@ class GeminiProvider(LLMProvider):
         schema: Type[BaseModel],
         config: Optional[GenerationConfig] = None,
     ) -> Any:
-        """Generate structured response using Gemini's native schema support."""
+        """Generate structured response using Gemini with fallback on model errors."""
         cfg = config or GenerationConfig()
         model = self._get_model(config)
         
-        response = await self.client.aio.models.generate_content(
-            model=model,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=schema,
-                temperature=cfg.temperature,
-                max_output_tokens=cfg.max_output_tokens,
-            ),
-        )
+        try:
+            response = await self._generate_structured_with_timeout(model, prompt, schema, cfg)
+        except asyncio.TimeoutError:
+            raise TimeoutError(f"LLM structured generation timed out after {self._llm_timeout}s")
+        except Exception as e:
+            # Check if we should fallback to main model
+            if self._is_model_unavailable_error(e) and model != self.model:
+                sys.stderr.write(
+                    f"[GeminiProvider] Model '{model}' unavailable, falling back to '{self.model}'\n"
+                )
+                self._unavailable_models.add(model)
+                # Retry with fallback model
+                try:
+                    response = await self._generate_structured_with_timeout(
+                        self.model, prompt, schema, cfg
+                    )
+                except asyncio.TimeoutError:
+                    raise TimeoutError(f"LLM structured generation timed out after {self._llm_timeout}s")
+            else:
+                raise
         
         # Handle parsed response
         if response.parsed:

@@ -1,9 +1,10 @@
 """Semantic search result filtering using embeddings.
 
-Uses Google Gemini text-embedding-005 with batch embedding for speed.
+Uses Google Gemini text-embedding-004 with batch embedding for speed.
 Based on official Google GenAI Python SDK documentation.
 """
 
+import asyncio
 import sys
 import numpy as np
 from typing import List, Tuple, Optional
@@ -12,6 +13,7 @@ from google import genai
 from google.genai import types
 
 from ..config import get_settings
+from ..utils.retry import retry_async, EMBEDDING_RETRY_CONFIG
 
 
 # Reference text representing ideal opportunities (combined for one embedding)
@@ -36,18 +38,24 @@ class SemanticFilter:
     and batch embedding for maximum speed.
     """
     
-    def __init__(self, similarity_threshold: float = 0.55):
+    def __init__(self, similarity_threshold: Optional[float] = None):
         """
         Initialize semantic filter.
         
         Args:
             similarity_threshold: Minimum cosine similarity to keep (0-1)
+                If None, uses default from settings (configurable per run).
                 0.55+ is recommended to filter out generic/irrelevant content
         """
-        self.threshold = similarity_threshold
+        settings = get_settings()
+        self.threshold = similarity_threshold or settings.default_semantic_threshold
         self._client = None
         self._model = None
         self._reference_embedding = None
+    
+    def set_threshold(self, threshold: float) -> None:
+        """Update the similarity threshold dynamically."""
+        self.threshold = threshold
     
     def _get_client(self):
         """Lazy-load the Gemini client."""
@@ -59,17 +67,25 @@ class SemanticFilter:
             self._model = settings.embedding_model  # text-embedding-005
         return self._client
     
-    def _get_reference_embedding(self) -> np.ndarray:
-        """Get cached reference embedding for ideal opportunities."""
+    async def _get_reference_embedding(self) -> np.ndarray:
+        """Get cached reference embedding for ideal opportunities with retry."""
         if self._reference_embedding is None:
             client = self._get_client()
-            response = client.models.embed_content(
-                model=self._model,
-                contents=[REFERENCE_TEXT],
-                config=types.EmbedContentConfig(
-                    task_type='SEMANTIC_SIMILARITY',
-                    output_dimensionality=256,  # Smaller for speed
-                ),
+            
+            async def do_embed():
+                return client.models.embed_content(
+                    model=self._model,
+                    contents=[REFERENCE_TEXT],
+                    config=types.EmbedContentConfig(
+                        task_type='SEMANTIC_SIMILARITY',
+                        output_dimensionality=256,  # Smaller for speed
+                    ),
+                )
+            
+            response = await retry_async(
+                do_embed,
+                config=EMBEDDING_RETRY_CONFIG,
+                operation_name="Reference embedding",
             )
             self._reference_embedding = np.array(response.embeddings[0].values)
         return self._reference_embedding
@@ -105,15 +121,17 @@ class SemanticFilter:
         self,
         results: List[Tuple[str, str, str]],  # (url, title, snippet)
         max_results: int = 35,
+        threshold_override: Optional[float] = None,
     ) -> List[Tuple[str, float]]:
         """
-        Filter search results by semantic similarity.
+        Filter search results by semantic similarity with retry logic.
         
         Uses ONE batch API call for all texts (fast).
         
         Args:
             results: List of (url, title, snippet) tuples
             max_results: Maximum results to return
+            threshold_override: Optional threshold to use instead of instance default
             
         Returns:
             List of (url, similarity_score) for results above threshold
@@ -121,11 +139,14 @@ class SemanticFilter:
         if not results:
             return []
         
+        # Use override if provided
+        threshold = threshold_override if threshold_override is not None else self.threshold
+        
         try:
             client = self._get_client()
             
-            # Get reference embedding (cached)
-            reference = self._get_reference_embedding()
+            # Get reference embedding (cached, with retry)
+            reference = await self._get_reference_embedding()
             
             # Prepare texts for batch embedding (truncate snippets for speed)
             texts_to_embed = [
@@ -133,14 +154,21 @@ class SemanticFilter:
                 for _, title, snippet in results
             ]
             
-            # BATCH EMBED - One API call for ALL texts
-            response = client.models.embed_content(
-                model=self._model,
-                contents=texts_to_embed,
-                config=types.EmbedContentConfig(
-                    task_type='SEMANTIC_SIMILARITY',
-                    output_dimensionality=256,
-                ),
+            # BATCH EMBED - One API call for ALL texts (with retry)
+            async def do_batch_embed():
+                return client.models.embed_content(
+                    model=self._model,
+                    contents=texts_to_embed,
+                    config=types.EmbedContentConfig(
+                        task_type='SEMANTIC_SIMILARITY',
+                        output_dimensionality=256,
+                    ),
+                )
+            
+            response = await retry_async(
+                do_batch_embed,
+                config=EMBEDDING_RETRY_CONFIG,
+                operation_name=f"Batch embed ({len(texts_to_embed)} texts)",
             )
             
             # Extract embeddings
@@ -153,7 +181,7 @@ class SemanticFilter:
             scored_results = []
             for i, (url, title, snippet) in enumerate(results):
                 similarity = similarities[i]
-                if similarity >= self.threshold:
+                if similarity >= threshold:
                     scored_results.append((url, similarity, title))
             
             # Sort by similarity descending
@@ -162,14 +190,14 @@ class SemanticFilter:
             # Log stats
             sys.stderr.write(
                 f"[SemanticFilter] {len(results)} → {len(scored_results)} "
-                f"(threshold={self.threshold})\n"
+                f"(threshold={threshold})\n"
             )
             
             return [(url, score) for url, score, _ in scored_results[:max_results]]
             
         except Exception as e:
-            sys.stderr.write(f"[SemanticFilter] Error: {e}\n")
-            # Return all results if filtering fails (fallback)
+            sys.stderr.write(f"[SemanticFilter] Error after retries: {e}\n")
+            # Re-raise to let caller handle
             raise
     
     def filter_results_sync(
