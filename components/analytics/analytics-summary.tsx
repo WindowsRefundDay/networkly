@@ -1,6 +1,7 @@
 "use client"
 
-import { Card, CardContent } from "@/components/ui/card"
+import { GlassCard } from "@/components/ui/glass-card"
+import { CardContent } from "@/components/ui/card"
 import { TrendingUp, TrendingDown, Users, Eye, Search, Briefcase, Target, Sparkles } from "lucide-react"
 
 interface AnalyticsSummaryProps {
@@ -68,7 +69,7 @@ export function AnalyticsSummary({ statsData }: AnalyticsSummaryProps) {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
       {metrics.map((metric) => (
-        <Card key={metric.label} className="border-border">
+        <GlassCard key={metric.label} className="border-border">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className={`rounded-full p-2 ${metric.color}`}>
@@ -86,7 +87,7 @@ export function AnalyticsSummary({ statsData }: AnalyticsSummaryProps) {
               </div>
             </div>
           </CardContent>
-        </Card>
+        </GlassCard>
       ))}
     </div>
   )

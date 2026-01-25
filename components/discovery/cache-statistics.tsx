@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Card } from "@/components/ui/card"
+import { GlassCard } from "@/components/ui/glass-card"
 import { Button } from "@/components/ui/button"
 import { Loader2, RefreshCw, Trash2, CheckCircle2, XCircle, Clock } from "lucide-react"
 import { getCacheStats, clearOldCacheEntries } from "@/app/actions/discovery"
@@ -71,19 +71,19 @@ export function CacheStatistics() {
 
     if (loading) {
         return (
-            <Card className="p-6 flex items-center justify-center min-h-[200px]">
+            <GlassCard className="p-6 flex items-center justify-center min-h-[200px]">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </Card>
+            </GlassCard>
         )
     }
 
     if (!stats) {
         return (
-            <Card className="p-6">
+            <GlassCard className="p-6">
                 <p className="text-sm text-muted-foreground text-center">
                     Failed to load cache statistics
                 </p>
-            </Card>
+            </GlassCard>
         )
     }
 
@@ -92,7 +92,7 @@ export function CacheStatistics() {
         : "0.0"
 
     return (
-        <Card className="p-6">
+        <GlassCard className="p-6">
             <div className="space-y-6">
                 {/* Header */}
                 <div className="flex items-center justify-between">
@@ -206,6 +206,6 @@ export function CacheStatistics() {
                     </div>
                 )}
             </div>
-        </Card>
+        </GlassCard>
     )
 }

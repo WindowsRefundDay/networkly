@@ -1,3 +1,4 @@
+import { GlassCard } from "@/components/ui/glass-card"
 import { Card, CardContent } from "@/components/ui/card"
 import { Users, Eye, Search, FolderKanban } from "lucide-react"
 
@@ -57,7 +58,7 @@ export function StatsCards({ statsData }: StatsCardsProps) {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {statsArr.map((stat) => (
-        <Card key={stat.title} className="border-border">
+        <GlassCard key={stat.title} className="border-border">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -70,7 +71,7 @@ export function StatsCards({ statsData }: StatsCardsProps) {
               </div>
             </div>
           </CardContent>
-        </Card>
+        </GlassCard>
       ))}
     </div>
   )

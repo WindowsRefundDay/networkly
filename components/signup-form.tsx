@@ -13,8 +13,8 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { GlassCard } from "@/components/ui/glass-card"
 import {
-    Card,
     CardContent,
     CardDescription,
     CardHeader,
@@ -73,7 +73,7 @@ export function SignupForm({ className, ...props }: SignupFormProps) {
 
     return (
         <div className={cn("flex flex-col gap-6", className)} {...props}>
-            <Card>
+            <GlassCard>
                 <CardHeader>
                     <CardTitle className="text-2xl">Create an account</CardTitle>
                     <CardDescription>
@@ -154,7 +154,7 @@ export function SignupForm({ className, ...props }: SignupFormProps) {
                         </div>
                     </form>
                 </CardContent>
-            </Card>
+            </GlassCard>
         </div>
     )
 }

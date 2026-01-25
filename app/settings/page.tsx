@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useState, useTransition } from "react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { GlassCard } from "@/components/ui/glass-card"
+import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -193,20 +194,22 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="space-y-6 container mx-auto px-4 sm:px-6 max-w-3xl py-6">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 container mx-auto px-4 sm:px-6 max-w-3xl py-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Settings</h1>
         <p className="text-muted-foreground">Manage your account and preferences</p>
       </div>
 
-      <Card className="border-border">
+      <GlassCard className="border-border">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <User className="h-5 w-5" />
@@ -326,9 +329,9 @@ export default function SettingsPage() {
             )}
           </Button>
         </CardContent>
-      </Card>
+      </GlassCard>
 
-      <Card className="border-border">
+      <GlassCard className="border-border">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Link2 className="h-5 w-5" />
@@ -375,9 +378,9 @@ export default function SettingsPage() {
             )}
           </Button>
         </CardContent>
-      </Card>
+      </GlassCard>
 
-      <Card className="border-border">
+      <GlassCard className="border-border">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Bell className="h-5 w-5" />
@@ -436,9 +439,9 @@ export default function SettingsPage() {
             />
           </div>
         </CardContent>
-      </Card>
+      </GlassCard>
 
-      <Card className="border-border">
+      <GlassCard className="border-border">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Eye className="h-5 w-5" />
@@ -482,9 +485,9 @@ export default function SettingsPage() {
             />
           </div>
         </CardContent>
-      </Card>
+      </GlassCard>
 
-      <Card className="border-border">
+      <GlassCard className="border-border">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
@@ -526,9 +529,9 @@ export default function SettingsPage() {
             />
           </div>
         </CardContent>
-      </Card>
+      </GlassCard>
 
-      <Card className="border-border">
+      <GlassCard className="border-border">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Search className="h-5 w-5 text-primary" />
@@ -555,9 +558,9 @@ export default function SettingsPage() {
             <CacheStatistics />
           </div>
         </CardContent>
-      </Card>
+      </GlassCard>
 
-      <Card className="border-border">
+      <GlassCard className="border-border">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Moon className="h-5 w-5" />
@@ -583,9 +586,9 @@ export default function SettingsPage() {
             </Select>
           </div>
         </CardContent>
-      </Card>
+      </GlassCard>
 
-      <Card className="border-border border-destructive/50">
+      <GlassCard className="border-border border-destructive/50">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-destructive">
             <Trash2 className="h-5 w-5" />
@@ -596,7 +599,7 @@ export default function SettingsPage() {
         <CardContent>
           <Button variant="destructive">Delete Account</Button>
         </CardContent>
-      </Card>
+      </GlassCard>
     </div>
   )
 }

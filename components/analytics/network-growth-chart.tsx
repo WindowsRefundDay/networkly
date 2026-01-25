@@ -1,5 +1,6 @@
 "use client"
 
+import { GlassCard } from "@/components/ui/glass-card"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 
@@ -9,7 +10,7 @@ interface NetworkGrowthChartProps {
 
 export function NetworkGrowthChart({ data = [] }: NetworkGrowthChartProps) {
   return (
-    <Card className="border-border">
+    <GlassCard className="border-border">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg font-semibold">Network Growth</CardTitle>
         <p className="text-sm text-muted-foreground">Last 5 months</p>
@@ -41,7 +42,7 @@ export function NetworkGrowthChart({ data = [] }: NetworkGrowthChartProps) {
           </ResponsiveContainer>
         </div>
       </CardContent>
-    </Card>
+    </GlassCard>
   )
 }
 

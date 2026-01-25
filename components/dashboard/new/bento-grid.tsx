@@ -91,7 +91,7 @@ export const BentoItem = ({ className, children, colSpan }: BentoItemProps) => {
         mdClass,
         lgClass,
         "rounded-xl backdrop-blur-md bg-background/40 border border-border/20 shadow-lg shadow-black/5 overflow-hidden",
-        "hover:shadow-xl hover:border-border/30 hover:scale-[1.01] hover:-translate-y-1 transition-all duration-300",
+        "transition-all duration-300",
         className
       )}
     >

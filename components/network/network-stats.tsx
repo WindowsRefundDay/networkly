@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { GlassCard } from "@/components/ui/glass-card"
 import { Card, CardContent } from "@/components/ui/card"
 import { Users, UserPlus, MessageCircle, TrendingUp, Loader2 } from "lucide-react"
 import { getNetworkStats } from "@/app/actions/connections"
@@ -32,13 +33,13 @@ export function NetworkStats() {
     return (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[1, 2, 3, 4].map((i) => (
-          <Card key={i} className="border-border">
+          <GlassCard key={i} className="border-border">
             <CardContent className="p-4">
               <div className="flex items-center justify-center h-16">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             </CardContent>
-          </Card>
+          </GlassCard>
         ))}
       </div>
     )
@@ -78,7 +79,7 @@ export function NetworkStats() {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       {statsArr.map((stat) => (
-        <Card key={stat.label} className="border-border">
+        <GlassCard key={stat.label} className="border-border">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className={`rounded-full p-2 ${stat.color}`}>
@@ -91,7 +92,7 @@ export function NetworkStats() {
               {stat.change && <span className="ml-auto text-xs text-secondary font-medium">{stat.change}</span>}
             </div>
           </CardContent>
-        </Card>
+        </GlassCard>
       ))}
     </div>
   )

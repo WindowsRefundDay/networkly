@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { GlassCard } from "@/components/ui/glass-card"
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -54,16 +55,16 @@ export function CuratedOpportunitiesWidget() {
 
     if (loading) {
         return (
-            <Card className="border-border">
+            <GlassCard className="border-border">
                 <CardContent className="flex items-center justify-center py-8">
                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </CardContent>
-            </Card>
+            </GlassCard>
         )
     }
 
     return (
-        <Card className="border-border">
+        <GlassCard className="border-border">
             <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-lg font-semibold">
                     <Sparkles className="h-5 w-5 text-primary" />
@@ -110,6 +111,6 @@ export function CuratedOpportunitiesWidget() {
                     </>
                 )}
             </CardContent>
-        </Card>
+        </GlassCard>
     )
 }

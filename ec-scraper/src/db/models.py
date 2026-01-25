@@ -52,6 +52,14 @@ class OpportunityType(str, Enum):
     OTHER = "Other"
 
 
+class ContentType(str, Enum):
+    """High-level content type classification."""
+
+    OPPORTUNITY = "opportunity"
+    GUIDE = "guide"
+    ARTICLE = "article"
+
+
 class LocationType(str, Enum):
     """Location types for activities."""
 
@@ -74,6 +82,7 @@ class OpportunityCard(BaseModel):
     organization: Optional[str] = None
 
     # Classification
+    content_type: ContentType = ContentType.OPPORTUNITY
     category: OpportunityCategory = OpportunityCategory.OTHER
     suggested_category: Optional[str] = None  # AI-suggested category when 'Other' is used
     opportunity_type: OpportunityType = OpportunityType.OTHER
@@ -163,6 +172,10 @@ class ExtractionResponse(BaseModel):
     organization: Optional[str] = Field(default=None, description="Hosting organization")
     
     # Classification
+    content_type: Optional[str] = Field(
+        default="opportunity",
+        description="Content type: opportunity (real program/application page), guide (how-to/advice), or article (news/blog)"
+    )
     category: Optional[str] = Field(default=None, description="Category: STEM, Arts, Business, Leadership, Community Service, Sports, Humanities, Language, Music, Debate, or Other")
     suggested_category: Optional[str] = Field(default=None, description="If category is 'Other', suggest a new category name (e.g., 'Entrepreneurship', 'Environmental', 'Healthcare')")
     opportunity_type: Optional[str] = Field(default=None, description="Type: Competition, Internship, Summer Program, Camp, Volunteer, Research, Club, Scholarship, Course, Workshop, Conference, or Other")

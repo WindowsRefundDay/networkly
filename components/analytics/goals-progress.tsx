@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { GlassCard } from "@/components/ui/glass-card"
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Target, CheckCircle2, Circle, Clock, Loader2 } from "lucide-react"
 import { getProfileGoals, getProfileGoalsProgress, type ProfileGoalData } from "@/app/actions/goals"
@@ -31,7 +32,7 @@ export function GoalsProgress() {
 
   if (loading) {
     return (
-      <Card className="border-border">
+      <GlassCard className="border-border">
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-lg font-semibold">
             <Target className="h-5 w-5 text-primary" />
@@ -43,13 +44,13 @@ export function GoalsProgress() {
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         </CardContent>
-      </Card>
+      </GlassCard>
     )
   }
 
   if (goals.length === 0) {
     return (
-      <Card className="border-border">
+      <GlassCard className="border-border">
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-lg font-semibold">
             <Target className="h-5 w-5 text-primary" />
@@ -61,7 +62,7 @@ export function GoalsProgress() {
             Set goals on your profile to track your progress!
           </p>
         </CardContent>
-      </Card>
+      </GlassCard>
     )
   }
 
@@ -74,7 +75,7 @@ export function GoalsProgress() {
   }
 
   return (
-    <Card className="border-border">
+    <GlassCard className="border-border">
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-lg font-semibold">
           <Target className="h-5 w-5 text-primary" />
@@ -118,6 +119,6 @@ export function GoalsProgress() {
           </div>
         </div>
       </CardContent>
-    </Card>
+    </GlassCard>
   )
 }

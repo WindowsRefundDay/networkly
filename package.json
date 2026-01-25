@@ -11,13 +11,15 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "db:seed": "bun scripts/seed-opportunities.ts",
+    "db:seed-profile": "bun scripts/seed-profile.ts",
+    "db:create-profile": "bun scripts/create-profile.ts",
     "db:init-opportunities": "bun scripts/init-opportunities.ts",
     "costs": "bun scripts/calculate-costs.ts",
     "costs:clear": "echo '{\"records\":[],\"lastUpdated\":\"\"}' > data/ai-costs.json && echo 'Cost data cleared!'"
   },
   "dependencies": {
+    "@ai-sdk/google": "^3.0.13",
     "@ai-sdk/react": "3.0.19",
-    "@google/generative-ai": "^0.24.1",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "1.2.2",
     "@radix-ui/react-alert-dialog": "^1.1.15",

@@ -30,13 +30,13 @@ interface UseDiscoveryLayersReturn {
   state: DiscoveryState | null
   isActive: boolean
   activeLayer: LayerId | null
-  startDiscovery: (query: string) => void
+  startDiscovery: (query: string, options?: { isPersonalized?: boolean, userProfileId?: string }) => void
   stopDiscovery: () => void
   toggleLayerExpanded: (layerId: LayerId) => void
   clearState: () => void
 }
 
-function createInitialState(query: string): DiscoveryState {
+function createInitialState(query: string, isPersonalized: boolean = false): DiscoveryState {
   const layers = {} as Record<LayerId, LayerState>
   
   for (const id of LAYER_ORDER) {
@@ -57,7 +57,7 @@ function createInitialState(query: string): DiscoveryState {
     status: 'idle',
     overallProgress: 0,
     foundCount: 0,
-    isPersonalized: false,
+    isPersonalized,
     layers,
   }
 }
@@ -309,7 +309,10 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
 
         case 'complete':
         case 'done': {
-          const count = (event as { count?: number }).count || newState.foundCount
+          const completeEvent = event as { count?: number; isPersonalized?: boolean; is_personalized?: boolean }
+          const count = completeEvent.count || newState.foundCount
+          // Handle both camelCase and snake_case from backend
+          const isPersonalized = completeEvent.isPersonalized ?? completeEvent.is_personalized ?? newState.isPersonalized
           
           // Mark all layers as complete
           for (const id of LAYER_ORDER) {
@@ -327,6 +330,7 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
           newState.endTime = Date.now()
           newState.overallProgress = 100
           newState.foundCount = count
+          newState.isPersonalized = isPersonalized
           
           onComplete?.(count)
           break
@@ -482,14 +486,23 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
     })
   }, [onOpportunityFound, onComplete])
 
-  const startDiscovery = useCallback((query: string) => {
+  const startDiscovery = useCallback((query: string, options: { isPersonalized?: boolean, userProfileId?: string } = {}) => {
     cleanup()
     
-    const initialState = createInitialState(query)
+    const { isPersonalized = false, userProfileId } = options
+    const initialState = createInitialState(query, isPersonalized)
     initialState.status = 'running'
     setState(initialState)
     
-    const es = new EventSource(`/api/discovery/stream?query=${encodeURIComponent(query)}`)
+    const buildUrl = () => {
+      let url = `/api/discovery/stream?query=${encodeURIComponent(query)}`
+      if (isPersonalized && userProfileId) {
+        url += `&userProfileId=${encodeURIComponent(userProfileId)}`
+      }
+      return url
+    }
+    
+    const es = new EventSource(buildUrl())
     eventSourceRef.current = es
     
     // Timeout after 3 minutes (aligned with server-side: 2.5 min + buffer)
@@ -528,8 +541,8 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
           // Retry after delay
           setTimeout(() => {
             if (eventSourceRef.current === es) {
-              // Re-initiate connection
-              const newEs = new EventSource(`/api/discovery/stream?query=${encodeURIComponent(query)}`)
+              // Re-initiate connection with same parameters
+              const newEs = new EventSource(buildUrl())
               eventSourceRef.current = newEs
               
               newEs.onmessage = es.onmessage

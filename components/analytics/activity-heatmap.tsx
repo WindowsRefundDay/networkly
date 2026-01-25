@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { GlassCard } from "@/components/ui/glass-card"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Loader2 } from "lucide-react"
 import { getActivityHeatmap } from "@/app/actions/activity"
@@ -37,7 +38,7 @@ export function ActivityHeatmap() {
 
   if (loading) {
     return (
-      <Card className="border-border">
+      <GlassCard className="border-border">
         <CardHeader className="pb-2">
           <CardTitle className="text-lg font-semibold">Activity</CardTitle>
           <p className="text-sm text-muted-foreground">Your networking activity over the past 12 weeks</p>
@@ -47,7 +48,7 @@ export function ActivityHeatmap() {
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         </CardContent>
-      </Card>
+      </GlassCard>
     )
   }
 
@@ -58,7 +59,7 @@ export function ActivityHeatmap() {
   }
 
   return (
-    <Card className="border-border">
+    <GlassCard className="border-border">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg font-semibold">Activity</CardTitle>
         <p className="text-sm text-muted-foreground">Your networking activity over the past 12 weeks</p>
@@ -94,6 +95,6 @@ export function ActivityHeatmap() {
           <span>More</span>
         </div>
       </CardContent>
-    </Card>
+    </GlassCard>
   )
 }

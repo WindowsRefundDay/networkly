@@ -21,7 +21,7 @@ export default async function AnalyticsPage() {
   const networkGrowthData = await getNetworkGrowthData()
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 container mx-auto px-4 sm:px-6 max-w-7xl py-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Analytics & Progress</h1>
         <p className="text-muted-foreground">Track your career growth and network engagement</p>

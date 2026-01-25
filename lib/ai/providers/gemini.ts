@@ -1,11 +1,12 @@
 /**
- * Gemini Provider - Direct Google Generative AI integration
- * 
- * Uses the @google/generative-ai SDK for direct access to Gemini models.
+ * Gemini Provider - Vercel AI SDK integration
+ *
+ * Uses the AI SDK with the Google provider for Gemini models.
  * Supports latest Gemini 2.5 models and legacy models.
  */
 
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai'
+import { google } from '@ai-sdk/google'
+import { generateText, streamText, type CoreMessage } from 'ai'
 import type {
   ProviderName,
   ProviderConfig,
@@ -114,7 +115,6 @@ const GEMINI_MODELS: Record<string, Omit<ModelInfo, 'id' | 'provider'>> = {
 const DEFAULT_MODEL = 'gemini-2.5-flash-lite'
 
 export class GeminiProvider {
-  private client: GoogleGenerativeAI
   private config: ProviderConfig
   private models: Map<string, ModelInfo> = new Map()
 
@@ -131,7 +131,6 @@ export class GeminiProvider {
       ...restConfig,
     }
 
-    this.client = new GoogleGenerativeAI(apiKey)
     this.initializeModels()
   }
 
@@ -178,49 +177,24 @@ export class GeminiProvider {
     })
 
     try {
-      const model = this.client.getGenerativeModel({
-        model: modelId,
-        generationConfig: {
-          temperature: options.temperature,
-          maxOutputTokens: options.maxTokens,
-          topP: options.topP,
-          stopSequences: options.stop,
-        },
-        safetySettings: [
-          {
-            category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-            threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-          },
-          {
-            category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-            threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-          },
-          {
-            category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-            threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-          },
-          {
-            category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-            threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-          },
-        ],
-      })
-
-      // Convert messages to Gemini format
+      const model = this.createModel(modelId)
       const contents = this.convertMessages(options.messages)
 
-      const result = await model.generateContent({
-        contents,
-      })
+      const result = await this.withRetry(() => generateText({
+        model,
+        messages: contents,
+        temperature: options.temperature,
+        maxTokens: options.maxTokens,
+        topP: options.topP,
+        stopSequences: options.stop,
+        responseFormat: options.responseFormat?.type === 'json_object' ? { type: 'json' } : undefined,
+      }))
 
-      const response = result.response
-      const text = response.text()
+      const text = result.text
       const latencyMs = Date.now() - startTime
 
-      // Extract usage metadata
-      const usageMetadata = response.usageMetadata
-      const promptTokens = usageMetadata?.promptTokenCount || this.estimateTokens(options.messages)
-      const completionTokens = usageMetadata?.candidatesTokenCount || Math.ceil(text.length / 4)
+      const promptTokens = result.usage?.promptTokens || this.estimateTokens(options.messages)
+      const completionTokens = result.usage?.completionTokens || Math.ceil(text.length / 4)
       const totalTokens = promptTokens + completionTokens
 
       // Record cost
@@ -243,7 +217,7 @@ export class GeminiProvider {
         provider: 'gemini',
         model: modelId,
         content: text,
-        finishReason: 'stop',
+        finishReason: result.finishReason || 'stop',
         usage: {
           promptTokens,
           completionTokens,
@@ -279,28 +253,23 @@ export class GeminiProvider {
     logger.request('gemini', modelId, { streaming: true })
 
     try {
-      const model = this.client.getGenerativeModel({
-        model: modelId,
-        generationConfig: {
-          temperature: options.temperature,
-          maxOutputTokens: options.maxTokens,
-          topP: options.topP,
-          stopSequences: options.stop,
-        },
-      })
-
+      const model = this.createModel(modelId)
       const contents = this.convertMessages(options.messages)
 
-      const result = await model.generateContentStream({
-        contents,
-      })
+      const result = await this.withRetry(() => streamText({
+        model,
+        messages: contents,
+        temperature: options.temperature,
+        maxTokens: options.maxTokens,
+        topP: options.topP,
+        stopSequences: options.stop,
+      }))
 
       let isFirst = true
       let totalContent = ''
       let promptTokens = this.estimateTokens(options.messages)
 
-      for await (const chunk of result.stream) {
-        const text = chunk.text()
+      for await (const text of result.textStream) {
         if (text) {
           totalContent += text
           yield {
@@ -315,7 +284,9 @@ export class GeminiProvider {
 
       // Final chunk
       const latencyMs = Date.now() - startTime
-      const completionTokens = Math.ceil(totalContent.length / 4)
+      const usage = await result.usage
+      const completionTokens = usage?.completionTokens || Math.ceil(totalContent.length / 4)
+      promptTokens = usage?.promptTokens || promptTokens
 
       // Record cost
       const costTracker = getCostTracker()
@@ -392,49 +363,61 @@ export class GeminiProvider {
    * Cancel ongoing requests (not fully supported by Gemini SDK)
    */
   cancel(): void {
-    // Gemini SDK doesn't have built-in cancellation
-    logger.warn('GeminiProvider', 'Cancel not fully supported by Gemini SDK')
+    // AI SDK doesn't support cancellation
+    logger.warn('GeminiProvider', 'Cancel not fully supported by AI SDK')
   }
 
   /**
    * Convert OpenAI-style messages to Gemini format
    */
-  private convertMessages(messages: CompletionOptions['messages']): Array<{
-    role: 'user' | 'model'
-    parts: Array<{ text: string }>
-  }> {
-    const contents: Array<{
-      role: 'user' | 'model'
-      parts: Array<{ text: string }>
-    }> = []
-
-    // Handle system message by prepending to first user message
-    let systemContent = ''
-    const filteredMessages = messages.filter(msg => {
+  private convertMessages(messages: CompletionOptions['messages']): CoreMessage[] {
+    return messages.map((msg) => {
+      if (msg.role === 'assistant') {
+        return { role: 'assistant', content: msg.content }
+      }
       if (msg.role === 'system') {
-        systemContent = msg.content + '\n\n'
-        return false
+        return { role: 'system', content: msg.content }
       }
-      return true
+      return { role: 'user', content: msg.content }
     })
+  }
 
-    for (let i = 0; i < filteredMessages.length; i++) {
-      const msg = filteredMessages[i]
-      const role = msg.role === 'assistant' ? 'model' : 'user'
-      let content = msg.content
+  private createModel(modelId: string) {
+    return google(modelId, { apiKey: this.config.apiKey })
+  }
 
-      // Prepend system message to first user message
-      if (i === 0 && role === 'user' && systemContent) {
-        content = systemContent + content
-      }
+  private isRateLimitError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error)
+    return message.includes('429') || message.toLowerCase().includes('resource_exhausted') || message.toLowerCase().includes('rate limit')
+  }
 
-      contents.push({
-        role,
-        parts: [{ text: content }],
-      })
+  private getRetryDelayMs(error: unknown, attempt: number): number {
+    const message = error instanceof Error ? error.message : String(error)
+    const match = message.toLowerCase().match(/retry in (\d+(?:\.\d+)?)/)
+    if (match) {
+      return Math.min(Number(match[1]) * 1000 + 250, 30000)
     }
+    const base = 500
+    return Math.min(base * Math.pow(2, attempt), 30000)
+  }
 
-    return contents
+  private async withRetry<T>(fn: () => Promise<T>): Promise<T> {
+    const maxRetries = this.config.maxRetries ?? 3
+    let lastError: unknown
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await fn()
+      } catch (error) {
+        lastError = error
+        if (this.isRateLimitError(error) && attempt < maxRetries) {
+          const delay = this.getRetryDelayMs(error, attempt)
+          await new Promise((resolve) => setTimeout(resolve, delay))
+          continue
+        }
+        throw error
+      }
+    }
+    throw lastError
   }
 
   /**

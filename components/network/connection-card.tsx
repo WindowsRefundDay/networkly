@@ -1,5 +1,6 @@
 "use client"
 
+import { GlassCard } from "@/components/ui/glass-card"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -35,7 +36,7 @@ export function ConnectionCard({ connection, onConnect, onMessage }: ConnectionC
   const StatusIcon = config.icon
 
   return (
-    <Card className="border-border hover:shadow-md transition-shadow">
+    <GlassCard className="border-border">
       <CardContent className="p-5">
         <div className="flex items-start gap-4">
           <Avatar className="h-14 w-14">
@@ -106,6 +107,6 @@ export function ConnectionCard({ connection, onConnect, onMessage }: ConnectionC
           </div>
         </div>
       </CardContent>
-    </Card>
+    </GlassCard>
   )
 }

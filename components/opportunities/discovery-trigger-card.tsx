@@ -12,11 +12,15 @@ import {
   ArrowRight,
   Zap,
   CheckCircle2,
-  X
+  X,
+  UserCheck
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useDiscoveryLayers } from "@/hooks/use-discovery-layers"
 import { LayerAccordion } from "@/components/discovery/layer-accordion"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface DiscoveryTriggerCardProps {
   /** Pre-fill the search input */
@@ -34,6 +38,12 @@ interface DiscoveryTriggerCardProps {
   compact?: boolean
   /** Additional className */
   className?: string
+  /** Whether personalization is enabled */
+  personalizedEnabled?: boolean
+  /** Callback when personalization toggle changes */
+  onPersonalizedChange?: (enabled: boolean) => void
+  /** The user's profile ID for personalization */
+  userProfileId?: string
 }
 
 const DISCOVERY_SUGGESTIONS = [
@@ -50,6 +60,9 @@ export function DiscoveryTriggerCard({
   onNewOpportunity,
   compact = false,
   className,
+  personalizedEnabled = false,
+  onPersonalizedChange,
+  userProfileId,
 }: DiscoveryTriggerCardProps) {
   const [query, setQuery] = useState(initialQuery)
   const [showSuggestions, setShowSuggestions] = useState(!initialQuery)
@@ -81,14 +94,20 @@ export function DiscoveryTriggerCard({
   const handleStartDiscovery = useCallback(() => {
     if (query.trim().length < 2) return
     setShowSuggestions(false)
-    startDiscovery(query.trim())
-  }, [query, startDiscovery])
+    startDiscovery(query.trim(), {
+      isPersonalized: personalizedEnabled,
+      userProfileId: userProfileId
+    })
+  }, [query, startDiscovery, personalizedEnabled, userProfileId])
 
   const handleSuggestionClick = useCallback((suggestion: string) => {
     setQuery(suggestion)
     setShowSuggestions(false)
-    startDiscovery(suggestion)
-  }, [startDiscovery])
+    startDiscovery(suggestion, {
+      isPersonalized: personalizedEnabled,
+      userProfileId: userProfileId
+    })
+  }, [startDiscovery, personalizedEnabled, userProfileId])
 
   const handleDismiss = useCallback(() => {
     clearState()
@@ -209,6 +228,33 @@ export function DiscoveryTriggerCard({
                 <Zap className="h-4 w-4" />
                 <span className="hidden sm:inline">Discover</span>
               </Button>
+            </div>
+
+            {/* Personalization Toggle */}
+            <div className="flex items-center justify-between px-1">
+              <div className="flex items-center gap-2">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center gap-2 cursor-help">
+                        <UserCheck className={cn("h-4 w-4", personalizedEnabled ? "text-primary" : "text-muted-foreground")} />
+                        <Label htmlFor="personalized-mode" className="text-sm font-medium cursor-pointer">
+                          Personalized Discovery
+                        </Label>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-[250px]">
+                      <p>Uses your profile data (interests, goals, strengths) to find more relevant opportunities.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              <Switch
+                id="personalized-mode"
+                checked={personalizedEnabled}
+                onCheckedChange={onPersonalizedChange}
+                disabled={!userProfileId}
+              />
             </div>
 
             {/* Quick suggestions */}

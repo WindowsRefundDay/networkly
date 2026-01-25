@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card"
 
 export default function ProfileLoading() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 container mx-auto px-4 sm:px-6 max-w-7xl py-6">
       {/* Profile Header Skeleton */}
       <Card className="border-border overflow-hidden">
         <div className="h-32 bg-gradient-to-r from-primary/20 via-secondary/20 to-primary/10" />
