@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { GlassCard } from "@/components/ui/glass-card"
 import { CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
-import { Target, CheckCircle2, Circle, Clock, Loader2 } from "lucide-react"
+
 import { getProfileGoals, getProfileGoalsProgress, type ProfileGoalData } from "@/app/actions/goals"
 
 export function GoalsProgress() {
@@ -33,15 +33,15 @@ export function GoalsProgress() {
   if (loading) {
     return (
       <GlassCard className="border-border">
-        <CardHeader className="pb-2">
+        <CardHeader className="pb-2 pt-6">
           <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-            <Target className="h-5 w-5 text-primary" />
+            <i className="bx bx-target-lock text-xl text-primary" />
             Goals Progress
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <i className="bx bx-loader-alt animate-spin text-2xl text-muted-foreground" />
           </div>
         </CardContent>
       </GlassCard>
@@ -51,16 +51,19 @@ export function GoalsProgress() {
   if (goals.length === 0) {
     return (
       <GlassCard className="border-border">
-        <CardHeader className="pb-2">
+        <CardHeader className="pb-2 pt-6">
           <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-            <Target className="h-5 w-5 text-primary" />
+            <i className="bx bx-target-lock text-xl text-primary" />
             Goals Progress
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground text-center py-8">
-            Set goals on your profile to track your progress!
-          </p>
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <i className="bx bx-target-lock text-4xl mb-2 text-muted-foreground opacity-20" />
+            <p className="text-sm text-muted-foreground">
+              Set goals on your profile to track your progress!
+            </p>
+          </div>
         </CardContent>
       </GlassCard>
     )
@@ -68,17 +71,17 @@ export function GoalsProgress() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case "completed": return <CheckCircle2 className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-      case "in_progress": return <Clock className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
-      default: return <Circle className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+      case "completed": return <i className="bx bx-check-circle text-primary mt-0.5 flex-shrink-0" />
+      case "in_progress": return <i className="bx bx-time-five text-primary mt-0.5 flex-shrink-0" />
+      default: return <i className="bx bx-circle text-muted-foreground mt-0.5 flex-shrink-0" />
     }
   }
 
   return (
     <GlassCard className="border-border">
-      <CardHeader className="pb-2">
+      <CardHeader className="pb-2 pt-6">
         <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-          <Target className="h-5 w-5 text-primary" />
+          <i className="bx bx-target-lock text-xl text-primary" />
           Goals Progress
         </CardTitle>
       </CardHeader>
@@ -97,12 +100,12 @@ export function GoalsProgress() {
               <div className="font-semibold text-foreground">{progress.pending}</div>
               <div className="text-muted-foreground">Pending</div>
             </div>
-            <div className="rounded-lg bg-blue-500/10 p-2">
-              <div className="font-semibold text-blue-600">{progress.inProgress}</div>
+            <div className="rounded-lg bg-primary/10 p-2">
+              <div className="font-semibold text-primary">{progress.inProgress}</div>
               <div className="text-muted-foreground">In Progress</div>
             </div>
-            <div className="rounded-lg bg-green-500/10 p-2">
-              <div className="font-semibold text-green-600">{progress.completed}</div>
+            <div className="rounded-lg bg-primary/10 p-2">
+              <div className="font-semibold text-primary">{progress.completed}</div>
               <div className="text-muted-foreground">Completed</div>
             </div>
           </div>

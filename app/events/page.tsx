@@ -80,7 +80,7 @@ export default function EventsPage() {
 
   if (loading) {
     return (
-      <div className="space-y-6 container mx-auto px-4 sm:px-6 max-w-7xl py-6">
+      <div className="space-y-6 container mx-auto px-4 sm:px-6 max-w-7xl">
         <div className="flex items-center justify-center min-h-[60vh]">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
@@ -89,7 +89,7 @@ export default function EventsPage() {
   }
 
   return (
-    <div className="space-y-6 container mx-auto px-4 sm:px-6 max-w-7xl py-6">
+    <div className="space-y-6 container mx-auto px-4 sm:px-6 max-w-7xl">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Events & Conferences</h1>

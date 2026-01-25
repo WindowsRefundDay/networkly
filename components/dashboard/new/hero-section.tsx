@@ -2,7 +2,6 @@
 
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-import { Sparkles, ArrowRight, User, CheckCircle2 } from "lucide-react"
 import Link from "next/link"
 
 interface HeroSectionProps {
@@ -38,7 +37,7 @@ export function HeroSection({ user, dailyDigest }: HeroSectionProps) {
           </div>
           <div className="hidden md:block">
             <Button size="sm" variant="outline" className="rounded-full gap-2">
-              <User className="w-4 h-4" />
+              <i className="bx bx-user text-sm" />
               Edit Profile
             </Button>
           </div>
@@ -64,11 +63,11 @@ export function HeroSection({ user, dailyDigest }: HeroSectionProps) {
               <div className="text-xs text-muted-foreground font-medium">New Matches</div>
             </div>
             <div className="bg-background/50 backdrop-blur-sm rounded-lg p-3 border border-border/50 text-center hover:bg-background transition-colors">
-              <div className="text-2xl font-bold text-blue-500">{dailyDigest.unreadMessages}</div>
+              <div className="text-2xl font-bold text-primary">{dailyDigest.unreadMessages}</div>
               <div className="text-xs text-muted-foreground font-medium">Messages</div>
             </div>
             <div className="bg-background/50 backdrop-blur-sm rounded-lg p-3 border border-border/50 text-center hover:bg-background transition-colors">
-              <div className="text-2xl font-bold text-emerald-500">{dailyDigest.pendingConnections}</div>
+              <div className="text-2xl font-bold text-primary">{dailyDigest.pendingConnections}</div>
               <div className="text-xs text-muted-foreground font-medium">Requests</div>
             </div>
           </div>
@@ -77,11 +76,11 @@ export function HeroSection({ user, dailyDigest }: HeroSectionProps) {
       
       <div className="mt-6 pt-4 border-t border-border/50 flex justify-between items-center">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Sparkles className="w-4 h-4 text-amber-500" />
+          <i className="bx bx-bulb text-base text-primary" />
           <span>Daily Tip: Update your skills regularly</span>
         </div>
         <Link href="/profile" className="text-xs font-medium text-primary flex items-center gap-1 hover:underline">
-          View Profile <ArrowRight className="w-3 h-3" />
+          View Profile <i className="bx bx-right-arrow-alt text-sm" />
         </Link>
       </div>
     </div>

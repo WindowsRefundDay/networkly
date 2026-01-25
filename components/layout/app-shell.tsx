@@ -29,7 +29,7 @@ export function AppShell({ children }: AppShellProps) {
         }}
       >
         <Header />
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto p-6">
           {children}
         </main>
       </div>

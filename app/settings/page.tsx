@@ -194,7 +194,7 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="space-y-6 container mx-auto px-4 sm:px-6 max-w-3xl py-6">
+      <div className="space-y-6 container mx-auto px-4 sm:px-6 max-w-3xl">
         <div className="flex items-center justify-center min-h-[400px]">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
@@ -203,21 +203,21 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6 container mx-auto px-4 sm:px-6 max-w-3xl py-6">
+    <div className="space-y-10 container mx-auto px-4 sm:px-6 max-w-5xl pb-20">
       <div>
         <h1 className="text-2xl font-bold text-foreground">Settings</h1>
         <p className="text-muted-foreground">Manage your account and preferences</p>
       </div>
 
       <GlassCard className="border-border">
-        <CardHeader>
+        <CardHeader className="p-8 sm:p-10 pt-12 pb-6">
           <CardTitle className="flex items-center gap-2">
             <User className="h-5 w-5" />
             Profile Information
           </CardTitle>
           <CardDescription>Update your personal details</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="p-8 sm:p-10 pt-8 pb-12 space-y-6">
           <div className="flex items-center gap-4">
             <Avatar className="h-20 w-20">
               <AvatarImage src={userAvatar} alt={userName} />
@@ -332,14 +332,14 @@ export default function SettingsPage() {
       </GlassCard>
 
       <GlassCard className="border-border">
-        <CardHeader>
+        <CardHeader className="p-8 sm:p-10 pt-12 pb-6">
           <CardTitle className="flex items-center gap-2">
             <Link2 className="h-5 w-5" />
             Social Links
           </CardTitle>
           <CardDescription>Add your social and portfolio links</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="p-8 sm:p-10 pt-8 pb-12 space-y-4">
           <div className="space-y-2">
             <Label htmlFor="linkedinUrl">LinkedIn URL</Label>
             <Input
@@ -381,14 +381,14 @@ export default function SettingsPage() {
       </GlassCard>
 
       <GlassCard className="border-border">
-        <CardHeader>
+        <CardHeader className="p-8 sm:p-10 pt-12 pb-6">
           <CardTitle className="flex items-center gap-2">
             <Bell className="h-5 w-5" />
             Notifications
           </CardTitle>
           <CardDescription>Choose what you want to be notified about</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="p-8 sm:p-10 pt-8 pb-12 space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <p className="font-medium text-foreground">New Opportunities</p>
@@ -442,14 +442,14 @@ export default function SettingsPage() {
       </GlassCard>
 
       <GlassCard className="border-border">
-        <CardHeader>
+        <CardHeader className="p-8 sm:p-10 pt-12 pb-6">
           <CardTitle className="flex items-center gap-2">
             <Eye className="h-5 w-5" />
             Privacy
           </CardTitle>
           <CardDescription>Control your profile visibility</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="p-8 sm:p-10 pt-8 pb-12 space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <p className="font-medium text-foreground">Public Profile</p>
@@ -488,14 +488,14 @@ export default function SettingsPage() {
       </GlassCard>
 
       <GlassCard className="border-border">
-        <CardHeader>
+        <CardHeader className="p-8 sm:p-10 pt-12 pb-6">
           <CardTitle className="flex items-center gap-2">
             <Sparkles className="h-5 w-5 text-primary" />
             AI Preferences
           </CardTitle>
           <CardDescription>Customize your AI assistant behavior</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="p-8 sm:p-10 pt-8 pb-12 space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <p className="font-medium text-foreground">AI Suggestions</p>
@@ -532,7 +532,7 @@ export default function SettingsPage() {
       </GlassCard>
 
       <GlassCard className="border-border">
-        <CardHeader>
+        <CardHeader className="p-8 sm:p-10 pt-12 pb-6">
           <CardTitle className="flex items-center gap-2">
             <Search className="h-5 w-5 text-primary" />
             Discovery Management
@@ -541,7 +541,7 @@ export default function SettingsPage() {
             Configure and monitor the opportunity discovery system
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="p-8 sm:p-10 pt-8 pb-12 space-y-6">
           <div className="space-y-4">
             <h4 className="text-sm font-semibold">Batch Discovery</h4>
             <BatchDiscoveryPanel 
@@ -561,14 +561,14 @@ export default function SettingsPage() {
       </GlassCard>
 
       <GlassCard className="border-border">
-        <CardHeader>
+        <CardHeader className="p-8 sm:p-10 pt-12 pb-6">
           <CardTitle className="flex items-center gap-2">
             <Moon className="h-5 w-5" />
             Appearance
           </CardTitle>
           <CardDescription>Customize the look and feel of the application</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-8 sm:p-10 pt-8 pb-12">
           <div className="flex items-center justify-between">
             <div>
               <p className="font-medium text-foreground">Theme</p>
@@ -589,14 +589,14 @@ export default function SettingsPage() {
       </GlassCard>
 
       <GlassCard className="border-border border-destructive/50">
-        <CardHeader>
+        <CardHeader className="p-8 sm:p-10 pt-12 pb-6">
           <CardTitle className="flex items-center gap-2 text-destructive">
             <Trash2 className="h-5 w-5" />
             Danger Zone
           </CardTitle>
           <CardDescription>Irreversible actions</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-8 sm:p-10 pt-8 pb-12">
           <Button variant="destructive">Delete Account</Button>
         </CardContent>
       </GlassCard>
