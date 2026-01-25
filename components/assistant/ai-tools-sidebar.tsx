@@ -16,7 +16,6 @@ import {
   History,
   Trash2,
   Loader2,
-  Sparkles,
 } from 'lucide-react'
 import { getSavedChatSession, deleteChatSession, type ChatSession } from '@/app/actions/chat'
 
@@ -75,111 +74,112 @@ export function AIToolsSidebar({ onToolClick, onLoadSession }: AIToolsSidebarPro
   }
 
   return (
-    <div className="flex flex-col gap-8 pt-12 pb-8">
+    <div className="flex flex-col h-full">
       {/* Data-Aware Tools */}
-      <div className="flex flex-col">
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2 px-1 mb-4">
-          <User className="h-4 w-4" />
+      <div className="flex flex-col flex-1 min-h-0">
+        <h3 className="text-lg font-bold flex items-center gap-2 px-2 mb-3">
+          <User className="h-5 w-5" />
           Your Data
         </h3>
-        <div className="grid grid-cols-1 gap-3">
-          {dataTools.map((tool) => (
-            <Button 
-              key={tool.label}
-              variant="outline" 
-              className="group w-full justify-start gap-4 p-4 h-auto bg-card hover:bg-muted/50 border-border/50 hover:border-primary/30 transition-all duration-200 rounded-xl text-left"
-              onClick={() => handleToolClick(tool.prompt)}
-            >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:scale-110 transition-transform">
-                <tool.icon className="h-5 w-5" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <span className="font-semibold text-sm text-foreground block">{tool.label}</span>
-                <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{tool.description}</p>
-              </div>
-            </Button>
+        <div className="flex flex-col flex-1 bg-card border border-border rounded-xl overflow-hidden shadow-sm">
+          {dataTools.map((tool, index) => (
+            <div key={tool.label} className="flex-1">
+              <Button 
+                variant="ghost" 
+                className="w-full justify-start gap-4 h-full min-h-[64px] px-4 rounded-none hover:bg-muted/50 text-left"
+                onClick={() => handleToolClick(tool.prompt)}
+              >
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <tool.icon className="h-6 w-6" />
+                </div>
+                <div className="flex-1 min-w-0 text-left">
+                  <span className="font-semibold text-lg text-foreground block truncate">{tool.label}</span>
+                  <p className="text-sm text-muted-foreground truncate">{tool.description}</p>
+                </div>
+              </Button>
+              {index < dataTools.length - 1 && <Separator />}
+            </div>
           ))}
         </div>
       </div>
 
       {/* Saved Chat */}
-      <div className="flex flex-col">
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2 px-1 mb-4">
-          <History className="h-4 w-4" />
+      <div className="mt-6 flex-none">
+        <h3 className="text-lg font-bold flex items-center gap-2 px-2 mb-3">
+          <History className="h-5 w-5" />
           Saved Chat
         </h3>
-        <div className="bg-card border border-border/50 rounded-xl p-4 shadow-sm">
+        <div className="bg-card border border-border rounded-xl p-4 shadow-sm">
           {isLoading ? (
-            <div className="flex items-center justify-center py-6">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           ) : savedSession ? (
             <div className="space-y-4">
-              <div className="rounded-lg bg-muted/40 p-3 border border-border/30">
-                <p className="text-sm font-semibold text-foreground line-clamp-2">
+              <div className="rounded-lg bg-muted/50 p-4 border border-border/50">
+                <p className="text-base font-semibold text-foreground line-clamp-2">
                   {savedSession.title || 'Untitled Chat'}
                 </p>
-                <div className="text-[10px] text-muted-foreground mt-2 flex items-center gap-2 uppercase tracking-tight">
+                <p className="text-sm text-muted-foreground mt-2 flex items-center gap-2">
                   <span>{new Date(savedSession.updatedAt).toLocaleDateString()}</span>
                   <span>•</span>
                   <span>{savedSession.messages.length} messages</span>
-                </div>
+                </p>
               </div>
               <div className="flex gap-2">
                 <Button
                   variant="outline"
-                  size="sm"
-                  className="flex-1 h-9 text-xs font-semibold"
+                  size="lg"
+                  className="flex-1 h-11 text-sm font-semibold"
                   onClick={handleLoadSession}
                 >
-                  <History className="h-3.5 w-3.5 mr-2" />
+                  <History className="h-4 w-4 mr-2" />
                   Load
                 </Button>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-9 w-9 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                  className="h-11 w-11 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                   onClick={handleDeleteSession}
                   disabled={isDeleting}
                 >
                   {isDeleting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader2 className="h-5 w-5 animate-spin" />
                   ) : (
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 className="h-5 w-5" />
                   )}
                 </Button>
               </div>
             </div>
           ) : (
-            <div className="text-center py-6 text-muted-foreground">
-              <p className="text-sm">No saved chats</p>
+            <div className="text-center py-8 text-muted-foreground">
+              <p className="text-base">No saved chats</p>
             </div>
           )}
         </div>
       </div>
 
       {/* AI Tools */}
-      <div className="flex flex-col">
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2 px-1 mb-4">
-          <Sparkles className="h-4 w-4" />
-          AI Tools
-        </h3>
-        <div className="grid grid-cols-1 gap-3">
-          {aiTools.map((tool) => (
-            <Button 
-              key={tool.label}
-              variant="outline" 
-              className="group w-full justify-start gap-4 p-4 h-auto bg-card hover:bg-muted/50 border-border/50 hover:border-blue-500/30 transition-all duration-200 rounded-xl text-left"
-              onClick={() => handleToolClick(tool.prompt)}
-            >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform">
-                <tool.icon className="h-5 w-5" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <span className="font-semibold text-sm text-foreground block">{tool.label}</span>
-                <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{tool.description}</p>
-              </div>
-            </Button>
+      <div className="mt-6 flex-none">
+        <h3 className="text-lg font-bold px-2 mb-3">AI Tools</h3>
+        <div className="flex flex-col bg-card border border-border rounded-xl overflow-hidden shadow-sm">
+          {aiTools.map((tool, index) => (
+            <div key={tool.label} className="flex-1">
+              <Button 
+                variant="ghost" 
+                className="w-full justify-start gap-4 h-full min-h-[64px] px-4 rounded-none hover:bg-muted/50 text-left"
+                onClick={() => handleToolClick(tool.prompt)}
+              >
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                  <tool.icon className="h-6 w-6" />
+                </div>
+                <div className="flex-1 min-w-0 text-left">
+                  <span className="font-semibold text-lg text-foreground block truncate">{tool.label}</span>
+                  <p className="text-sm text-muted-foreground truncate">{tool.description}</p>
+                </div>
+              </Button>
+              {index < aiTools.length - 1 && <Separator />}
+            </div>
           ))}
         </div>
       </div>

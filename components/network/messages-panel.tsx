@@ -5,6 +5,7 @@ import { GlassCard } from "@/components/ui/glass-card"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import { ArrowRight, MessageCircle, Loader2 } from "lucide-react"
 import { getMessages } from "@/app/actions/messages"
 
 interface Message {
@@ -32,7 +33,7 @@ export function MessagesPanel() {
     return (
       <GlassCard className="border-border">
         <CardContent className="flex items-center justify-center py-8">
-          <i className="bx bx-loader-alt animate-spin text-2xl text-muted-foreground" />
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </CardContent>
       </GlassCard>
     )
@@ -49,15 +50,15 @@ export function MessagesPanel() {
   }
 
   return (
-    <GlassCard className="border-border pb-6">
-      <CardHeader className="flex flex-row items-center justify-between pb-2 pt-6">
+    <GlassCard className="border-border">
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-          <i className='bx bx-message-detail text-xl text-primary' />
+          <MessageCircle className="h-5 w-5 text-primary" />
           Messages
         </CardTitle>
         <Button variant="ghost" size="sm" className="gap-1 text-primary">
           View All
-          <i className='bx bx-right-arrow-alt text-lg' />
+          <ArrowRight className="h-4 w-4" />
         </Button>
       </CardHeader>
       <CardContent className="space-y-3">
