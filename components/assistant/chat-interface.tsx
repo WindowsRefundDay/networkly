@@ -489,24 +489,20 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
   }
 
   return (
-    <div className="flex flex-col h-full bg-background/40 backdrop-blur-md rounded-3xl border border-border/50 shadow-2xl overflow-hidden relative">
-      {/* Decorative background elements */}
-      <div className="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-0 left-0 translate-y-1/2 -translate-x-1/2 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
-
-      <div className="flex-none border-b border-border/50 p-6 bg-card/50 backdrop-blur-xl z-10">
+    <div className="flex flex-col h-full bg-background rounded-2xl border border-border shadow-sm">
+      <div className="flex-none border-b border-border p-6 bg-card rounded-t-2xl">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4 min-w-0">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary shadow-md">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary shadow-md">
               <Sparkles className="h-7 w-7 text-primary-foreground" />
             </div>
-            <div className="min-w-0">
-              <h2 className="text-xl font-bold text-foreground truncate">Networkly AI Assistant</h2>
-              <p className="text-sm text-muted-foreground truncate">Your personal career guide</p>
+            <div>
+              <h2 className="text-xl font-bold text-foreground">Networkly AI Assistant</h2>
+              <p className="text-sm text-muted-foreground">Your personal career guide</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2">
             {hasSavedSession && messages.length === 0 && (
               <Button
                 variant="outline"
@@ -547,44 +543,35 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
       <div className="flex-1 overflow-hidden bg-background">
         <div className="h-full overflow-y-auto p-6" ref={scrollAreaRef}>
           {messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-start md:justify-center min-h-full py-12 pt-20">
-              <div className="relative mb-10">
-                <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full scale-150 animate-pulse" />
-                <div className="relative flex h-24 w-24 items-center justify-center rounded-3xl bg-gradient-to-br from-primary to-blue-600 shadow-xl shadow-primary/20">
-                  <Sparkles className="h-12 w-12 text-primary-foreground" />
-                </div>
+            <div className="flex flex-col items-center justify-center h-full min-h-[400px]">
+              <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-primary shadow-lg mb-8">
+                <Sparkles className="h-10 w-10 text-primary-foreground" />
               </div>
-              
-              <h2 className="text-3xl font-extrabold text-foreground mb-4 tracking-tight text-center">
-                Your AI Career Partner
+              <h2 className="text-2xl font-bold text-foreground mb-3">
+                How can I help you today?
               </h2>
-              <p className="text-lg text-muted-foreground text-center max-w-lg mb-12 leading-relaxed">
-                Unlock your potential with personalized career advice, internship discovery, and application support.
+              <p className="text-base text-muted-foreground text-center max-w-lg mb-10">
+                I can find opportunities, help with applications, and give career advice — all personalized to your profile.
               </p>
 
-              <div className="w-full max-w-4xl px-4">
-                <div className="flex items-center gap-3 mb-8 justify-center">
-                  <div className="h-px w-12 bg-border/50" />
-                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-[0.2em]">
-                    Quick Start Suggestions
-                  </p>
-                  <div className="h-px w-12 bg-border/50" />
-                </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="w-full max-w-3xl space-y-4">
+                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider text-center mb-6">
+                  Try asking
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {quickPrompts.map((prompt) => (
                     <Button
                       key={prompt}
                       variant="outline"
-                      className="group min-h-[140px] h-auto p-5 text-left justify-start bg-card/40 hover:bg-card border-border/50 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 rounded-2xl backdrop-blur-sm whitespace-normal"
+                      className="h-auto py-4 px-5 text-left justify-start bg-background hover:bg-muted border-2 border-border/50 hover:border-primary/50 transition-all duration-200 rounded-xl"
                       onClick={() => handleQuickPrompt(prompt)}
                       disabled={isLoading}
                     >
-                      <div className="flex flex-col gap-3 w-full h-full">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors mb-auto">
+                      <div className="flex items-center gap-4 w-full">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                           <Sparkles className="h-5 w-5" />
                         </div>
-                        <span className="text-sm font-semibold text-foreground leading-snug group-hover:text-foreground transition-colors line-clamp-2 mt-auto whitespace-normal">
+                        <span className="text-base font-medium text-foreground line-clamp-2">
                           {prompt}
                         </span>
                       </div>
@@ -604,9 +591,9 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
                   )}
                   <div className={`max-w-[75%]`}>
                     <div
-                      className={`rounded-3xl px-6 py-4 shadow-sm relative group/msg ${message.role === 'user'
-                          ? 'bg-gradient-to-br from-primary to-blue-700 text-primary-foreground shadow-primary/10'
-                          : 'bg-card/80 backdrop-blur-sm text-foreground border border-border/50 hover:border-primary/30 transition-colors'
+                      className={`rounded-2xl px-5 py-4 ${message.role === 'user'
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'bg-muted text-foreground border border-border/50'
                         }`}
                     >
                       {message.content ? (
@@ -700,35 +687,18 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
         </div>
       </div>
 
-      <div className="flex-none p-6 z-20">
-        <form 
-          onSubmit={handleSubmit} 
-          className="relative max-w-4xl mx-auto flex items-center group"
-        >
-          <div className="absolute inset-0 bg-primary/5 blur-xl group-focus-within:bg-primary/10 transition-colors rounded-full -z-10" />
-          
-          <div className="relative flex-1 flex items-center bg-card/80 backdrop-blur-2xl border-2 border-border/50 group-focus-within:border-primary/40 group-focus-within:shadow-2xl group-focus-within:shadow-primary/5 transition-all duration-300 rounded-[2rem] px-2 py-2 overflow-hidden">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full ml-2 text-muted-foreground group-focus-within:text-primary transition-colors">
-              <Sparkles className="h-5 w-5" />
-            </div>
-            
-            <Input
-              placeholder="Ask me anything about your career..."
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              disabled={isLoading || isDiscovering}
-              className="flex-1 h-12 text-base bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 px-4 placeholder:text-muted-foreground/60"
-            />
-            
-            <Button 
-              type="submit" 
-              size="icon" 
-              disabled={isLoading || isDiscovering || !input.trim()} 
-              className="h-12 w-12 rounded-full bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all shrink-0"
-            >
-              <Send className="h-5 w-5" />
-            </Button>
-          </div>
+      <div className="flex-none border-t border-border p-5 bg-card rounded-b-2xl">
+        <form onSubmit={handleSubmit} className="flex gap-3">
+          <Input
+            placeholder="Ask me anything about your career..."
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            disabled={isLoading || isDiscovering}
+            className="flex-1 h-12 text-base"
+          />
+          <Button type="submit" size="lg" disabled={isLoading || isDiscovering || !input.trim()} className="h-12 w-12">
+            <Send className="h-5 w-5" />
+          </Button>
         </form>
       </div>
     </div>

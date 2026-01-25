@@ -125,15 +125,15 @@ export function OpportunityCardInline({
       </div>
 
       {/* Meta info: location and deadline */}
-      <div className="flex flex-wrap items-center gap-y-2 gap-x-4 mt-2.5 text-xs text-muted-foreground">
-        <div className="flex items-center gap-1.5 shrink-0">
-          <MapPin className="h-3.5 w-3.5 text-primary/60" />
-          <span className="font-medium">{opportunity.location}</span>
+      <div className="flex flex-wrap items-center gap-3 mt-2.5 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1">
+          <MapPin className="h-3 w-3" />
+          <span>{opportunity.location}</span>
         </div>
         {opportunity.deadline && (
-          <div className="flex items-center gap-1.5 shrink-0">
-            <Calendar className="h-3.5 w-3.5 text-primary/60" />
-            <span className="font-medium text-destructive">Due: {opportunity.deadline}</span>
+          <div className="flex items-center gap-1">
+            <Calendar className="h-3 w-3" />
+            <span>Due: {opportunity.deadline}</span>
           </div>
         )}
       </div>
@@ -190,16 +190,19 @@ export function OpportunityCardInline({
       )}
 
       {/* Action Buttons: Apply Now | Bookmark | Details */}
-      <div className="flex flex-wrap items-center justify-end gap-2 mt-4 pt-3 border-t border-border/40">
-        {/* Details - navigate to opportunity page */}
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-8 text-xs px-3 hover:bg-muted/50 transition-colors"
-          onClick={handleDetails}
-        >
-          Details
-        </Button>
+      <div className="flex items-center justify-end gap-2 mt-4 pt-3 border-t border-border/50">
+        {/* Apply Now - only if URL exists */}
+        {opportunity.url && (
+          <Button
+            variant="default"
+            size="sm"
+            className="h-8 text-xs px-3 bg-primary hover:bg-primary/90"
+            onClick={handleApply}
+          >
+            <ExternalLink className="h-3 w-3 mr-1.5" />
+            Apply Now
+          </Button>
+        )}
 
         {/* Bookmark */}
         {onBookmark && (
@@ -207,29 +210,26 @@ export function OpportunityCardInline({
             variant={isBookmarked ? 'secondary' : 'outline'}
             size="sm"
             className={cn(
-              'h-8 text-xs px-3 whitespace-nowrap',
+              'h-8 text-xs px-3',
               isBookmarked && 'bg-amber-500/10 text-amber-600 border-amber-500/30'
             )}
             onClick={handleBookmark}
             disabled={isBookmarking}
           >
-            <Bookmark className={cn('h-3.5 w-3.5 mr-1.5', isBookmarked && 'fill-current')} />
+            <Bookmark className={cn('h-3 w-3 mr-1.5', isBookmarked && 'fill-current')} />
             {isBookmarking ? 'Saving...' : isBookmarked ? 'Saved' : 'Bookmark'}
           </Button>
         )}
 
-        {/* Apply Now - only if URL exists */}
-        {opportunity.url && (
-          <Button
-            variant="default"
-            size="sm"
-            className="h-8 text-xs px-3 bg-primary hover:bg-primary/90 shadow-sm shadow-primary/20 whitespace-nowrap"
-            onClick={handleApply}
-          >
-            <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-            Apply Now
-          </Button>
-        )}
+        {/* Details - navigate to opportunity page */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 text-xs px-3"
+          onClick={handleDetails}
+        >
+          Details
+        </Button>
       </div>
     </div>
   )

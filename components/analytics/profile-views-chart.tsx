@@ -11,20 +11,14 @@ interface ProfileViewsChartProps {
 export function ProfileViewsChart({ data = [] }: ProfileViewsChartProps) {
   return (
     <GlassCard className="border-border">
-      <CardHeader className="pb-2 pt-6">
+      <CardHeader className="pb-2">
         <CardTitle className="text-lg font-semibold">Profile Views</CardTitle>
         <p className="text-sm text-muted-foreground">Last 7 days</p>
       </CardHeader>
       <CardContent>
-        {data.length === 0 ? (
-          <div className="h-64 flex flex-col items-center justify-center text-muted-foreground">
-            <i className="bx bx-show text-4xl mb-2 opacity-20" />
-            <p className="text-sm">No profile views yet</p>
-          </div>
-        ) : (
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={data}>
+        <div className="h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={data}>
               <defs>
                 <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
@@ -52,8 +46,7 @@ export function ProfileViewsChart({ data = [] }: ProfileViewsChartProps) {
               />
             </AreaChart>
           </ResponsiveContainer>
-          </div>
-        )}
+        </div>
       </CardContent>
     </GlassCard>
   )
