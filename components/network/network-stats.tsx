@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import { GlassCard } from "@/components/ui/glass-card"
 import { Card, CardContent } from "@/components/ui/card"
-import { Users, UserPlus, MessageCircle, TrendingUp, Loader2 } from "lucide-react"
 import { getNetworkStats } from "@/app/actions/connections"
 
 export function NetworkStats() {
@@ -36,7 +35,7 @@ export function NetworkStats() {
           <GlassCard key={i} className="border-border">
             <CardContent className="p-4">
               <div className="flex items-center justify-center h-16">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                <i className="bx bx-loader-alt animate-spin text-2xl text-muted-foreground" />
               </div>
             </CardContent>
           </GlassCard>
@@ -50,29 +49,29 @@ export function NetworkStats() {
       label: "Total Connections",
       value: stats.totalConnections.toString(),
       change: "",
-      icon: Users,
+      iconClass: "bx bx-group",
       color: "text-primary bg-primary/10",
     },
     {
       label: "Pending Requests",
       value: stats.pendingRequests.toString(),
       change: "",
-      icon: UserPlus,
-      color: "text-amber-500 bg-amber-500/10",
+      iconClass: "bx bx-user-plus",
+      color: "text-primary bg-primary/10",
     },
     {
       label: "Unread Messages",
       value: stats.unreadMessages.toString(),
       change: "",
-      icon: MessageCircle,
-      color: "text-secondary bg-secondary/10",
+      iconClass: "bx bx-message-detail",
+      color: "text-primary bg-primary/10",
     },
     {
       label: "Profile Views",
       value: stats.profileViews.toString(),
       change: "",
-      icon: TrendingUp,
-      color: "text-rose-500 bg-rose-500/10",
+      iconClass: "bx bx-trending-up",
+      color: "text-primary bg-primary/10",
     },
   ]
 
@@ -82,8 +81,8 @@ export function NetworkStats() {
         <GlassCard key={stat.label} className="border-border">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className={`rounded-full p-2 ${stat.color}`}>
-                <stat.icon className="h-5 w-5" />
+              <div className={`rounded-full p-2 flex items-center justify-center ${stat.color}`}>
+                <i className={`${stat.iconClass} text-xl`} />
               </div>
               <div>
                 <p className="text-2xl font-bold text-foreground">{stat.value}</p>

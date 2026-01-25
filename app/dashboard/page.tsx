@@ -47,7 +47,7 @@ export default async function DashboardPage() {
   }
 
   return (
-    <div className="space-y-6 container mx-auto px-4 sm:px-6 max-w-7xl py-6">
+    <div className="space-y-6 container mx-auto px-4 sm:px-6 max-w-7xl">
       <BentoGrid>
         {/* Hero Section - Top Left Priority */}
         <BentoItem colSpan={{ md: 4, lg: 8 }} className="min-h-[300px]">

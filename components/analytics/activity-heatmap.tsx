@@ -38,8 +38,8 @@ export function ActivityHeatmap() {
 
   if (loading) {
     return (
-      <GlassCard className="border-border">
-        <CardHeader className="pb-2">
+      <GlassCard className="border-border pb-6">
+        <CardHeader className="pb-2 pt-6">
           <CardTitle className="text-lg font-semibold">Activity</CardTitle>
           <p className="text-sm text-muted-foreground">Your networking activity over the past 12 weeks</p>
         </CardHeader>
@@ -59,8 +59,8 @@ export function ActivityHeatmap() {
   }
 
   return (
-    <GlassCard className="border-border">
-      <CardHeader className="pb-2">
+    <GlassCard className="border-border pb-6">
+      <CardHeader className="pb-2 pt-6">
         <CardTitle className="text-lg font-semibold">Activity</CardTitle>
         <p className="text-sm text-muted-foreground">Your networking activity over the past 12 weeks</p>
       </CardHeader>

@@ -1,7 +1,7 @@
 "use client"
 
 import { Line, LineChart, ResponsiveContainer } from "recharts"
-import { ArrowUpRight, ArrowDownRight, Activity } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 interface StatsWidgetProps {
   stats: {
@@ -25,19 +25,19 @@ export function StatsWidget({ stats }: StatsWidgetProps) {
   const searchAppearancesData = stats.sparklineData?.searchAppearances || []
 
   return (
-    <div className="h-full flex flex-col justify-between p-6">
-      <div className="flex items-center gap-2 mb-6">
-        <Activity className="w-5 h-5 text-primary" />
+    <div className="h-full flex flex-col p-6">
+      <div className="flex items-center gap-2 mb-8">
+        <i className='bx bx-line-chart text-xl text-primary' />
         <h3 className="font-semibold text-foreground">Weekly Activity</h3>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
+      <div className="grid grid-cols-3 divide-x divide-border/40 h-full">
         <StatItem
           label="Profile Views"
           value={stats.profileViews}
           trend={stats.viewsTrend}
           data={profileViewsData}
-          color="hsl(var(--primary))"
+          color="#3b82f6" // Blue
         />
 
         <StatItem
@@ -45,7 +45,7 @@ export function StatsWidget({ stats }: StatsWidgetProps) {
           value={stats.networkGrowth}
           trend={stats.growthTrend}
           data={networkGrowthData}
-          color="#10b981"
+          color="#3b82f6" // Blue
         />
 
         <StatItem
@@ -53,7 +53,7 @@ export function StatsWidget({ stats }: StatsWidgetProps) {
           value={stats.searchAppearances}
           trend={stats.searchTrend}
           data={searchAppearancesData}
-          color="#3b82f6"
+          color="#3b82f6" // Blue
         />
       </div>
     </div>
@@ -65,33 +65,44 @@ function StatItem({ label, value, trend, data, color }: any) {
   const hasData = data && data.length > 0
 
   return (
-    <div className="flex flex-col justify-between h-full min-h-[100px] border-r last:border-r-0 border-border/50 px-4 first:pl-0 last:pr-0">
-      <div>
-        <p className="text-sm text-muted-foreground font-medium mb-1">{label}</p>
-        <div className="flex items-baseline gap-2">
-          <span className="text-2xl font-bold text-foreground">{value}</span>
-          <span className={`text-xs font-medium flex items-center ${isPositive ? 'text-emerald-500' : 'text-rose-500'}`}>
-            {isPositive ? <ArrowUpRight className="w-3 h-3 mr-0.5" /> : <ArrowDownRight className="w-3 h-3 mr-0.5" />}
-            {Math.abs(trend)}%
-          </span>
+    <div className="flex flex-col justify-between px-2 md:px-3 first:pl-0 last:pr-0 w-full overflow-hidden">
+      <div className="space-y-3">
+        <p className="text-[10px] font-semibold text-muted-foreground uppercase leading-tight min-h-[2.5em] flex items-center break-words">{label}</p>
+        
+        <div className="flex flex-col gap-1">
+          <span className="text-3xl font-bold tracking-tight text-foreground">{value}</span>
+          
+          <div className="flex flex-col items-start gap-1">
+            <div className={cn(
+              "flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full w-fit",
+              "text-primary bg-primary/10"
+            )}>
+              {isPositive ? <i className='bx bx-up-arrow-alt text-sm' /> : <i className='bx bx-down-arrow-alt text-sm' />}
+              <span>{Math.abs(trend)}%</span>
+            </div>
+            <span className="text-[10px] text-muted-foreground pl-1">vs last week</span>
+          </div>
         </div>
       </div>
 
-      {hasData && (
-        <div className="h-[50px] mt-4 w-full">
+      <div className="mt-6 relative h-[40px] w-full group">
+        {hasData ? (
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data}>
               <Line
                 type="monotone"
                 dataKey="value"
                 stroke={color}
-                strokeWidth={2}
+                strokeWidth={2.5}
                 dot={false}
+                strokeLinecap="round"
               />
             </LineChart>
           </ResponsiveContainer>
-        </div>
-      )}
+        ) : (
+          <div className="absolute bottom-0 left-0 w-full h-[2px] rounded-full opacity-20" style={{ backgroundColor: color }} />
+        )}
+      </div>
     </div>
   )
 }

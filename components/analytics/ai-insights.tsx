@@ -4,14 +4,14 @@ import { useState, useEffect } from "react"
 import { GlassCard } from "@/components/ui/glass-card"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Sparkles, TrendingUp, Target, Users, Lightbulb, ArrowRight, Loader2 } from "lucide-react"
+
 import { generateInsights } from "@/app/actions/insights"
 
-const iconMap: Record<string, any> = {
-  TrendingUp,
-  Target,
-  Users,
-  Lightbulb,
+const iconMap: Record<string, string> = {
+  TrendingUp: "bx bx-trending-up",
+  Target: "bx bx-target-lock",
+  Users: "bx bx-group",
+  Lightbulb: "bx bx-bulb",
 }
 
 export function AIInsights() {
@@ -34,17 +34,17 @@ export function AIInsights() {
 
   if (loading) {
     return (
-      <GlassCard className="border-border">
-        <CardHeader className="pb-2">
+      <GlassCard className="border-border pb-6">
+        <CardHeader className="pb-2 pt-6">
           <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-            <Sparkles className="h-5 w-5 text-primary" />
+            <i className="bx bx-sparkles text-xl text-primary" />
             AI Insights
           </CardTitle>
           <p className="text-sm text-muted-foreground">Personalized recommendations based on your activity</p>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <i className="bx bx-loader-alt animate-spin text-2xl text-muted-foreground" />
           </div>
         </CardContent>
       </GlassCard>
@@ -53,10 +53,10 @@ export function AIInsights() {
 
   if (insights.length === 0) {
     return (
-      <GlassCard className="border-border">
-        <CardHeader className="pb-2">
+      <GlassCard className="border-border pb-6">
+        <CardHeader className="pb-2 pt-6">
           <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-            <Sparkles className="h-5 w-5 text-primary" />
+            <i className="bx bx-sparkles text-xl text-primary" />
             AI Insights
           </CardTitle>
           <p className="text-sm text-muted-foreground">Personalized recommendations based on your activity</p>
@@ -71,34 +71,34 @@ export function AIInsights() {
   }
 
   return (
-    <GlassCard className="border-border">
-      <CardHeader className="pb-2">
+    <GlassCard className="border-border pb-6">
+      <CardHeader className="pb-2 pt-6">
         <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-          <Sparkles className="h-5 w-5 text-primary" />
+          <i className="bx bx-sparkles text-xl text-primary" />
           AI Insights
         </CardTitle>
         <p className="text-sm text-muted-foreground">Personalized recommendations based on your activity</p>
       </CardHeader>
       <CardContent className="space-y-4">
         {insights.map((insight) => {
-          const IconComponent = iconMap[insight.icon] || Lightbulb
+          const iconClass = iconMap[insight.icon] || "bx bx-bulb"
           return (
-          <div
-            key={insight.title}
-            className="flex gap-4 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors"
-          >
-            <div className={`rounded-full p-2 h-fit ${insight.color}`}>
-                <IconComponent className="h-5 w-5" />
+            <div
+              key={insight.title}
+              className="flex gap-4 p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors"
+            >
+              <div className="rounded-full p-2 h-fit flex items-center justify-center text-primary bg-primary/10">
+                <i className={`${iconClass} text-xl`} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="font-medium text-foreground text-sm">{insight.title}</h4>
+                <p className="text-sm text-muted-foreground mt-1">{insight.description}</p>
+                <Button variant="ghost" size="sm" className="mt-2 gap-1 text-primary h-auto p-0">
+                  {insight.action}
+                  <i className="bx bx-right-arrow-alt text-lg" />
+                </Button>
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <h4 className="font-medium text-foreground text-sm">{insight.title}</h4>
-              <p className="text-sm text-muted-foreground mt-1">{insight.description}</p>
-              <Button variant="ghost" size="sm" className="mt-2 gap-1 text-primary h-auto p-0">
-                {insight.action}
-                <ArrowRight className="h-3 w-3" />
-              </Button>
-            </div>
-          </div>
           )
         })}
       </CardContent>

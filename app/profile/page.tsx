@@ -37,7 +37,7 @@ export default async function ProfilePage() {
   const skillEndorsements = analytics?.skillEndorsements || []
 
   return (
-    <div className="space-y-6 container mx-auto px-4 sm:px-6 max-w-7xl py-6">
+    <div className="space-y-6 container mx-auto px-4 sm:px-6 max-w-7xl">
       {/* 1. Header Section */}
       <GlassContainer delay={0}>
         <GlassCard variant="hero" glow hover>

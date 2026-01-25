@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from "react"
 import { Bell, Search, MessageCircle, Plus } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import Link from "next/link"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   DropdownMenu,
@@ -113,6 +114,8 @@ export function Header() {
         />
       </div>
 
+      <div className="flex-1" />
+
       <div className="flex items-center gap-2">
         <Button variant="outline" size="sm" className="gap-2 bg-transparent">
           <Plus className="h-4 w-4" />
@@ -151,9 +154,15 @@ export function Header() {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>View Profile</DropdownMenuItem>
-              <DropdownMenuItem>Settings</DropdownMenuItem>
-              <DropdownMenuItem>Help & Support</DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/profile" className="w-full cursor-pointer">View Profile</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/settings" className="w-full cursor-pointer">Settings</Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/settings" className="w-full cursor-pointer">Help & Support</Link>
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="text-destructive"
