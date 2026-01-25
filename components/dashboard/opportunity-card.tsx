@@ -1,4 +1,5 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { GlassCard } from "@/components/ui/glass-card"
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -10,7 +11,7 @@ export async function OpportunityCard() {
   const opportunities = await getOpportunities()
 
   return (
-    <Card className="border-border">
+    <GlassCard className="border-border">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-lg font-semibold">Top Opportunities</CardTitle>
         <Link href="/opportunities">
@@ -62,7 +63,7 @@ export async function OpportunityCard() {
           </div>
         ))}
       </CardContent>
-    </Card>
+    </GlassCard>
   )
 }
 

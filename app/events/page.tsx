@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Card, CardContent } from "@/components/ui/card"
+import { GlassCard } from "@/components/ui/glass-card"
+import { CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
@@ -79,14 +80,16 @@ export default function EventsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="space-y-6 container mx-auto px-4 sm:px-6 max-w-7xl py-6">
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 container mx-auto px-4 sm:px-6 max-w-7xl py-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Events & Conferences</h1>
@@ -105,7 +108,7 @@ export default function EventsPage() {
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {filteredEvents.map((event) => (
-          <Card key={event.id} className="border-border overflow-hidden hover:shadow-lg transition-shadow">
+          <GlassCard key={event.id} className="border-border overflow-hidden">
             <div className="relative aspect-video">
               <Image src={event.image || "/placeholder.svg"} alt={event.title} fill className="object-cover" />
               <div className="absolute top-3 left-3 flex gap-2">
@@ -157,7 +160,7 @@ export default function EventsPage() {
                 </Button>
               </div>
             </CardContent>
-          </Card>
+          </GlassCard>
         ))}
       </div>
     </div>

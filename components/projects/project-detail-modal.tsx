@@ -131,7 +131,7 @@ export function ProjectDetailModal({ project, open, onOpenChange }: ProjectDetai
             </div>
           )}
 
-          <Card className="border-border">
+          <GlassCard className="border-border">
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Team ({project.collaborators.length})</CardTitle>
             </CardHeader>
@@ -149,10 +149,10 @@ export function ProjectDetailModal({ project, open, onOpenChange }: ProjectDetai
                 </div>
               ))}
             </CardContent>
-          </Card>
+          </GlassCard>
 
           {project.lookingFor.length > 0 && (
-            <Card className="border-border bg-rose-500/5">
+            <GlassCard className="border-border bg-rose-500/5">
               <CardHeader className="pb-2">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Users className="h-5 w-5 text-rose-500" />
@@ -172,7 +172,7 @@ export function ProjectDetailModal({ project, open, onOpenChange }: ProjectDetai
                   Request to Join
                 </Button>
               </CardContent>
-            </Card>
+            </GlassCard>
           )}
 
           <div className="flex gap-3">

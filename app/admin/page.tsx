@@ -1,6 +1,12 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState, useEffect } from "react"
+import { GlassCard } from "@/components/ui/glass-card"
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { Loader2, RefreshCw, GitBranch, Terminal, Settings, Users, Activity, Database, Server, AlertCircle } from "lucide-react"
 
 interface SystemStats {
   database: { status: string; latency: number }
@@ -163,268 +169,337 @@ export default function AdminPanel() {
   }
 
   return (
-    <div style={{ padding: "20px", fontFamily: "monospace", maxWidth: "1400px" }}>
-      <h1>Admin Panel</h1>
-      
-      <div style={{ border: "1px solid #ccc", padding: "15px", marginBottom: "20px" }}>
-        <h2>System Status</h2>
-        <button onClick={loadStats} disabled={loading.stats}>
-          {loading.stats ? "Loading..." : "Refresh"}
-        </button>
-        {stats && (
-          <>
-            <h3>Database</h3>
-            <p>Status: {stats.database.status}</p>
-            <p>Latency: {stats.database.latency}ms</p>
-            
-            <h3>APIs</h3>
-            <table border={1} cellPadding={5} style={{ width: "100%", marginTop: "10px" }}>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Status</th>
-                  <th>Last Checked</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stats.apis.map((api, i) => (
-                  <tr key={i}>
-                    <td>{api.name}</td>
-                    <td style={{ color: api.status === "ok" ? "green" : "red" }}>{api.status}</td>
-                    <td>{api.lastChecked}</td>
-                  </tr>
+    <div className="space-y-6 container mx-auto px-4 sm:px-6 max-w-7xl py-6">
+      <div>
+        <h1 className="text-2xl font-bold text-foreground">Admin Panel</h1>
+        <p className="text-muted-foreground">System monitoring and management</p>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {/* System Status */}
+        <GlassCard>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">System Status</CardTitle>
+            <Button variant="ghost" size="icon" onClick={loadStats} disabled={loading.stats}>
+              {loading.stats ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {stats ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Database className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">Database</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">{stats.database.latency}ms</span>
+                    <Badge variant={stats.database.status === 'connected' ? 'default' : 'destructive'}>
+                      {stats.database.status}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Server className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium">APIs</span>
+                  </div>
+                  {stats.apis.map((api, i) => (
+                    <div key={i} className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">{api.name}</span>
+                      <Badge variant={api.status === 'ok' ? 'outline' : 'destructive'} className={api.status === 'ok' ? 'text-green-500 border-green-500' : ''}>
+                        {api.status}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="flex justify-center p-4">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            )}
+          </CardContent>
+        </GlassCard>
+
+        {/* GitHub Status */}
+        <GlassCard>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">GitHub</CardTitle>
+            <div className="flex gap-1">
+              <Button variant="ghost" size="icon" onClick={loadGitHub} disabled={loading.github}>
+                {loading.github ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              </Button>
+              <Button variant="ghost" size="icon" onClick={pullLatest} disabled={loading.pull}>
+                {loading.pull ? <Loader2 className="h-4 w-4 animate-spin" /> : <GitBranch className="h-4 w-4" />}
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {github ? (
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Branch</span>
+                  <span className="font-mono">{github.branch}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Commit</span>
+                  <span className="font-mono">{github.commit}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Behind</span>
+                  <Badge variant={github.behind > 0 ? 'secondary' : 'outline'}>
+                    {github.behind} commits
+                  </Badge>
+                </div>
+              </div>
+            ) : (
+              <div className="flex justify-center p-4">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            )}
+          </CardContent>
+        </GlassCard>
+
+        {/* Tests */}
+        <GlassCard>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Tests</CardTitle>
+            <Button variant="ghost" size="icon" onClick={runTests} disabled={loading.tests}>
+              {loading.tests ? <Loader2 className="h-4 w-4 animate-spin" /> : <Terminal className="h-4 w-4" />}
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {testResult ? (
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium">Status</span>
+                  <Badge variant={testResult.status === 'pass' ? 'default' : 'destructive'}>
+                    {testResult.status}
+                  </Badge>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="flex justify-between p-2 bg-green-500/10 rounded">
+                    <span>Passed</span>
+                    <span className="font-bold text-green-600">{testResult.passed}</span>
+                  </div>
+                  <div className="flex justify-between p-2 bg-red-500/10 rounded">
+                    <span>Failed</span>
+                    <span className="font-bold text-red-600">{testResult.failed}</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground text-center p-4">
+                Run tests to see results
+              </div>
+            )}
+          </CardContent>
+        </GlassCard>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Recent Errors */}
+        <GlassCard className="md:col-span-1">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5" />
+              Recent Errors
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {stats?.errors && stats.errors.length > 0 ? (
+              <div className="space-y-4">
+                {stats.errors.slice(0, 5).map((err, i) => (
+                  <div key={i} className="flex flex-col gap-1 p-3 bg-muted/50 rounded-lg text-sm">
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>{new Date(err.timestamp).toLocaleString()}</span>
+                      <span className="font-mono">{err.route}</span>
+                    </div>
+                    <p className="text-destructive font-medium line-clamp-2">{err.message}</p>
+                  </div>
                 ))}
-              </tbody>
-            </table>
-            
-            <h3>Recent Errors ({stats.errors.length})</h3>
-            <table border={1} cellPadding={5} style={{ width: "100%", marginTop: "10px" }}>
-              <thead>
-                <tr>
-                  <th>Time</th>
-                  <th>Route</th>
-                  <th>Message</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stats.errors.slice(0, 10).map((err, i) => (
-                  <tr key={i}>
-                    <td>{new Date(err.timestamp).toLocaleString()}</td>
-                    <td>{err.route}</td>
-                    <td>{err.message}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </>
-        )}
-      </div>
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground text-center py-4">No recent errors</div>
+            )}
+          </CardContent>
+        </GlassCard>
 
-      <div style={{ border: "1px solid #ccc", padding: "15px", marginBottom: "20px" }}>
-        <h2>GitHub</h2>
-        <button onClick={loadGitHub} disabled={loading.github}>
-          {loading.github ? "Loading..." : "Refresh"}
-        </button>
-        <button onClick={pullLatest} disabled={loading.pull} style={{ marginLeft: "10px" }}>
-          {loading.pull ? "Pulling..." : "Pull Latest"}
-        </button>
-        {github && (
-          <>
-            <p>Branch: {github.branch}</p>
-            <p>Commit: {github.commit}</p>
-            <p>Behind: {github.behind} commits</p>
-          </>
-        )}
-      </div>
-
-      <div style={{ border: "1px solid #ccc", padding: "15px", marginBottom: "20px" }}>
-        <h2>Tests</h2>
-        <button onClick={runTests} disabled={loading.tests}>
-          {loading.tests ? "Running..." : "Run Tests"}
-        </button>
-        {testResult && (
-          <>
-            <p>Status: <span style={{ color: testResult.status === "pass" ? "green" : "red" }}>{testResult.status}</span></p>
-            <p>Passed: {testResult.passed}</p>
-            <p>Failed: {testResult.failed}</p>
-            <pre style={{ background: "#f4f4f4", padding: "10px", overflow: "auto", maxHeight: "300px" }}>
-              {testResult.output}
-            </pre>
-          </>
-        )}
-      </div>
-
-      <div style={{ border: "1px solid #ccc", padding: "15px", marginBottom: "20px" }}>
-        <h2>Configuration</h2>
-        <table border={1} cellPadding={5} style={{ width: "100%", marginTop: "10px" }}>
-          <thead>
-            <tr>
-              <th>Key</th>
-              <th>Value</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {Object.entries(config).map(([key, value]) => (
-              <tr key={key}>
-                <td>{key}</td>
-                <td>
-                  <input
-                    type="text"
-                    value={value}
-                    onChange={(e) => setConfig(prev => ({ ...prev, [key]: e.target.value }))}
-                    style={{ width: "100%", padding: "5px" }}
-                  />
-                </td>
-                <td>
-                  <button onClick={() => updateConfig(key, config[key])}>Update</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div style={{ border: "1px solid #ccc", padding: "15px", marginBottom: "20px" }}>
-        <h2>Users ({users?.total || 0})</h2>
-        <button onClick={loadUsers} disabled={loading.users}>
-          {loading.users ? "Loading..." : "Refresh"}
-        </button>
-        {users && (
-          <table border={1} cellPadding={5} style={{ width: "100%", marginTop: "10px", fontSize: "12px" }}>
-            <thead>
-              <tr>
-                <th>Email</th>
-                <th>Name</th>
-                <th>Created</th>
-                <th>Last Login</th>
-                <th>Views</th>
-                <th>Connections</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.users.map((user) => (
-                <tr key={user.id}>
-                  <td>{user.email}</td>
-                  <td>{user.name}</td>
-                  <td>{new Date(user.createdAt).toLocaleDateString()}</td>
-                  <td>{user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString() : 'Never'}</td>
-                  <td>{user.profileViews}</td>
-                  <td>{user.connections}</td>
-                </tr>
+        {/* Configuration */}
+        <GlassCard className="md:col-span-1">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              Configuration
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
+              {Object.entries(config).map(([key, value]) => (
+                <div key={key} className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground">{key}</label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={value}
+                      onChange={(e) => setConfig(prev => ({ ...prev, [key]: e.target.value }))}
+                      className="font-mono text-xs"
+                    />
+                    <Button size="sm" onClick={() => updateConfig(key, config[key])}>Save</Button>
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
-        )}
+            </div>
+          </CardContent>
+        </GlassCard>
       </div>
 
-      <div style={{ border: "1px solid #ccc", padding: "15px", marginBottom: "20px" }}>
-        <h2>AI Query Diagnostics</h2>
-        <button onClick={loadAIQueries} disabled={loading.aiQueries}>
-          {loading.aiQueries ? "Loading..." : "Refresh"}
-        </button>
-        {aiQueries && (
-          <>
-            <h3>Overview</h3>
-            <table border={1} cellPadding={5} style={{ width: "100%", marginTop: "10px" }}>
-              <tbody>
-                <tr>
-                  <td><strong>Total Queries</strong></td>
-                  <td>{aiQueries.total}</td>
-                  <td><strong>Success</strong></td>
-                  <td style={{ color: "green" }}>{aiQueries.success}</td>
-                  <td><strong>Failed</strong></td>
-                  <td style={{ color: "red" }}>{aiQueries.failed}</td>
-                </tr>
-                <tr>
-                  <td><strong>Error Rate</strong></td>
-                  <td style={{ color: aiQueries.errorRate > 20 ? "red" : "green" }}>{aiQueries.errorRate.toFixed(2)}%</td>
-                  <td><strong>Avg Latency</strong></td>
-                  <td>{aiQueries.avgLatency.toFixed(0)}ms</td>
-                  <td></td>
-                  <td></td>
-                </tr>
-              </tbody>
-            </table>
-
-            <h3>By Provider</h3>
-            <table border={1} cellPadding={5} style={{ width: "100%", marginTop: "10px" }}>
-              <thead>
-                <tr>
-                  <th>Provider</th>
-                  <th>Total</th>
-                  <th>Success</th>
-                  <th>Failed</th>
-                  <th>Error Rate</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(aiQueries.byProvider).map(([provider, stats]) => (
-                  <tr key={provider}>
-                    <td>{provider}</td>
-                    <td>{stats.total}</td>
-                    <td style={{ color: "green" }}>{stats.success}</td>
-                    <td style={{ color: "red" }}>{stats.failed}</td>
-                    <td>{stats.total > 0 ? ((stats.failed / stats.total) * 100).toFixed(1) : 0}%</td>
+      {/* Users */}
+      <GlassCard>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5" />
+            Users ({users?.total || 0})
+          </CardTitle>
+          <Button variant="ghost" size="icon" onClick={loadUsers} disabled={loading.users}>
+            {loading.users ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            {users ? (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left">
+                    <th className="py-2 font-medium text-muted-foreground">Name</th>
+                    <th className="py-2 font-medium text-muted-foreground">Email</th>
+                    <th className="py-2 font-medium text-muted-foreground">Joined</th>
+                    <th className="py-2 font-medium text-muted-foreground">Last Login</th>
+                    <th className="py-2 font-medium text-muted-foreground text-right">Views</th>
+                    <th className="py-2 font-medium text-muted-foreground text-right">Connections</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {users.users.map((user) => (
+                    <tr key={user.id} className="border-b last:border-0 hover:bg-muted/50">
+                      <td className="py-3 font-medium">{user.name}</td>
+                      <td className="py-3 text-muted-foreground">{user.email}</td>
+                      <td className="py-3 text-muted-foreground">{new Date(user.createdAt).toLocaleDateString()}</td>
+                      <td className="py-3 text-muted-foreground">
+                        {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString() : 'Never'}
+                      </td>
+                      <td className="py-3 text-right">{user.profileViews}</td>
+                      <td className="py-3 text-right">{user.connections}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <div className="flex justify-center p-8">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </GlassCard>
 
-            <h3>By Use Case</h3>
-            <table border={1} cellPadding={5} style={{ width: "100%", marginTop: "10px" }}>
-              <thead>
-                <tr>
-                  <th>Use Case</th>
-                  <th>Total</th>
-                  <th>Success</th>
-                  <th>Failed</th>
-                  <th>Error Rate</th>
-                </tr>
-              </thead>
-              <tbody>
-                {Object.entries(aiQueries.byUseCase).map(([useCase, stats]) => (
-                  <tr key={useCase}>
-                    <td>{useCase}</td>
-                    <td>{stats.total}</td>
-                    <td style={{ color: "green" }}>{stats.success}</td>
-                    <td style={{ color: "red" }}>{stats.failed}</td>
-                    <td>{stats.total > 0 ? ((stats.failed / stats.total) * 100).toFixed(1) : 0}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {/* AI Query Diagnostics */}
+      <GlassCard>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <Activity className="h-5 w-5" />
+            AI Query Diagnostics
+          </CardTitle>
+          <Button variant="ghost" size="icon" onClick={loadAIQueries} disabled={loading.aiQueries}>
+            {loading.aiQueries ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          </Button>
+        </CardHeader>
+        <CardContent>
+          {aiQueries ? (
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="p-4 bg-muted/30 rounded-lg">
+                  <div className="text-sm text-muted-foreground">Total Queries</div>
+                  <div className="text-2xl font-bold">{aiQueries.total}</div>
+                </div>
+                <div className="p-4 bg-green-500/10 rounded-lg">
+                  <div className="text-sm text-green-600">Success</div>
+                  <div className="text-2xl font-bold text-green-700">{aiQueries.success}</div>
+                </div>
+                <div className="p-4 bg-red-500/10 rounded-lg">
+                  <div className="text-sm text-red-600">Failed</div>
+                  <div className="text-2xl font-bold text-red-700">{aiQueries.failed}</div>
+                </div>
+                <div className="p-4 bg-blue-500/10 rounded-lg">
+                  <div className="text-sm text-blue-600">Avg Latency</div>
+                  <div className="text-2xl font-bold text-blue-700">{aiQueries.avgLatency.toFixed(0)}ms</div>
+                </div>
+              </div>
 
-            <h3>Recent Errors ({aiQueries.recentErrors.length})</h3>
-            <table border={1} cellPadding={5} style={{ width: "100%", marginTop: "10px", fontSize: "11px" }}>
-              <thead>
-                <tr>
-                  <th>Time</th>
-                  <th>Provider</th>
-                  <th>Model</th>
-                  <th>Use Case</th>
-                  <th>Prompt</th>
-                  <th>Error</th>
-                  <th>Latency</th>
-                </tr>
-              </thead>
-              <tbody>
-                {aiQueries.recentErrors.slice(0, 10).map((err) => (
-                  <tr key={err.id}>
-                    <td>{new Date(err.timestamp).toLocaleTimeString()}</td>
-                    <td>{err.provider}</td>
-                    <td>{err.model}</td>
-                    <td>{err.useCase}</td>
-                    <td style={{ maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis" }}>{err.prompt}</td>
-                    <td style={{ color: "red", maxWidth: "250px" }}>{err.error}</td>
-                    <td>{err.latencyMs}ms</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </>
-        )}
-      </div>
+              <div className="grid md:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="text-sm font-medium mb-3">By Provider</h3>
+                  <div className="space-y-2">
+                    {Object.entries(aiQueries.byProvider).map(([provider, stats]) => (
+                      <div key={provider} className="flex items-center justify-between p-2 border rounded">
+                        <span className="font-medium capitalize">{provider}</span>
+                        <div className="flex gap-3 text-sm">
+                          <span className="text-green-600">{stats.success}</span>
+                          <span className="text-red-600">{stats.failed}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium mb-3">By Use Case</h3>
+                  <div className="space-y-2">
+                    {Object.entries(aiQueries.byUseCase).map(([useCase, stats]) => (
+                      <div key={useCase} className="flex items-center justify-between p-2 border rounded">
+                        <span className="font-medium capitalize">{useCase}</span>
+                        <div className="flex gap-3 text-sm">
+                          <span className="text-green-600">{stats.success}</span>
+                          <span className="text-red-600">{stats.failed}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {aiQueries.recentErrors.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-medium mb-3">Recent AI Errors</h3>
+                  <div className="border rounded-md overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead className="bg-muted">
+                        <tr>
+                          <th className="p-2 text-left">Time</th>
+                          <th className="p-2 text-left">Provider</th>
+                          <th className="p-2 text-left">Error</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {aiQueries.recentErrors.slice(0, 5).map((err) => (
+                          <tr key={err.id} className="border-t">
+                            <td className="p-2">{new Date(err.timestamp).toLocaleTimeString()}</td>
+                            <td className="p-2">{err.provider}</td>
+                            <td className="p-2 text-red-600 truncate max-w-[200px]" title={err.error}>{err.error}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex justify-center p-8">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          )}
+        </CardContent>
+      </GlassCard>
     </div>
   )
 }

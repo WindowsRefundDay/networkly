@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { GlassCard } from "@/components/ui/glass-card"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -30,26 +31,26 @@ export function MessagesPanel() {
 
   if (loading) {
     return (
-      <Card className="border-border">
+      <GlassCard className="border-border">
         <CardContent className="flex items-center justify-center py-8">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </CardContent>
-      </Card>
+      </GlassCard>
     )
   }
 
   if (error) {
     return (
-      <Card className="border-border">
+      <GlassCard className="border-border">
         <CardContent className="py-8 text-center text-muted-foreground">
           <p>Could not load messages.</p>
         </CardContent>
-      </Card>
+      </GlassCard>
     )
   }
 
   return (
-    <Card className="border-border">
+    <GlassCard className="border-border">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="flex items-center gap-2 text-lg font-semibold">
           <MessageCircle className="h-5 w-5 text-primary" />
@@ -89,6 +90,6 @@ export function MessagesPanel() {
           </div>
         ))}
       </CardContent>
-    </Card>
+    </GlassCard>
   )
 }

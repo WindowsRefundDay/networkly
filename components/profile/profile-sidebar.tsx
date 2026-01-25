@@ -21,6 +21,7 @@ interface ProfileSidebarProps {
   linkedinUrl?: string | null
   githubUrl?: string | null
   portfolioUrl?: string | null
+  showStrength?: boolean
 }
 
 function getProfileTip(strength: number): string {
@@ -36,7 +37,8 @@ export function ProfileSidebar({
   profileStrength = 0, 
   linkedinUrl, 
   githubUrl, 
-  portfolioUrl 
+  portfolioUrl,
+  showStrength = true
 }: ProfileSidebarProps) {
   const router = useRouter()
 
@@ -46,37 +48,39 @@ export function ProfileSidebar({
 
   return (
     <div className="space-y-6">
-      <Card className="border-border">
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-            <TrendingUp className="h-5 w-5 text-primary" />
-            Profile Strength
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-2xl font-bold text-foreground">{profileStrength}%</span>
-            <span className={`text-sm font-medium ${
-              profileStrength >= 80 ? "text-green-500" : 
-              profileStrength >= 50 ? "text-amber-500" : 
-              "text-red-500"
-            }`}>
-              {profileStrength >= 80 ? "Strong" : profileStrength >= 50 ? "Good" : "Needs Work"}
-            </span>
-          </div>
-          <Progress value={profileStrength} className="h-2" />
-          <p className="text-xs text-muted-foreground">{getProfileTip(profileStrength)}</p>
-          <Button 
-            size="sm" 
-            variant="outline"
-            className="w-full gap-1"
-            onClick={handleImproveProfile}
-          >
-            <Settings className="h-4 w-4" />
-            Improve Profile
-          </Button>
-        </CardContent>
-      </Card>
+      {showStrength && (
+        <Card className="border-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              Profile Strength
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-2xl font-bold text-foreground">{profileStrength}%</span>
+              <span className={`text-sm font-medium ${
+                profileStrength >= 80 ? "text-green-500" : 
+                profileStrength >= 50 ? "text-amber-500" : 
+                "text-red-500"
+              }`}>
+                {profileStrength >= 80 ? "Strong" : profileStrength >= 50 ? "Good" : "Needs Work"}
+              </span>
+            </div>
+            <Progress value={profileStrength} className="h-2" />
+            <p className="text-xs text-muted-foreground">{getProfileTip(profileStrength)}</p>
+            <Button 
+              size="sm" 
+              variant="outline"
+              className="w-full gap-1"
+              onClick={handleImproveProfile}
+            >
+              <Settings className="h-4 w-4" />
+              Improve Profile
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="border-border">
         <CardHeader className="pb-2">

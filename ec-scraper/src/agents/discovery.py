@@ -248,6 +248,8 @@ class DiscoveryAgent:
         negative_patterns = [
             'blog', 'news', 'article', 'reddit', 'forum',
             'facebook', 'twitter', 'linkedin', 'indeed',
+            '/blog/', '/guides/', '/guide/', '/article/', '/news/', '/post/', '/how-to/',
+            'how-to', 'ultimate-guide',
         ]
         if any(pattern in url_lower for pattern in negative_patterns):
             score -= 0.3

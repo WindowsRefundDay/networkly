@@ -32,8 +32,13 @@ class GeminiProvider(LLMProvider):
         self.model = settings.gemini_pro_model
         self.fast_model = settings.gemini_flash_model
         self._llm_timeout = settings.llm_timeout_seconds
+        self._max_retries = settings.max_retries
+        self._retry_base_delay = settings.retry_base_delay
+        self._retry_max_delay = settings.retry_max_delay
         # Track which models have failed to avoid repeated failures
         self._unavailable_models: set = set()
+        self._rate_limit_lock = asyncio.Lock()
+        self._last_request_time: float = 0.0
     
     @property
     def name(self) -> str:
@@ -56,6 +61,31 @@ class GeminiProvider(LLMProvider):
         """Check if error indicates model is unavailable."""
         error_str = str(error).lower()
         return any(msg in error_str for msg in MODEL_UNAVAILABLE_ERRORS)
+
+    def _is_rate_limit_error(self, error: Exception) -> bool:
+        """Check if error indicates rate limiting."""
+        error_str = str(error).lower()
+        return "resource_exhausted" in error_str or "429" in error_str or "rate limit" in error_str
+
+    def _get_retry_delay(self, error: Exception, attempt: int) -> float:
+        """Extract retry delay or compute exponential backoff."""
+        error_str = str(error).lower()
+        import re
+        retry_match = re.search(r'retry in (\d+(?:\.\d+)?)', error_str)
+        if retry_match:
+            return min(float(retry_match.group(1)) + 0.5, self._retry_max_delay)
+        delay = min(self._retry_base_delay * (2 ** attempt), self._retry_max_delay)
+        return delay
+
+    async def _throttle(self) -> None:
+        """Lightweight throttle to reduce bursty RPM spikes."""
+        async with self._rate_limit_lock:
+            now = asyncio.get_event_loop().time()
+            elapsed = now - self._last_request_time
+            min_interval = 1.0
+            if elapsed < min_interval:
+                await asyncio.sleep(min_interval - elapsed)
+            self._last_request_time = asyncio.get_event_loop().time()
     
     async def _generate_with_timeout(
         self,
@@ -64,17 +94,28 @@ class GeminiProvider(LLMProvider):
         cfg: GenerationConfig,
     ) -> Any:
         """Execute generation with timeout protection."""
-        return await asyncio.wait_for(
-            self.client.aio.models.generate_content(
-                model=model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    temperature=cfg.temperature,
-                    max_output_tokens=cfg.max_output_tokens,
-                ),
-            ),
-            timeout=self._llm_timeout,
-        )
+        last_error: Exception | None = None
+        for attempt in range(self._max_retries + 1):
+            try:
+                await self._throttle()
+                return await asyncio.wait_for(
+                    self.client.aio.models.generate_content(
+                        model=model,
+                        contents=prompt,
+                        config=types.GenerateContentConfig(
+                            temperature=cfg.temperature,
+                            max_output_tokens=cfg.max_output_tokens,
+                        ),
+                    ),
+                    timeout=self._llm_timeout,
+                )
+            except Exception as e:
+                last_error = e
+                if self._is_rate_limit_error(e) and attempt < self._max_retries:
+                    await asyncio.sleep(self._get_retry_delay(e, attempt))
+                    continue
+                raise
+        raise last_error
     
     async def _generate_structured_with_timeout(
         self,
@@ -84,19 +125,30 @@ class GeminiProvider(LLMProvider):
         cfg: GenerationConfig,
     ) -> Any:
         """Execute structured generation with timeout protection."""
-        return await asyncio.wait_for(
-            self.client.aio.models.generate_content(
-                model=model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=schema,
-                    temperature=cfg.temperature,
-                    max_output_tokens=cfg.max_output_tokens,
-                ),
-            ),
-            timeout=self._llm_timeout,
-        )
+        last_error: Exception | None = None
+        for attempt in range(self._max_retries + 1):
+            try:
+                await self._throttle()
+                return await asyncio.wait_for(
+                    self.client.aio.models.generate_content(
+                        model=model,
+                        contents=prompt,
+                        config=types.GenerateContentConfig(
+                            response_mime_type="application/json",
+                            response_schema=schema,
+                            temperature=cfg.temperature,
+                            max_output_tokens=cfg.max_output_tokens,
+                        ),
+                    ),
+                    timeout=self._llm_timeout,
+                )
+            except Exception as e:
+                last_error = e
+                if self._is_rate_limit_error(e) and attempt < self._max_retries:
+                    await asyncio.sleep(self._get_retry_delay(e, attempt))
+                    continue
+                raise
+        raise last_error
     
     async def generate(
         self,

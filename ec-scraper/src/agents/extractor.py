@@ -9,6 +9,7 @@ from ..db.models import (
     OpportunityCard,
     OpportunityCategory,
     OpportunityType,
+    ContentType,
     ExtractionResponse,
     ExtractionResult,
     LocationType,
@@ -27,6 +28,8 @@ VALIDATION RULES (Set valid=false only if):
 - This is a ranking article listing MULTIPLE different programs (e.g. "Top 10 Internships", "15 Best Scholarships")
 - This is a general directory or aggregator page without specific application details for a SINGLE program
 - This is strictly a forum discussion (Reddit/Quora)
+- This is a guide or advice article about opportunities (e.g. "How to get a summer internship")
+- This is news/blog content discussing opportunities but not hosting or describing a specific program page
 - This is clearly for Graduate/PhD students only (not High School)
 - This is a 404 error page or "page not found"
 
@@ -38,9 +41,14 @@ ACCEPTABLE CONTENT (Set valid=true):
 - "About" pages for specific organizations/clubs
 
 EXTRACTION INSTRUCTIONS:
-1. Extract the MAIN opportunity described on the page.
+1. Classify the content_type:
+   - opportunity: official program page, application page, competition homepage, scholarship listing
+   - guide: how-to articles, advice posts, "ultimate guide" content
+   - article: news/blog coverage, announcements without program details
 
-2. **DATE EXTRACTION IS CRITICAL** - Search extensively for dates in these formats:
+2. Extract the MAIN opportunity described on the page ONLY if content_type=opportunity.
+
+3. **DATE EXTRACTION IS CRITICAL** - Search extensively for dates in these formats:
    - Application deadline: "Apply by March 15, 2026", "Deadline: 3/15/26", "Applications due March 15"
    - Program dates: "June 1 - August 15", "Summer 2026", "July 2026"
    - Start/End dates: "Program runs June-August", "Begins Summer 2026"
@@ -49,15 +57,15 @@ EXTRACTION INSTRUCTIONS:
    - If NO specific date found but it's a summer program, infer: June 1 - August 15 for start/end
    - If scholarship with no deadline, check for "rolling" or "annual deadline"
 
-3. If you find dates, extract ALL of them:
+4. If you find dates, extract ALL of them:
    - deadline: Application deadline in YYYY-MM-DD format
    - start_date: When program/opportunity begins in YYYY-MM-DD format  
    - end_date: When program/opportunity ends in YYYY-MM-DD format
 
-4. Check if dates are in the PAST (e.g., 2025 or earlier when current year is 2026):
+5. Check if dates are in the PAST (e.g., 2025 or earlier when current year is 2026):
    - If so, set appears_expired=true
 
-5. TIMING CLASSIFICATION:
+6. TIMING CLASSIFICATION:
    - "one-time": Single event, won't recur (e.g., specific workshop with fixed date)
    - "annual": Happens every year (e.g., Science Olympiad, annual hackathons, yearly contests, annual scholarships)
    - "recurring": Regular schedule (monthly meetings, quarterly programs)
@@ -65,13 +73,13 @@ EXTRACTION INSTRUCTIONS:
    - "ongoing": Always open (e.g., volunteer positions, club membership)
    - "seasonal": Seasonal pattern (summer programs, winter camps)
 
-6. For annual/recurring opportunities where appears_expired=true, the program will run again next year.
+7. For annual/recurring opportunities where appears_expired=true, the program will run again next year.
 
-7. For grade_levels, infer from "High School", "Secondary School", "9th-12th grade" -> [9, 10, 11, 12]
+8. For grade_levels, infer from "High School", "Secondary School", "9th-12th grade" -> [9, 10, 11, 12]
 
-8. Use "Other" category if it doesn't fit perfectly, but provide a specific suggested_category.
+9. Use "Other" category if it doesn't fit perfectly, but provide a specific suggested_category.
 
-9. Set confidence based on completeness:
+10. Set confidence based on completeness:
    - 0.9+: Full details with specific dates, requirements, application info
    - 0.7-0.8: Good details, missing some dates or specifics
    - 0.5-0.6: Basic info, missing important details like dates or requirements
@@ -199,6 +207,14 @@ class ExtractorAgent:
                 raw_content=truncated_content[:500],
             )
 
+        content_type = (data.get("content_type") or "opportunity").lower()
+        if content_type != ContentType.OPPORTUNITY.value:
+            return ExtractionResult(
+                success=False,
+                error=f"Rejected: content_type={content_type}",
+                raw_content=truncated_content[:500],
+            )
+        
         # Build Opportunity Card from the extracted data
         opportunity_card = self._build_opportunity_card(data, url, source_url)
         
@@ -290,12 +306,19 @@ class ExtractorAgent:
         # Ensure all grade levels are integers
         grade_levels = [int(g) for g in grade_levels if isinstance(g, (int, float)) or (isinstance(g, str) and g.isdigit())]
 
+        content_type_str = (data.get("content_type") or ContentType.OPPORTUNITY.value).lower()
+        try:
+            content_type = ContentType(content_type_str)
+        except ValueError:
+            content_type = ContentType.OPPORTUNITY
+
         return OpportunityCard(
             url=url,
             source_url=source_url,
             title=data.get("title") or "Unknown Opportunity",
             summary=data.get("summary") or "No summary available",
             organization=data.get("organization"),
+            content_type=content_type,
             category=category,
             suggested_category=suggested_category,
             opportunity_type=opportunity_type,

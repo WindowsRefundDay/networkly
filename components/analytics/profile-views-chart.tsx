@@ -1,5 +1,6 @@
 "use client"
 
+import { GlassCard } from "@/components/ui/glass-card"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
 
@@ -9,7 +10,7 @@ interface ProfileViewsChartProps {
 
 export function ProfileViewsChart({ data = [] }: ProfileViewsChartProps) {
   return (
-    <Card className="border-border">
+    <GlassCard className="border-border">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg font-semibold">Profile Views</CardTitle>
         <p className="text-sm text-muted-foreground">Last 7 days</p>
@@ -47,7 +48,7 @@ export function ProfileViewsChart({ data = [] }: ProfileViewsChartProps) {
           </ResponsiveContainer>
         </div>
       </CardContent>
-    </Card>
+    </GlassCard>
   )
 }
 

@@ -18,7 +18,7 @@ export function GlassCard({
   className,
   children,
   glow = false,
-  hover = true,
+  hover = false,
 }: GlassCardProps) {
   const variants = {
     default: 'backdrop-blur-md bg-background/40 border-border/20',

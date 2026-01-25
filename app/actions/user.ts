@@ -1,6 +1,8 @@
 "use server"
 
 import { cache } from "react"
+import { revalidatePath } from "next/cache"
+import { z } from "zod"
 
 import { createClient, requireAuth } from "@/lib/supabase/server"
 
@@ -204,18 +206,36 @@ export async function getUserProfile() {
   const {
     data: { user: authUser },
   } = await supabase.auth.getUser()
-  if (!authUser) return null
+  
+  // Debug logging
+  console.log("[getUserProfile] Auth user ID:", authUser?.id || "NOT AUTHENTICATED")
+  
+  if (!authUser) {
+    console.log("[getUserProfile] No authenticated user, returning null")
+    return null
+  }
 
-  const { data: userProfile } = await supabase
+  const { data: userProfile, error } = await supabase
     .from("user_profiles")
     .select("*")
     .eq("user_id", authUser.id)
     .single()
 
-  if (!userProfile) return null
+  // Debug logging
+  console.log("[getUserProfile] Query for user_id:", authUser.id)
+  console.log("[getUserProfile] Result:", userProfile ? "FOUND" : "NOT FOUND")
+  if (error) {
+    console.log("[getUserProfile] Error:", error.message, error.code)
+  }
+
+  if (!userProfile) {
+    console.log("[getUserProfile] No profile found for user:", authUser.id)
+    return null
+  }
 
   return {
     id: userProfile.id,
+    user_id: userProfile.user_id,
     school: userProfile.school,
     grade_level: userProfile.grade_level,
     interests: userProfile.interests,
@@ -225,4 +245,82 @@ export async function getUserProfile() {
     academic_strengths: userProfile.academic_strengths,
     availability: userProfile.availability,
   }
+}
+
+// ============================================================================
+// USER PROFILE DETAILS UPDATE ACTION
+// ============================================================================
+
+const userProfileDetailsSchema = z.object({
+  school: z.string().max(100).optional().nullable(),
+  grade_level: z.number().int().min(9).max(12).optional().nullable(),
+  interests: z.array(z.string().max(50)).max(20).optional(),
+  location: z.string().max(100).optional().nullable(),
+  career_goals: z.string().max(500).optional().nullable(),
+  preferred_opportunity_types: z.array(z.string()).max(10).optional(),
+  academic_strengths: z.array(z.string()).max(15).optional(),
+  availability: z.string().max(50).optional().nullable(),
+})
+
+export type UpdateUserProfileDetailsInput = z.infer<typeof userProfileDetailsSchema>
+
+export async function updateUserProfileDetails(data: UpdateUserProfileDetailsInput) {
+  const authUser = await requireAuth()
+  const supabase = await createClient()
+
+  const validatedData = userProfileDetailsSchema.parse(data)
+
+  // Check if profile exists
+  const { data: existingProfile } = await supabase
+    .from("user_profiles")
+    .select("id")
+    .eq("user_id", authUser.id)
+    .single()
+
+  const profileData = {
+    user_id: authUser.id,
+    school: validatedData.school ?? null,
+    grade_level: validatedData.grade_level ?? null,
+    interests: validatedData.interests ?? [],
+    location: validatedData.location ?? null,
+    career_goals: validatedData.career_goals ?? null,
+    preferred_opportunity_types: validatedData.preferred_opportunity_types ?? [],
+    academic_strengths: validatedData.academic_strengths ?? [],
+    availability: validatedData.availability ?? null,
+    updated_at: new Date().toISOString(),
+  }
+
+  let result
+  if (existingProfile) {
+    // Update existing profile
+    const { data: updated, error } = await supabase
+      .from("user_profiles")
+      .update(profileData)
+      .eq("user_id", authUser.id)
+      .select()
+      .single()
+
+    if (error) {
+      console.error("[updateUserProfileDetails] Update error:", error)
+      throw new Error("Failed to update profile details")
+    }
+    result = updated
+  } else {
+    // Insert new profile
+    const { data: inserted, error } = await supabase
+      .from("user_profiles")
+      .insert(profileData)
+      .select()
+      .single()
+
+    if (error) {
+      console.error("[updateUserProfileDetails] Insert error:", error)
+      throw new Error("Failed to create profile details")
+    }
+    result = inserted
+  }
+
+  revalidatePath("/profile")
+  revalidatePath("/opportunities")
+  return result
 }

@@ -309,6 +309,14 @@ class URLCache:
         # Use upsert for batch insert/update
         client.table("url_cache").upsert(records, on_conflict="url").execute()
 
+    def delete_urls(self, urls: List[str]) -> int:
+        """Delete specific URLs from cache."""
+        if not urls:
+            return 0
+        client = self._get_client()
+        result = client.table("url_cache").delete().in_("url", urls).execute()
+        return len(result.data) if result.data else 0
+
 
 # Singleton
 _cache_instance: Optional[URLCache] = None

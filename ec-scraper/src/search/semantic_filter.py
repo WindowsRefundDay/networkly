@@ -30,6 +30,12 @@ university pre-college summer program admissions deadline
 coding bootcamp hackathon for teenage developers
 """
 
+GUIDE_HINTS = [
+    "guide", "guides", "how to", "step-by-step", "tips for", "tips to",
+    "ultimate guide", "best ", "top ", "list of", "article", "blog",
+    "resource", "resources", "2026 guide",
+]
+
 
 class SemanticFilter:
     """Filter search results using embedding similarity.
@@ -116,6 +122,16 @@ class SemanticFilter:
         # Dot product gives cosine similarity
         similarities = emb_matrix @ ref_normalized
         return similarities.tolist()
+
+    def _guide_penalty(self, title: str, snippet: str) -> float:
+        """Penalty for likely guide/article results based on text signals."""
+        text = f"{title} {snippet}".lower()
+        penalty = 0.0
+        if any(hint in text for hint in GUIDE_HINTS):
+            penalty += 0.05
+        if any(hint in text for hint in ["ultimate guide", "how to", "step-by-step", "tips for", "tips to"]):
+            penalty += 0.08
+        return min(penalty, 0.15)
     
     async def filter_results(
         self,
@@ -181,8 +197,9 @@ class SemanticFilter:
             scored_results = []
             for i, (url, title, snippet) in enumerate(results):
                 similarity = similarities[i]
-                if similarity >= threshold:
-                    scored_results.append((url, similarity, title))
+                adjusted_similarity = similarity - self._guide_penalty(title, snippet)
+                if adjusted_similarity >= threshold:
+                    scored_results.append((url, adjusted_similarity, title))
             
             # Sort by similarity descending
             scored_results.sort(key=lambda x: x[1], reverse=True)

@@ -1,31 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion, AnimatePresence, LayoutGroup } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { Sparkles, Search, ArrowRight, Globe } from "lucide-react"
+import { Sparkles, Search, ArrowRight, Globe, TrendingUp, Zap } from "lucide-react"
 import { OpportunityCard } from "@/components/opportunities/opportunity-card"
 import { InlineDiscovery } from "@/components/discovery/inline-discovery"
-
-interface Opportunity {
-  id: string
-  title: string
-  company: string
-  location: string
-  type: string
-  matchScore: number
-  matchReasons?: string[]
-  deadline: string | null
-  postedDate: string
-  logo: string | null
-  skills: string[]
-  description: string | null
-  salary: string | null
-  duration: string | null
-  remote: boolean
-  applicants: number
-  saved: boolean
-}
+import type { Opportunity } from "@/types/opportunity"
 
 interface OpportunityListProps {
   opportunities: Opportunity[]
@@ -37,6 +18,30 @@ interface OpportunityListProps {
   isSearching?: boolean
   onSearchComplete?: () => void
   onNewOpportunity?: (card: { title: string; organization: string; type: string; location?: string }) => void
+}
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.05,
+      delayChildren: 0.08,
+    },
+  },
+}
+
+const sectionVariants = {
+  hidden: { opacity: 0, y: 16 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      type: "spring" as const,
+      stiffness: 260,
+      damping: 28,
+    },
+  },
 }
 
 export function OpportunityList({
@@ -63,27 +68,29 @@ export function OpportunityList({
     })
   }
 
-  // Group opportunities
   const featured = opportunities.filter(o => o.matchScore >= 85).slice(0, 3)
   const recommended = opportunities.filter(o => o.matchScore >= 60 && o.matchScore < 85 && !featured.find(f => f.id === o.id)).slice(0, 6)
   const newest = opportunities.filter(o => !featured.find(f => f.id === o.id) && !recommended.find(r => r.id === o.id))
 
-  const container = {
-    hidden: { opacity: 0 },
-    show: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1
-      }
-    }
-  }
-
-  // Empty state with search option
   if (opportunities.length === 0 && !isSearching) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <div className="h-20 w-20 rounded-full bg-muted/50 flex items-center justify-center mb-6">
-          <Sparkles className="h-10 w-10 text-muted-foreground/50" />
+      <motion.div 
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ type: "spring", stiffness: 260, damping: 28 }}
+        className="flex flex-col items-center justify-center py-20 text-center"
+      >
+        <div className="relative">
+          <div className="h-24 w-24 rounded-full bg-gradient-to-br from-muted/80 to-muted/40 flex items-center justify-center mb-6 shadow-inner">
+            <Sparkles className="h-12 w-12 text-muted-foreground/40" />
+          </div>
+          <motion.div
+            className="absolute -top-1 -right-1 h-6 w-6 rounded-full bg-primary/20 flex items-center justify-center"
+            animate={{ scale: [1, 1.15, 1] }}
+            transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <Search className="h-3 w-3 text-primary" />
+          </motion.div>
         </div>
         <h3 className="text-xl font-semibold text-foreground mb-2">No opportunities found</h3>
         <p className="text-muted-foreground max-w-sm mx-auto mb-6">
@@ -93,29 +100,42 @@ export function OpportunityList({
           }
         </p>
         
-        {/* Show search button when there's a query */}
         {searchQuery && searchQuery.length >= 3 && onSearchMore && (
-          <Button 
-            size="lg" 
-            className="gap-2 h-12 px-8"
-            onClick={() => onSearchMore(searchQuery)}
+          <motion.div 
+            whileHover={{ scale: 1.02 }} 
+            whileTap={{ scale: 0.98 }}
+            transition={{ type: "spring", stiffness: 400, damping: 25 }}
           >
-            <Globe className="h-4 w-4" />
-            Search Web for "{searchQuery}"
-            <ArrowRight className="h-4 w-4 ml-2" />
-          </Button>
+            <Button 
+              size="lg" 
+              className="gap-2 h-12 px-8 shadow-lg shadow-primary/20"
+              onClick={() => onSearchMore(searchQuery)}
+            >
+              <Globe className="h-4 w-4" />
+              Search Web for "{searchQuery}"
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+          </motion.div>
         )}
-      </div>
+      </motion.div>
     )
   }
 
-  // Searching state - show inline discovery
   if (isSearching && searchQuery) {
     return (
       <div className="space-y-6">
-        <section>
+        <motion.section
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        >
           <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-            <Globe className="h-5 w-5 text-primary animate-pulse" />
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+            >
+              <Globe className="h-5 w-5 text-primary" />
+            </motion.div>
             Live Discovery
           </h2>
           <InlineDiscovery
@@ -124,17 +144,21 @@ export function OpportunityList({
             onComplete={onSearchComplete || (() => {})}
             onNewOpportunity={onNewOpportunity}
           />
-        </section>
+        </motion.section>
         
-        {/* Show existing results below if any */}
         {opportunities.length > 0 && (
-          <section className="pt-6 border-t border-border">
+          <motion.section 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.15 }}
+            className="pt-6 border-t border-border"
+          >
             <h2 className="text-lg font-semibold text-foreground mb-4">Cached Results</h2>
             <motion.div 
-              variants={container}
+              variants={containerVariants}
               initial="hidden"
-              animate="show"
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+              animate="visible"
+              className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5"
             >
               {opportunities.map((opp) => (
                 <OpportunityCard
@@ -147,7 +171,7 @@ export function OpportunityList({
                 />
               ))}
             </motion.div>
-          </section>
+          </motion.section>
         )}
       </div>
     )
@@ -156,101 +180,145 @@ export function OpportunityList({
   return (
     <div className="space-y-10 pb-20">
       
-      {/* Featured Section - Only show if high matches exist */}
       {featured.length > 0 && (
-        <section>
-          <div className="flex items-center justify-between mb-4">
-             <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
-               <Sparkles className="h-5 w-5 text-amber-500" />
-               Top Matches for You
-             </h2>
-          </div>
-          <motion.div 
-            variants={container}
+          <motion.section
+            variants={sectionVariants}
             initial="hidden"
-            animate="show"
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+            animate="visible"
           >
-            {featured.map((opp) => (
-              <OpportunityCard
-                key={opp.id}
-                opportunity={opp}
-                isSelected={selectedId === opp.id}
-                onSelect={onSelect}
-                onToggleSave={handleToggleSave}
-                saving={savingIds.has(opp.id)}
-              />
-            ))}
-          </motion.div>
-        </section>
-      )}
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/20">
+                  <Sparkles className="h-5 w-5 text-amber-500" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-foreground">Top Matches</h2>
+                  <p className="text-sm text-muted-foreground">Opportunities that best match your profile</p>
+                </div>
+              </div>
+              <div className="hidden sm:flex items-center gap-1.5 text-sm text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-full">
+                <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+                85%+ match score
+              </div>
+            </div>
+            <motion.div 
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5"
+            >
+              {featured.map((opp) => (
+                <OpportunityCard
+                  key={opp.id}
+                  opportunity={opp}
+                  isSelected={selectedId === opp.id}
+                  onSelect={onSelect}
+                  onToggleSave={handleToggleSave}
+                  saving={savingIds.has(opp.id)}
+                />
+              ))}
+            </motion.div>
+          </motion.section>
+        )}
 
-      {/* Recommended Section */}
-      {recommended.length > 0 && (
-        <section>
-          <h2 className="text-lg font-semibold text-foreground mb-4">Recommended for You</h2>
-          <motion.div 
-            variants={container}
+        {recommended.length > 0 && (
+          <motion.section
+            variants={sectionVariants}
             initial="hidden"
-            animate="show"
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+            animate="visible"
           >
-            {recommended.map((opp) => (
-              <OpportunityCard
-                key={opp.id}
-                opportunity={opp}
-                isSelected={selectedId === opp.id}
-                onSelect={onSelect}
-                onToggleSave={handleToggleSave}
-                saving={savingIds.has(opp.id)}
-              />
-            ))}
-          </motion.div>
-        </section>
-      )}
+            <div className="flex items-center gap-3 mb-5">
+              <div className="p-2 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-500/20">
+                <Zap className="h-5 w-5 text-blue-500" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">Recommended for You</h2>
+                <p className="text-sm text-muted-foreground">Good opportunities based on your interests</p>
+              </div>
+            </div>
+            <motion.div 
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5"
+            >
+              {recommended.map((opp) => (
+                <OpportunityCard
+                  key={opp.id}
+                  opportunity={opp}
+                  isSelected={selectedId === opp.id}
+                  onSelect={onSelect}
+                  onToggleSave={handleToggleSave}
+                  saving={savingIds.has(opp.id)}
+                />
+              ))}
+            </motion.div>
+          </motion.section>
+        )}
 
-      {/* Newest / Remaining */}
-      {newest.length > 0 && (
-        <section>
-          <h2 className="text-lg font-semibold text-foreground mb-4">Newest Opportunities</h2>
-          <motion.div 
-            variants={container}
+        {newest.length > 0 && (
+          <motion.section
+            variants={sectionVariants}
             initial="hidden"
-            animate="show"
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+            animate="visible"
           >
-            {newest.map((opp) => (
-              <OpportunityCard
-                key={opp.id}
-                opportunity={opp}
-                isSelected={selectedId === opp.id}
-                onSelect={onSelect}
-                onToggleSave={handleToggleSave}
-                saving={savingIds.has(opp.id)}
-              />
-            ))}
-          </motion.div>
-        </section>
-      )}
+            <div className="flex items-center gap-3 mb-5">
+              <div className="p-2 rounded-xl bg-gradient-to-br from-slate-500/20 to-gray-500/20">
+                <Search className="h-5 w-5 text-slate-500" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">Browse All</h2>
+                <p className="text-sm text-muted-foreground">{newest.length} more opportunities to explore</p>
+              </div>
+            </div>
+            <motion.div 
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5"
+            >
+              {newest.map((opp) => (
+                <OpportunityCard
+                  key={opp.id}
+                  opportunity={opp}
+                  isSelected={selectedId === opp.id}
+                  onSelect={onSelect}
+                  onToggleSave={handleToggleSave}
+                  saving={savingIds.has(opp.id)}
+                />
+              ))}
+            </motion.div>
+          </motion.section>
+        )}
 
-      {/* Load More Action - Show when there are results and a search query */}
-      {onSearchMore && searchQuery && searchQuery.length >= 3 && (
-        <div className="flex flex-col items-center justify-center pt-8 border-t border-border">
-          <p className="text-muted-foreground mb-4">
-            Showing {opportunities.length} results from our database
-          </p>
-          <Button 
-            variant="outline" 
-            size="lg" 
-            className="gap-2 h-12 px-8"
-            onClick={() => onSearchMore(searchQuery)}
+        {onSearchMore && searchQuery && searchQuery.length >= 3 && (
+          <motion.div 
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, type: "spring", stiffness: 260, damping: 28 }}
+            className="flex flex-col items-center justify-center pt-8 border-t border-border"
           >
-            <Search className="h-4 w-4" />
-            Scan Web for More Matches
-            <ArrowRight className="h-4 w-4 ml-2 opacity-50" />
-          </Button>
-        </div>
-      )}
+            <p className="text-muted-foreground mb-4">
+              Showing {opportunities.length} results from our database
+            </p>
+            <motion.div 
+              whileHover={{ scale: 1.02 }} 
+              whileTap={{ scale: 0.98 }}
+              transition={{ type: "spring", stiffness: 400, damping: 25 }}
+            >
+              <Button 
+                variant="outline" 
+                size="lg" 
+                className="gap-2 h-12 px-8"
+                onClick={() => onSearchMore(searchQuery)}
+              >
+                <Search className="h-4 w-4" />
+                Scan Web for More Matches
+                <ArrowRight className="h-4 w-4 ml-2 opacity-50" />
+              </Button>
+            </motion.div>
+          </motion.div>
+        )}
     </div>
   )
 }

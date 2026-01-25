@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { GlassCard } from "@/components/ui/glass-card"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Sparkles, TrendingUp, Target, Users, Lightbulb, ArrowRight, Loader2 } from "lucide-react"
@@ -33,7 +34,7 @@ export function AIInsights() {
 
   if (loading) {
     return (
-      <Card className="border-border">
+      <GlassCard className="border-border">
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-lg font-semibold">
             <Sparkles className="h-5 w-5 text-primary" />
@@ -46,13 +47,13 @@ export function AIInsights() {
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         </CardContent>
-      </Card>
+      </GlassCard>
     )
   }
 
   if (insights.length === 0) {
     return (
-      <Card className="border-border">
+      <GlassCard className="border-border">
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-lg font-semibold">
             <Sparkles className="h-5 w-5 text-primary" />
@@ -65,12 +66,12 @@ export function AIInsights() {
             Keep using Networkly to get personalized insights!
           </p>
         </CardContent>
-      </Card>
+      </GlassCard>
     )
   }
 
   return (
-    <Card className="border-border">
+    <GlassCard className="border-border">
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-lg font-semibold">
           <Sparkles className="h-5 w-5 text-primary" />
@@ -101,6 +102,6 @@ export function AIInsights() {
           )
         })}
       </CardContent>
-    </Card>
+    </GlassCard>
   )
 }

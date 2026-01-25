@@ -11,6 +11,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
+from collections import Counter
 from dotenv import load_dotenv
 
 # Load env first
@@ -30,7 +31,7 @@ from src.config import get_settings, get_discovery_profile, QUICK_PROFILE
 from src.embeddings import get_embeddings
 from src.db.vector_db import get_vector_db
 from src.db.url_cache import get_url_cache
-from src.db.models import OpportunityTiming
+from src.db.models import OpportunityTiming, ContentType
 
 
 def emit_event(type: str, data: dict):
@@ -63,12 +64,12 @@ async def fetch_user_profile(user_profile_id: str, db_url: str) -> Optional[Dict
         conn = await asyncpg.connect(db_url, ssl=ssl_context)
         
         try:
-            # Query user profile from database
-            # First try UserProfile table, then fall back to User table
+            # Query user profile from database using Supabase table names
+            # First try user_profiles table, then fall back to users table
             profile_row = await conn.fetchrow('''
                 SELECT 
                     up.id,
-                    up."userId",
+                    up.user_id,
                     up.interests,
                     up.location,
                     up.grade_level,
@@ -77,14 +78,14 @@ async def fetch_user_profile(user_profile_id: str, db_url: str) -> Optional[Dict
                     up.academic_strengths,
                     up.availability,
                     u.name
-                FROM "UserProfile" up
-                JOIN "User" u ON up."userId" = u.id
-                WHERE up."userId" = $1
+                FROM user_profiles up
+                JOIN users u ON up.user_id = u.id
+                WHERE up.user_id = $1
             ''', user_profile_id)
             
             if profile_row:
                 return {
-                    "user_id": profile_row["userId"],
+                    "user_id": profile_row["user_id"],
                     "name": profile_row["name"],
                     "interests": profile_row["interests"] or [],
                     "location": profile_row["location"] or "Any",
@@ -95,10 +96,10 @@ async def fetch_user_profile(user_profile_id: str, db_url: str) -> Optional[Dict
                     "availability": profile_row["availability"] or "Flexible",
                 }
             
-            # If no UserProfile, try to get basic user info
+            # If no user_profiles, try to get basic user info from users table
             user_row = await conn.fetchrow('''
                 SELECT id, name, headline, location
-                FROM "User"
+                FROM users
                 WHERE id = $1
             ''', user_profile_id)
             
@@ -126,7 +127,14 @@ async def fetch_user_profile(user_profile_id: str, db_url: str) -> Optional[Dict
         return None
 
 
-async def main(query: str, user_profile_id: Optional[str] = None, profile: str = "quick"):
+async def main(
+    query: str,
+    user_profile_id: Optional[str] = None,
+    profile: str = "quick",
+    dry_run: bool = False,
+    ignore_cache: bool = False,
+    reset_cache: bool = False,
+):
     """
     Main discovery function.
     
@@ -148,13 +156,13 @@ async def main(query: str, user_profile_id: Optional[str] = None, profile: str =
     if db_url:
         db_url = db_url.strip().strip('"').strip("'")
     
-    if not db_url:
+    if not db_url and not dry_run:
         emit_event("error", {"message": "DATABASE_URL not found"})
         return
     
     # Fetch user profile if ID provided
     user_profile = None
-    if user_profile_id:
+    if user_profile_id and db_url:
         emit_event("plan", {"message": "Fetching user profile for personalized discovery..."})
         user_profile = await fetch_user_profile(user_profile_id, db_url)
         if user_profile:
@@ -176,13 +184,15 @@ async def main(query: str, user_profile_id: Optional[str] = None, profile: str =
     crawler = get_hybrid_crawler()
     extractor = get_extractor()
     url_cache = get_url_cache()
-    sync = PostgresSync(db_url)
-    await sync.connect()
+    sync = None
+    if not dry_run:
+        sync = PostgresSync(db_url)
+        await sync.connect()
 
     # Initialize embeddings and vector DB (only if enabled - uses Google Gemini embeddings)
     embeddings = None
     vector_db = None
-    if settings.use_embeddings:
+    if settings.use_embeddings and not dry_run:
         try:
             embeddings = get_embeddings()
             vector_db = get_vector_db()
@@ -340,8 +350,13 @@ async def main(query: str, user_profile_id: Optional[str] = None, profile: str =
     # Get just the URLs (already sorted by relevance score)
     filtered_urls = [url for url, score in semantic_scored_urls]
     
+    # Optionally reset cache entries for this batch
+    if reset_cache:
+        deleted_count = url_cache.delete_urls(filtered_urls)
+        emit_event("cache_reset", {"count": deleted_count})
+
     # Filter out already-seen URLs using cache (check within last 7 days)
-    unseen_urls = url_cache.filter_unseen(filtered_urls, within_days=7)
+    unseen_urls = filtered_urls if ignore_cache else url_cache.filter_unseen(filtered_urls, within_days=7)
     
     # Use profile settings for max URLs (personalized gets slightly fewer)
     max_urls = min(discovery_profile.max_crawl_urls, 25 if user_profile else discovery_profile.max_crawl_urls)
@@ -384,15 +399,38 @@ async def main(query: str, user_profile_id: Optional[str] = None, profile: str =
     # Filter successful crawls and extract in parallel
     extraction_semaphore = asyncio.Semaphore(8)
     extraction_count = [0]  # Use list for mutable counter in closure
+    rejection_counts = Counter()
+    rejection_lock = asyncio.Lock()
+
+    async def log_rejection(
+        reason: str,
+        url: str,
+        title: Optional[str] = None,
+        content_type: Optional[str] = None,
+        confidence: Optional[float] = None,
+        error: Optional[str] = None,
+    ) -> None:
+        async with rejection_lock:
+            rejection_counts[reason] += 1
+        emit_event("rejected", {
+            "url": url,
+            "reason": reason,
+            "title": title,
+            "content_type": content_type,
+            "confidence": confidence,
+            "error": error,
+        })
     
     async def extract_and_save(crawl_result) -> dict | None:
         if not crawl_result.success:
             url_cache.mark_seen(crawl_result.url, "failed", expires_days=7, notes=crawl_result.error)
+            await log_rejection("crawl_failed", crawl_result.url, error=crawl_result.error)
             return {"error": f"Crawl failed: {crawl_result.error}", "url": crawl_result.url}
         
         content_len = len(crawl_result.markdown or '')
         if content_len < 100:
             url_cache.mark_seen(crawl_result.url, "invalid", expires_days=30, notes="Content too short")
+            await log_rejection("content_too_short", crawl_result.url)
             return {"error": f"Content too short: {content_len} chars", "url": crawl_result.url}
         
         async with extraction_semaphore:
@@ -400,33 +438,84 @@ async def main(query: str, user_profile_id: Optional[str] = None, profile: str =
                 extraction = await extractor.extract(crawl_result.markdown, crawl_result.url)
                 if not extraction.success:
                     url_cache.mark_seen(crawl_result.url, "failed", expires_days=14, notes=extraction.error)
+                    await log_rejection("extraction_failed", crawl_result.url, error=extraction.error)
                     return {"error": f"Extraction failed: {extraction.error}", "url": crawl_result.url}
                 
                 opp = extraction.opportunity_card
                 if not opp:
                     url_cache.mark_seen(crawl_result.url, "invalid", expires_days=30, notes="No card extracted")
+                    await log_rejection("no_card", crawl_result.url)
                     return {"error": "No card extracted", "url": crawl_result.url}
                 
+                # Skip guide/article content types
+                if opp.content_type != ContentType.OPPORTUNITY:
+                    url_cache.mark_seen(
+                        crawl_result.url,
+                        "blocked",
+                        expires_days=90,
+                        notes=f"Content type: {opp.content_type.value}",
+                    )
+                    await log_rejection(
+                        "content_type",
+                        crawl_result.url,
+                        title=opp.title,
+                        content_type=opp.content_type.value,
+                        confidence=extraction.confidence,
+                    )
+                    return {"error": f"Non-opportunity content: {opp.content_type.value}", "url": crawl_result.url}
+
                 # Skip low-confidence extractions
                 confidence = extraction.confidence or 0.0
                 if confidence < 0.4:
                     url_cache.mark_seen(crawl_result.url, "low_confidence", expires_days=30, notes=f"Confidence: {confidence:.2f}")
+                    await log_rejection(
+                        "low_confidence",
+                        crawl_result.url,
+                        title=opp.title,
+                        content_type=opp.content_type.value,
+                        confidence=confidence,
+                    )
                     return {"error": f"Low confidence: {confidence:.2f}", "url": crawl_result.url}
                 
                 # Skip generic/invalid extractions
                 if opp.title == "Unknown Opportunity" or opp.organization in ["Unknown", None, ""]:
                     url_cache.mark_seen(crawl_result.url, "invalid", expires_days=30, notes="Generic extraction")
+                    await log_rejection(
+                        "generic_extraction",
+                        crawl_result.url,
+                        title=opp.title,
+                        content_type=opp.content_type.value,
+                        confidence=confidence,
+                    )
                     return {"error": "Generic extraction", "url": crawl_result.url}
                 
                 # Skip ranking/list articles (common noise)
                 title_lower = opp.title.lower()
-                if any(skip in title_lower for skip in ['best ', 'top ', 'ranking', 'list of']):
+                guide_signals = [
+                    'best ', 'top ', 'ranking', 'list of',
+                    'ultimate guide', 'guide to', 'how to', 'tips for', 'tips to',
+                ]
+                if any(skip in title_lower for skip in guide_signals):
                     url_cache.mark_seen(crawl_result.url, "blocked", expires_days=90, notes="Ranking article")
+                    await log_rejection(
+                        "guide_title",
+                        crawl_result.url,
+                        title=opp.title,
+                        content_type=opp.content_type.value,
+                        confidence=confidence,
+                    )
                     return {"error": f"Ranking article: {opp.title}", "url": crawl_result.url}
                 
                 # Time-based filtering
                 if opp.is_expired and opp.timing_type == OpportunityTiming.ONE_TIME:
                     url_cache.mark_seen(crawl_result.url, "expired", expires_days=365, notes="Expired one-time")
+                    await log_rejection(
+                        "expired_one_time",
+                        crawl_result.url,
+                        title=opp.title,
+                        content_type=opp.content_type.value,
+                        confidence=confidence,
+                    )
                     return {"error": f"Expired one-time opportunity", "url": crawl_result.url}
                 
                 # For expired recurring/annual opportunities, set priority recheck
@@ -434,7 +523,8 @@ async def main(query: str, user_profile_id: Optional[str] = None, profile: str =
                     opp.recheck_days = 3
                 
                 # Sync to database (contributes to overall database)
-                await sync.upsert_opportunity(opp)
+                if sync:
+                    await sync.upsert_opportunity(opp)
                 
                 # Mark as successfully processed in cache
                 url_cache.mark_seen(crawl_result.url, "success", expires_days=opp.recheck_days, notes=opp.title)
@@ -486,6 +576,7 @@ async def main(query: str, user_profile_id: Optional[str] = None, profile: str =
                     "status": "failed",
                     "error": str(e)[:50]
                 })
+                await log_rejection("exception", crawl_result.url, error=str(e)[:200])
                 return {"error": str(e)[:100], "url": crawl_result.url}
     
     # Run extractions in parallel
@@ -508,20 +599,26 @@ async def main(query: str, user_profile_id: Optional[str] = None, profile: str =
         "layer": "ai_extraction",
         "stats": {"total": len(crawl_results), "completed": success_count, "failed": failed_count}
     })
+
+    emit_event("rejection_summary", {
+        "reasons": dict(rejection_counts),
+    })
     
     # DB sync layer (already done inline, just emit completion)
-    emit_event("layer_start", {"layer": "db_sync", "message": f"Syncing {success_count} opportunities..."})
-    emit_event("layer_complete", {
-        "layer": "db_sync",
-        "stats": {"inserted": success_count, "updated": 0, "skipped": failed_count}
-    })
+    if sync:
+        emit_event("layer_start", {"layer": "db_sync", "message": f"Syncing {success_count} opportunities..."})
+        emit_event("layer_complete", {
+            "layer": "db_sync",
+            "stats": {"inserted": success_count, "updated": 0, "skipped": failed_count}
+        })
     
     emit_event("complete", {
         "count": success_count,
-        "is_personalized": user_profile is not None,
+        "isPersonalized": user_profile is not None,
         "user_id": user_profile.get("user_id") if user_profile else None,
     })
-    await sync.close()
+    if sync:
+        await sync.close()
 
 
 if __name__ == "__main__":
@@ -534,11 +631,35 @@ if __name__ == "__main__":
         default="quick",
         help="Discovery profile: 'quick' for on-demand (stricter), 'daily' for batch (broader)"
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Run discovery without writing to Supabase or vector DB"
+    )
+    parser.add_argument(
+        "--ignore-cache",
+        action="store_true",
+        help="Skip URL cache filtering for this run"
+    )
+    parser.add_argument(
+        "--reset-cache",
+        action="store_true",
+        help="Delete cache entries for URLs in this run"
+    )
     
     args = parser.parse_args()
     
     try:
-        asyncio.run(main(args.query, args.user_profile_id, args.profile))
+        asyncio.run(
+            main(
+                args.query,
+                args.user_profile_id,
+                args.profile,
+                args.dry_run,
+                args.ignore_cache,
+                args.reset_cache,
+            )
+        )
     except Exception as e:
         print(json.dumps({"type": "error", "message": str(e)}))
         sys.exit(1)
