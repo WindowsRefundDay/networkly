@@ -9,7 +9,7 @@ const STORAGE_KEY = "networkly-known-bugs-dismissed"
 const VERSION_KEY = "networkly-known-bugs-version"
 
 // Set this to false to hide the modal from all users
-const SHOW_KNOWN_BUGS_MODAL = true
+const SHOW_KNOWN_BUGS_MODAL = false
 
 export function KnownBugsModal() {
     const [isVisible, setIsVisible] = useState(false)
