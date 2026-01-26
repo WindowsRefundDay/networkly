@@ -43,8 +43,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcairo2 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy dependency files first for better layer caching
+# Copy dependency files and source code for installation
 COPY pyproject.toml README.md ./
+COPY src/ ./src/
 
 # Install Python dependencies
 RUN pip install --upgrade pip && \
@@ -55,8 +56,7 @@ RUN pip install --upgrade pip && \
 RUN playwright install chromium && \
     playwright install-deps chromium
 
-# Copy application code
-COPY src/ ./src/
+# Copy additional application files
 COPY scripts/ ./scripts/
 COPY data/ ./data/
 
