@@ -1,19 +1,17 @@
-# Known Bugs 🐛
+# Known Bugs & Updates 🐛
 
 _Last updated: 2026-01-26_
 
-## Current Issues
-
-### Important Notes
+## Current Status
 
 1. **Most of the AI functionality is not ready yet.**
-   - We're working hard to bring you the full AI-powered experience
-   
+   - We are working on integrating the full AI capabilities soon.
+
 2. **There are some UI bugs, but that will be fixed in no time.**
-   - Visual inconsistencies and layout issues are being actively addressed
-   
+   - We are aware of visual glitches and layout inconsistencies.
+
 3. **We'll work on it as soon as possible.**
-   - Your patience is appreciated as we polish the platform
+   - Our team is prioritized on stability and polish.
 
 ---
 
