@@ -19,7 +19,7 @@ class GenerationConfig:
 class LLMProvider(ABC):
     """Abstract base class for LLM providers.
     
-    Provides a unified interface for both Gemini and Groq APIs.
+    Provides a unified interface for Gemini API.
     """
     
     @property

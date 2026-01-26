@@ -80,6 +80,9 @@ const MAX_RUNNING_STATE_AGE_MS = 180_000;
 export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): UseDiscoveryLayersReturn {
   const { onOpportunityFound, onComplete, persistState = true } = options
   
+  // Track last discovery to prevent duplicate runs
+  const lastDiscoveryRef = useRef<{ query: string; startedAt: number } | null>(null)
+  
   const [state, setState] = useState<DiscoveryState | null>(() => {
     // Try to restore from storage on initial load
     if (persistState && typeof window !== 'undefined') {
@@ -521,6 +524,30 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
   }, [onOpportunityFound, onComplete])
 
   const startDiscovery = useCallback((query: string, options: { isPersonalized?: boolean, userProfileId?: string } = {}) => {
+    const normalizedQuery = query.trim().toLowerCase()
+    const now = Date.now()
+    
+    // Prevent duplicate/overlapping runs
+    // Skip if already running or if same query was started within last 30 seconds
+    if (state?.status === 'running') {
+      console.log('[Discovery] Already running, skipping duplicate start')
+      return
+    }
+    
+    if (lastDiscoveryRef.current) {
+      const { query: lastQuery, startedAt } = lastDiscoveryRef.current
+      const timeSinceStart = now - startedAt
+      const DUPLICATE_WINDOW_MS = 60_000 // 60 seconds - aggressive deduplication
+      
+      if (lastQuery === normalizedQuery && timeSinceStart < DUPLICATE_WINDOW_MS) {
+        console.log(`[Discovery] Same query started ${Math.round(timeSinceStart / 1000)}s ago, skipping duplicate`)
+        return
+      }
+    }
+    
+    // Update last discovery tracking
+    lastDiscoveryRef.current = { query: normalizedQuery, startedAt: now }
+    
     cleanup()
     
     const { isPersonalized = false, userProfileId } = options
@@ -539,8 +566,8 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
     const es = new EventSource(buildUrl())
     eventSourceRef.current = es
     
-    // Timeout after 3 minutes (aligned with server-side: 2.5 min + buffer)
-    const CLIENT_TIMEOUT_MS = 180_000; // 3 minutes
+    // Timeout after 2 minutes (aggressive timeout for quick profile optimization)
+    const CLIENT_TIMEOUT_MS = 120_000; // 2 minutes
     timeoutRef.current = setTimeout(() => {
       es.close()
       processEvent({ type: 'error', message: 'Discovery timed out' } as DiscoveryEvent)
@@ -556,10 +583,10 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
       }
     }
     
-    // Track retry attempts
+    // Track retry attempts (reduced for faster failure)
     let retryCount = 0
-    const MAX_RETRIES = 2
-    const RETRY_DELAY_MS = 2000
+    const MAX_RETRIES = 1  // Fail fast - reduced from 2
+    const RETRY_DELAY_MS = 1000  // Reduced from 2000ms
     
     es.onerror = (err) => {
       // EventSource fires onerror on connection issues

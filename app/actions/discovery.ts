@@ -72,7 +72,6 @@ export async function triggerDiscovery(
                 ...scraperEnv,
                 DATABASE_URL: process.env.DATABASE_URL || mainEnv.DATABASE_URL,
                 GOOGLE_API_KEY: scraperEnv.GOOGLE_API_KEY || process.env.GOOGLE_API_KEY,
-                GROQ_API_KEY: scraperEnv.GROQ_API_KEY || process.env.GROQ_API_KEY,
             },
         });
 
@@ -88,14 +87,14 @@ export async function triggerDiscovery(
             stderr += data.toString();
         });
 
-        // Timeout after 2.5 minutes (aligned with SSE streaming route)
+        // Timeout after 2 minutes (aggressive optimization for quick discovery)
         // Quick discovery: query gen + search + filter + crawl + extract
-        const QUICK_DISCOVERY_TIMEOUT_MS = 150_000;
+        const QUICK_DISCOVERY_TIMEOUT_MS = 120_000;
         const timeout = setTimeout(() => {
             pythonProcess.kill();
             resolve({
                 success: false,
-                message: "Discovery timed out after 2.5 minutes. Please try again.",
+                message: "Discovery timed out after 2 minutes. Please try again.",
             });
         }, QUICK_DISCOVERY_TIMEOUT_MS);
 
@@ -176,7 +175,6 @@ export async function triggerBatchDiscovery(
                 ...scraperEnv,
                 DATABASE_URL: process.env.DATABASE_URL || mainEnv.DATABASE_URL,
                 GOOGLE_API_KEY: scraperEnv.GOOGLE_API_KEY || process.env.GOOGLE_API_KEY,
-                GROQ_API_KEY: scraperEnv.GROQ_API_KEY || process.env.GROQ_API_KEY,
             },
         });
 

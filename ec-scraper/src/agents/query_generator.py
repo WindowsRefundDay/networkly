@@ -130,25 +130,20 @@ class QueryGenerator:
             # Use fast lite model for quick query generation
             config = GenerationConfig(
                 temperature=0.8,  # Higher temp for more diversity
-                max_output_tokens=500,
+                max_output_tokens=400,  # Reduced from 500 (generating fewer queries now)
                 use_fast_model=True,  # Use gemini-2.5-flash-lite
             )
             
             response = await self.provider.generate(prompt, config)
             
-            # Clean response (remove markdown if present)
-            response_text = response.strip()
-            if response_text.startswith("```"):
-                lines = response_text.split("\n")
-                # Remove first and last line (markdown fences)
-                response_text = "\n".join(lines[1:-1])
-
-            # Parse JSON (try extracting the JSON array if extra text appears)
-            queries = self._parse_json_array(response_text)
+            # Parse JSON with safe parser (handles markdown, malformed JSON, etc.)
+            queries = self._parse_json_array(response.strip())
             
-            # Validate and clean
-            if not isinstance(queries, list):
-                raise ValueError("Response is not a list")
+            # If parsing failed or returned empty list, fall back immediately
+            if not queries or not isinstance(queries, list):
+                import sys
+                sys.stderr.write(f"Query parsing returned empty list, using fallback\n")
+                return self._fallback_queries(user_query, count)
             
             # Filter and deduplicate (with near-duplicate detection)
             unique_queries = self._dedupe_queries(queries)
@@ -159,6 +154,13 @@ class QueryGenerator:
                 unique_queries,
                 target_count=count,
             )
+            
+            # If we still don't have enough queries after all this, mix in fallback
+            if len(unique_queries) < count // 2:
+                import sys
+                sys.stderr.write(f"Only got {len(unique_queries)} queries, supplementing with fallback\n")
+                fallback = self._fallback_queries(user_query, count - len(unique_queries))
+                unique_queries.extend(fallback)
             
             return unique_queries[:count]
             
@@ -187,13 +189,17 @@ class QueryGenerator:
         return templates[:count]
 
     def _parse_json_array(self, response_text: str) -> List[str]:
-        try:
-            return json.loads(response_text)
-        except json.JSONDecodeError:
-            match = re.search(r"\[[\s\S]*\]", response_text)
-            if match:
-                return json.loads(match.group(0))
-            raise
+        """Parse JSON array with fallback handling."""
+        from ..utils.json_parser import safe_json_loads
+        
+        result = safe_json_loads(response_text, expected_type=list, fallback=[])
+        
+        # Validate that we got a list of strings
+        if isinstance(result, list) and all(isinstance(item, str) for item in result):
+            return result
+        
+        # If parsing failed or returned wrong type, return empty list
+        return []
 
     def _normalize_query(self, query: str) -> str:
         normalized = re.sub(r"[^a-z0-9\s]", " ", query.lower())

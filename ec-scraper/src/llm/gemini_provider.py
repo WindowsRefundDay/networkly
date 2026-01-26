@@ -246,8 +246,11 @@ class GeminiProvider(LLMProvider):
             else:
                 return dict(parsed)
         
-        # Fallback to text parsing
+        # Fallback to text parsing with safe JSON parser
         if response.text:
-            return json.loads(response.text.strip())
+            from ..utils.json_parser import safe_json_loads
+            result = safe_json_loads(response.text, expected_type=dict)
+            if result:
+                return result
         
         raise ValueError("Empty response from Gemini")

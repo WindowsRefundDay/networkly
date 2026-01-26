@@ -5,11 +5,13 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { Loader2 } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { toast } from "sonner"
 import Link from "next/link"
+import Image from "next/image"
 
 import { cn } from "@/lib/utils"
+import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -35,7 +37,11 @@ interface LoginFormProps extends React.HTMLAttributes<HTMLDivElement> { }
 
 export function LoginForm({ className, ...props }: LoginFormProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [isLoading, setIsLoading] = React.useState<boolean>(false)
+  const [isGoogleLoading, setIsGoogleLoading] = React.useState<boolean>(false)
+  const supabase = createClient()
+  const redirect = searchParams.get("redirect") || "/dashboard"
 
   const {
     register,
@@ -59,6 +65,22 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
       toast.success("Logged in successfully!")
       router.push("/dashboard") // Redirect to dashboard after login
     }, 2000)
+  }
+
+  const loginWithGoogle = async () => {
+    setIsGoogleLoading(true)
+    try {
+      await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirect)}`,
+        },
+      })
+    } catch (error) {
+      console.error("Google login error:", error)
+      toast.error("Failed to sign in with Google. Please try again.")
+      setIsGoogleLoading(false)
+    }
   }
 
   return (
@@ -126,6 +148,41 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
               </Link>
             </div>
           </form>
+          <div className="mt-6 space-y-3">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-border" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-card px-2 text-muted-foreground">or continue with</span>
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={loginWithGoogle}
+              disabled={isGoogleLoading || isLoading}
+            >
+              {isGoogleLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                <>
+                  <Image
+                    src="/google-logo.png"
+                    alt="Google"
+                    width={20}
+                    height={20}
+                    className="mr-2"
+                  />
+                  Continue with Google
+                </>
+              )}
+            </Button>
+          </div>
         </CardContent>
       </GlassCard>
     </div>

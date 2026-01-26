@@ -144,7 +144,7 @@ class ExtractorAgent:
         content: str,
         url: str,
         source_url: Optional[str] = None,
-        max_retries: int = 3,
+        max_retries: int = 2,  # Reduced from 3 for faster failures
     ) -> ExtractionResult:
         """
         Extract opportunity information from webpage content.
@@ -173,8 +173,8 @@ class ExtractorAgent:
                 raw_content=content[:500],
             )
 
-        # Truncate very long content to save tokens
-        max_content_length = 12000
+        # Truncate very long content to save tokens (aggressive optimization)
+        max_content_length = 10000  # Reduced from 12000 for speed
         truncated_content = self._truncate_content(content, max_content_length)
 
         # Build prompt (use replace to avoid issues with curly braces in content)
@@ -201,9 +201,9 @@ class ExtractorAgent:
                         import re
                         retry_match = re.search(r'retry in (\d+(?:\.\d+)?)', error_str.lower())
                         if retry_match:
-                            wait_time = min(float(retry_match.group(1)) + 1, 60)  # Cap at 60s
+                            wait_time = min(float(retry_match.group(1)) + 0.5, 20)  # Reduced cap from 60s to 20s
                         else:
-                            wait_time = (2 ** attempt) * 5 + 5  # 10, 25, 45 seconds
+                            wait_time = (2 ** attempt) * 2 + 2  # Reduced: 4, 10, 18 seconds (vs 10, 25, 45)
                         await asyncio.sleep(wait_time)
                         continue
                 
@@ -228,7 +228,7 @@ class ExtractorAgent:
         
         config = GenerationConfig(
             temperature=0.1,
-            max_output_tokens=1500,
+            max_output_tokens=1200,  # Reduced from 1500 for speed
             use_fast_model=True,  # Use fast model for extraction
         )
         

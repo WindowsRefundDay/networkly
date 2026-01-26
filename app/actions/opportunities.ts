@@ -5,6 +5,37 @@ import { revalidatePath } from "next/cache"
 import { createClient, requireAuth } from "@/lib/supabase/server"
 import { triggerDiscovery } from "@/app/actions/discovery"
 
+// Discovery cooldown tracking (in-memory, resets on server restart)
+const discoveryLocks = new Map<string, number>()
+const DISCOVERY_COOLDOWN_MS = 15 * 60 * 1000 // 15 minutes - aggressive cooldown for cost/speed optimization
+
+function normalizeQuery(query: string): string {
+  return query.trim().toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ')
+}
+
+function canTriggerDiscovery(query: string): boolean {
+  const normalized = normalizeQuery(query)
+  const lastTrigger = discoveryLocks.get(normalized)
+  
+  if (!lastTrigger) return true
+  
+  const timeSince = Date.now() - lastTrigger
+  return timeSince > DISCOVERY_COOLDOWN_MS
+}
+
+function markDiscoveryTriggered(query: string): void {
+  const normalized = normalizeQuery(query)
+  discoveryLocks.set(normalized, Date.now())
+  
+  // Clean up old entries (older than 15 minutes)
+  const cutoff = Date.now() - 15 * 60 * 1000
+  for (const [key, timestamp] of discoveryLocks.entries()) {
+    if (timestamp < cutoff) {
+      discoveryLocks.delete(key)
+    }
+  }
+}
+
 function formatDate(date: Date): string {
   return date.toLocaleDateString("en-US", {
     month: "short",
@@ -319,8 +350,21 @@ export async function searchOpportunities(
     }
   }
 
-  // No results and query is long enough: trigger discovery
+  // No results and query is long enough: trigger discovery (with cooldown check)
   if (sanitizedQuery.length >= 3) {
+    // Check cooldown to prevent repeated discovery runs
+    if (!canTriggerDiscovery(sanitizedQuery)) {
+      console.log(`[Search] Discovery cooldown active for "${sanitizedQuery}", skipping`)
+      return {
+        opportunities: [],
+        discoveryTriggered: false,
+        newOpportunitiesFound: 0,
+      }
+    }
+    
+    // Mark as triggered before running to prevent concurrent runs
+    markDiscoveryTriggered(sanitizedQuery)
+    
     const discoveryResult = await triggerDiscovery(sanitizedQuery)
 
     if (discoveryResult.success && discoveryResult.newOpportunities && discoveryResult.newOpportunities > 0) {

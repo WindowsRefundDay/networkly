@@ -19,6 +19,8 @@ class DiscoveryProfile:
     max_crawl_urls: int
     # Max concurrent crawls
     max_concurrent_crawls: int
+    # Max concurrent AI extractions
+    max_concurrent_extractions: int
     # Search timeout in seconds
     search_timeout: float
     # Crawl timeout per URL in seconds
@@ -32,13 +34,14 @@ class DiscoveryProfile:
 # Discovery profiles: quick (on-demand) vs daily (batch)
 QUICK_PROFILE = DiscoveryProfile(
     name="quick",
-    semantic_threshold=0.60,  # Stricter - fewer but more relevant results
-    max_crawl_urls=35,
-    max_concurrent_crawls=10,
-    search_timeout=20.0,
-    crawl_timeout=15.0,
-    max_queries=10,
-    description="On-demand quick search with stricter relevance",
+    semantic_threshold=0.65,  # Stricter - highest quality results only
+    max_crawl_urls=20,  # Reduced from 35 for speed
+    max_concurrent_crawls=8,  # Reduced from 10 to prevent overwhelming
+    max_concurrent_extractions=4,  # Reduced from 6 for faster, focused extraction
+    search_timeout=15.0,  # Reduced from 20s
+    crawl_timeout=12.0,  # Reduced from 15s
+    max_queries=8,  # Reduced from 10 for speed
+    description="On-demand quick search optimized for speed and quality",
 )
 
 DAILY_PROFILE = DiscoveryProfile(
@@ -46,6 +49,7 @@ DAILY_PROFILE = DiscoveryProfile(
     semantic_threshold=0.50,  # Broader - more results for daily indexing
     max_crawl_urls=100,
     max_concurrent_crawls=20,
+    max_concurrent_extractions=12,  # Higher concurrency for batch processing
     search_timeout=30.0,
     crawl_timeout=20.0,
     max_queries=20,
@@ -62,18 +66,13 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # API Mode: "gemini" uses Google Gemini for everything (default), "groq" uses Groq for LLM
-    api_mode: Literal["gemini", "groq"] = "gemini"  # Default: Google Gemini
-
     # Vertex AI Configuration (IAM auth - preferred for production)
     use_vertex_ai: bool = True  # Use Vertex AI Gemini API instead of Developer API
     vertex_project_id: Optional[str] = None  # GCP project ID (required if use_vertex_ai=True)
     vertex_location: str = "us-central1"  # Vertex AI location
 
-    # API Keys (both optional - use whichever matches api_mode)
-    # Note: GOOGLE_API_KEY only used when use_vertex_ai=False
+    # API Key (only used when use_vertex_ai=False)
     GOOGLE_API_KEY: Optional[str] = None
-    GROQ_API_KEY: Optional[str] = None
 
     # Gemini Model Configuration
     # Main model: Used for discovery, planning, and complex reasoning tasks
@@ -81,10 +80,6 @@ class Settings(BaseSettings):
     # Fast model: Used for extraction, matching, profiling (when use_fast_model=True)
     # Falls back to gemini_pro_model if unavailable
     gemini_flash_model: str = "gemini-2.0-flash"
-
-    # Groq Model Configuration (used when api_mode="groq")
-    groq_model: str = "llama-3.3-70b-versatile"
-    groq_fast_model: str = "llama-3.1-8b-instant"
 
     # Embedding Configuration - text-embedding-004 for vectorization
     # Available models: text-embedding-004 (stable), gemini-embedding-001
@@ -100,26 +95,26 @@ class Settings(BaseSettings):
     max_concurrent_scrapes: int = 5
     scrape_timeout_seconds: int = 30
 
-    # Centralized Timeout Configuration
-    search_timeout_seconds: float = 30.0
-    crawl_timeout_seconds: float = 20.0
-    embedding_timeout_seconds: float = 30.0
-    llm_timeout_seconds: float = 60.0
+    # Centralized Timeout Configuration (aggressive optimization)
+    search_timeout_seconds: float = 20.0  # Reduced from 30.0
+    crawl_timeout_seconds: float = 15.0  # Reduced from 20.0
+    embedding_timeout_seconds: float = 20.0  # Reduced from 30.0
+    llm_timeout_seconds: float = 45.0  # Reduced from 60.0
 
-    # Centralized Retry Configuration
-    max_retries: int = 3
-    retry_base_delay: float = 1.0
-    retry_max_delay: float = 30.0
+    # Centralized Retry Configuration (aggressive - fail fast)
+    max_retries: int = 2  # Reduced from 3
+    retry_base_delay: float = 0.5  # Reduced from 1.0
+    retry_max_delay: float = 10.0  # Reduced from 30.0
 
-    # Semantic Filter Configuration
-    default_semantic_threshold: float = 0.55
+    # Semantic Filter Configuration (aggressive quality filtering)
+    default_semantic_threshold: float = 0.60  # Increased from 0.55 for higher quality
     semantic_category_bumps: dict = {
-        "competitions": 0.02,
-        "internships": 0.02,
-        "summer_programs": 0.03,
-        "scholarships": 0.04,
-        "research": 0.02,
-        "volunteering": 0.02,
+        "competitions": 0.01,  # Reduced from 0.02
+        "internships": 0.01,  # Reduced from 0.02
+        "summer_programs": 0.02,  # Reduced from 0.03
+        "scholarships": 0.03,  # Reduced from 0.04
+        "research": 0.01,  # Reduced from 0.02
+        "volunteering": 0.01,  # Reduced from 0.02
         "general": 0.0,
     }
 

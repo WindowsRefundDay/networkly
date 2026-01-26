@@ -88,9 +88,7 @@ export async function GET(req: NextRequest) {
             ...mainEnv,
             ...scraperEnv,
             DATABASE_URL: process.env.DATABASE_URL || mainEnv.DATABASE_URL,
-            GROQ_API_KEY: scraperEnv.GROQ_API_KEY || process.env.GROQ_API_KEY || mainEnv.GROQ_API_KEY,
             GOOGLE_API_KEY: scraperEnv.GOOGLE_API_KEY || process.env.GOOGLE_API_KEY || mainEnv.GOOGLE_API_KEY,
-            API_MODE: scraperEnv.API_MODE || process.env.API_MODE || "gemini", // Default to Google Gemini
         },
     });
 
@@ -120,16 +118,16 @@ export async function GET(req: NextRequest) {
     });
 
     // Set up timeout to kill the process if it takes too long
-    // Quick discovery profile: ~2 minutes max (aligned with scraper settings)
-    // This covers: query gen (~5s) + search (~20s) + semantic filter (~10s) + crawl (~60s) + extract (~30s)
-    const QUICK_DISCOVERY_TIMEOUT_MS = 150_000; // 2.5 minutes (with buffer)
+    // Quick discovery profile: aggressively optimized for speed
+    // This covers: query gen (~3s) + search (~15s) + semantic filter (~8s) + crawl (~50s) + extract (~40s)
+    const QUICK_DISCOVERY_TIMEOUT_MS = 120_000; // 2 minutes - aggressive timeout
     const timeoutId = setTimeout(async () => {
         if (!processEnded) {
             console.log("[Discovery] Process timeout reached, killing Python process");
             // Notify client of timeout before cleanup
             const timeoutEvent = `data: ${JSON.stringify({ 
                 type: "error", 
-                message: "Discovery timed out after 2.5 minutes",
+                message: "Discovery timed out after 2 minutes",
                 source: "timeout" 
             })}\n\n`;
             await safeWrite(timeoutEvent);

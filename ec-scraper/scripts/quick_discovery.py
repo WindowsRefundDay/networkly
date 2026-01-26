@@ -182,7 +182,10 @@ async def fetch_user_profile(user_profile_id: str, db_url: str) -> Optional[Dict
             await conn.close()
             
     except Exception as e:
-        sys.stderr.write(f"Error fetching user profile: {e}\n")
+        # Silently handle "relation does not exist" errors (table not created yet)
+        error_msg = str(e).lower()
+        if "relation" not in error_msg and "does not exist" not in error_msg:
+            sys.stderr.write(f"Error fetching user profile: {e}\n")
         return None
 
 
@@ -272,17 +275,17 @@ async def main(
         career_goals = user_profile.get("career_goals", "")
         preferred_types = user_profile.get("preferred_ec_types", [])
         
-        # Build personalized queries
+        # Build personalized queries (reduced for speed)
         search_queries = []
         
-        # Add interest-based queries
-        for interest in interests[:3]:
+        # Add interest-based queries (reduced from 3 to 2)
+        for interest in interests[:2]:
             search_queries.append(f"{interest} high school opportunities 2026")
             if location and location != "Any":
                 search_queries.append(f"{interest} programs {location}")
         
-        # Add type-specific queries
-        for ptype in preferred_types[:2]:
+        # Add type-specific queries (reduced from 2 to 1)
+        for ptype in preferred_types[:1]:
             search_queries.append(f"high school {ptype} {query} 2026")
         
         # Add career goal query
@@ -292,8 +295,8 @@ async def main(
         # Add the base query
         search_queries.append(f"{query} high school opportunities")
         
-        # Limit to 5 queries for personalized search
-        search_queries = search_queries[:5]
+        # Limit to 4 queries for personalized search (speed optimization)
+        search_queries = search_queries[:4]
         
     else:
         # Global: Use AI query generator for diverse queries
@@ -338,8 +341,8 @@ async def main(
         })
         emit_event("search", {"query": search_query})
         try:
-            # Personalized searches get more results per query
-            max_results = 15 if user_profile else 10
+            # Reduced search results for speed optimization
+            max_results = 10 if user_profile else 8
             results = await search_client.search(search_query, max_results=max_results)
             emit_event("layer_progress", {
                 "layer": "web_search",
@@ -432,9 +435,42 @@ async def main(
     unseen_urls = filtered_urls if ignore_cache else url_cache.filter_unseen(filtered_urls, within_days=7)
     cache_skipped = len(filtered_urls) - len(unseen_urls)
     
-    # Use profile settings for max URLs (personalized gets slightly fewer)
-    max_urls = min(discovery_profile.max_crawl_urls, 25 if user_profile else discovery_profile.max_crawl_urls)
+    # Use profile settings for max URLs (personalized gets fewer for speed)
+    max_urls = min(discovery_profile.max_crawl_urls, 15 if user_profile else discovery_profile.max_crawl_urls)
     urls_to_process = unseen_urls[:max_urls]
+    
+    # Early exit if no URLs to process
+    if not urls_to_process:
+        emit_event("layer_complete", {
+            "layer": "parallel_crawl",
+            "stats": {"total": 0, "completed": 0, "failed": 0}
+        })
+        emit_event("layer_complete", {
+            "layer": "ai_extraction",
+            "stats": {"total": 0, "completed": 0, "failed": 0}
+        })
+        emit_event("layer_complete", {
+            "layer": "db_sync",
+            "stats": {"inserted": 0, "updated": 0, "skipped": 0}
+        })
+        emit_event("filter_report", {
+            "query_category": query_category,
+            "query_count": len(search_queries),
+            "search_results": len(all_results),
+            "semantic_prefilter_skipped": semantic_filter.last_prefilter_skipped,
+            "semantic_kept": len(semantic_scored_urls),
+            "cache_skipped": cache_skipped,
+            "urls_crawled": 0,
+            "rejections": {},
+        })
+        emit_event("complete", {
+            "count": 0,
+            "isPersonalized": user_profile is not None,
+            "user_id": user_profile.get("user_id") if user_profile else None,
+        })
+        if sync:
+            await sync.close()
+        return
     
     # Start parallel crawl layer
     emit_event("layer_start", {"layer": "parallel_crawl", "message": f"Crawling {len(urls_to_process)} URLs..."})
@@ -471,7 +507,8 @@ async def main(
     emit_event("layer_start", {"layer": "ai_extraction", "message": f"Extracting from {crawl_success} pages..."})
     
     # Filter successful crawls and extract in parallel
-    extraction_semaphore = asyncio.Semaphore(8)
+    # Use profile-based concurrency setting
+    extraction_semaphore = asyncio.Semaphore(discovery_profile.max_concurrent_extractions)
     extraction_count = [0]  # Use list for mutable counter in closure
     rejection_counts = Counter()
     rejection_lock = asyncio.Lock()
@@ -540,9 +577,9 @@ async def main(
                     )
                     return {"error": f"Non-opportunity content: {opp.content_type.value}", "url": crawl_result.url}
 
-                # Skip low-confidence extractions
+                # Skip low-confidence extractions (stricter quality threshold)
                 confidence = extraction.confidence or 0.0
-                if confidence < 0.4:
+                if confidence < 0.5:  # Increased from 0.4 for higher quality
                     url_cache.mark_seen(crawl_result.url, "low_confidence", expires_days=30, notes=f"Confidence: {confidence:.2f}")
                     await log_rejection(
                         "low_confidence",
