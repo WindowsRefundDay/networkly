@@ -98,67 +98,61 @@ export function KnownBugsModal() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    transition={{ duration: 0.3 }}
+                    transition={{ duration: 0.2 }}
                 >
-                    {/* Backdrop with blur */}
+                    {/* Simple Backdrop */}
                     <motion.div
-                        className="absolute inset-0 bg-black/60 backdrop-blur-md"
+                        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        transition={{ duration: 0.2 }}
                         onClick={handleDismiss}
                     />
 
                     {/* Modal content */}
                     <motion.div
-                        className="relative z-10 mx-4 max-w-2xl w-full max-h-[80vh] overflow-hidden"
+                        className="relative z-10 mx-4 max-w-lg w-full overflow-hidden"
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -10 }}
-                        transition={{
-                            duration: 0.25,
-                            ease: "easeOut"
-                        }}
+                        transition={{ duration: 0.2, ease: "easeOut" }}
                     >
-                        {/* Glowing border effect */}
-                        <div className="absolute -inset-[1px] rounded-2xl bg-gradient-to-r from-amber-500/30 via-orange-500/30 to-red-500/30 blur-sm opacity-50" />
-
-                        <div className="relative bg-background/95 backdrop-blur-xl rounded-2xl border border-border/50 shadow-2xl overflow-hidden">
-                            {/* Header */}
-                            <div className="flex items-center justify-between p-6 border-b border-border/50 bg-gradient-to-r from-amber-500/10 to-orange-500/10">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2 rounded-lg bg-amber-500/20 border border-amber-500/30">
-                                        <Bug className="w-5 h-5 text-amber-500" />
-                                    </div>
-                                    <div>
-                                        <h2 className="text-lg font-semibold text-foreground">Known Bugs</h2>
-                                        <p className="text-xs text-muted-foreground">Updated information about current issues</p>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={handleDismiss}
-                                    className="p-2 rounded-lg hover:bg-muted/50 transition-colors"
-                                    aria-label="Dismiss"
-                                >
-                                    <X className="w-5 h-5 text-muted-foreground" />
-                                </button>
+                        <div className="relative bg-[#0a0a0a] rounded-2xl border border-white/5 p-8 shadow-2xl flex flex-col items-center text-center">
+                            {/* Icon */}
+                            <div className="mb-6 p-4 rounded-full bg-white/5 border border-white/10">
+                                <Bug className="w-8 h-8 text-amber-500" />
                             </div>
+
+                            {/* Title */}
+                            <h2 className="text-2xl font-bold mb-4 text-white">
+                                Known Bugs & Updates 🐛
+                            </h2>
 
                             {/* Content */}
-                            <div className="p-6 overflow-y-auto max-h-[60vh] prose prose-sm dark:prose-invert prose-headings:text-foreground prose-p:text-muted-foreground prose-strong:text-foreground prose-li:text-muted-foreground prose-a:text-primary">
-                                <ReactMarkdown>{content}</ReactMarkdown>
+                            <div className="prose prose-invert prose-sm max-w-none mb-8 text-gray-400">
+                                <ReactMarkdown
+                                    components={{
+                                        p: ({ children }) => <p className="mb-4 last:mb-0 leading-relaxed">{children}</p>,
+                                        ul: ({ children }) => <ul className="list-none p-0 m-0 space-y-2">{children}</ul>,
+                                        li: ({ children }) => <li className="m-0 p-0 text-gray-400">{children}</li>,
+                                        strong: ({ children }) => <span className="font-semibold text-white">{children}</span>,
+                                        h1: () => null, // Hide h1 from markdown
+                                        h2: () => null, // Hide h2 from markdown
+                                        h3: () => null, // Hide h3 from markdown
+                                        hr: () => <div className="my-6 border-t border-white/10" />
+                                    }}
+                                >
+                                    {content}
+                                </ReactMarkdown>
                             </div>
 
-                            {/* Footer */}
-                            <div className="p-4 border-t border-border/50 bg-muted/30">
-                                <button
-                                    onClick={handleDismiss}
-                                    className="w-full group flex items-center justify-center gap-2 py-3 px-6 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold shadow-lg shadow-amber-500/25 hover:shadow-xl hover:shadow-amber-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
-                                >
-                                    Got it, thanks!
-                                </button>
-                            </div>
+                            {/* Dismiss button */}
+                            <button
+                                onClick={handleDismiss}
+                                className="w-full py-4 px-6 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-semibold transition-all duration-200 shadow-[0_0_20px_rgba(217,119,6,0.2)] active:scale-[0.98]"
+                            >
+                                Continue to Networkly
+                            </button>
                         </div>
                     </motion.div>
                 </motion.div>
