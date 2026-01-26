@@ -27,7 +27,8 @@ export async function GET() {
     const apiStatuses = await Promise.all(
       apiEndpoints.map(async (endpoint) => {
         try {
-          const res = await fetch(`http://localhost:3000${endpoint.path}`, {
+          const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+          const res = await fetch(`${appUrl}${endpoint.path}`, {
             method: "GET",
             signal: AbortSignal.timeout(5000)
           })
@@ -58,7 +59,7 @@ export async function GET() {
       errors: recentErrors
     })
   } catch (error) {
-    return NextResponse.json({ 
+    return NextResponse.json({
       error: "Failed to fetch stats",
       details: error instanceof Error ? error.message : String(error)
     }, { status: 500 })
