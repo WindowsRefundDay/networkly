@@ -6,6 +6,8 @@
  */
 
 import { createClient } from '@/lib/supabase/server'
+import { SupabaseClient } from '@supabase/supabase-js'
+import { Database } from '@/lib/database.types'
 
 export interface ToolResult {
   success: boolean
@@ -16,27 +18,30 @@ export interface ToolResult {
 /**
  * Get user profile with skills, interests, and goals
  */
-export async function getUserProfile(userId: string): Promise<ToolResult> {
+export async function getUserProfile(userId: string, supabaseClient?: SupabaseClient<Database>): Promise<ToolResult> {
   try {
-    const supabase = await createClient()
+    const supabase = (supabaseClient || await createClient()) as SupabaseClient<Database>
     
-    // Get user data
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .select('id, name, headline, bio, location, skills, interests, university, graduation_year')
-      .eq('id', userId)
-      .single()
+    // Get user and profile data in parallel
+    const [
+      { data: user, error: userError },
+      { data: userProfile }
+    ] = await Promise.all([
+      supabase
+        .from('users')
+        .select('id, name, headline, bio, location, skills, interests, university, graduation_year')
+        .eq('id', userId)
+        .single(),
+      supabase
+        .from('user_profiles')
+        .select('career_goals, grade_level, preferred_opportunity_types, academic_strengths')
+        .eq('user_id', userId)
+        .single()
+    ])
 
     if (userError || !user) {
       return { success: false, error: 'User not found' }
     }
-
-    // Get user profile data
-    const { data: userProfile } = await supabase
-      .from('user_profiles')
-      .select('career_goals, grade_level, preferred_opportunity_types, academic_strengths')
-      .eq('user_id', userId)
-      .single()
 
     return {
       success: true,
@@ -343,29 +348,33 @@ export async function searchOpportunities(
  */
 export async function smartSearchOpportunities(
   userId: string,
-  params: { query?: string; category?: string; type?: string; limit?: number }
+  params: { query?: string; category?: string; type?: string; limit?: number },
+  supabaseClient?: SupabaseClient<Database>
 ): Promise<ToolResult> {
   try {
-    const supabase = await createClient()
+    const supabase = (supabaseClient || await createClient()) as SupabaseClient<Database>
     const { query = '', category, type, limit = 10 } = params
 
-    // First, get user profile for personalization
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .select('id, location, skills, interests')
-      .eq('id', userId)
-      .single()
+    // Get user and profile data in parallel for personalization
+    const [
+      { data: user, error: userError },
+      { data: userProfile }
+    ] = await Promise.all([
+      supabase
+        .from('users')
+        .select('id, location, skills, interests')
+        .eq('id', userId)
+        .single(),
+      supabase
+        .from('user_profiles')
+        .select('grade_level, preferred_opportunity_types, academic_strengths')
+        .eq('user_id', userId)
+        .single()
+    ])
 
     if (userError || !user) {
       return { success: false, error: 'User not found' }
     }
-
-    // Get user profile
-    const { data: userProfile } = await supabase
-      .from('user_profiles')
-      .select('grade_level, preferred_opportunity_types, academic_strengths')
-      .eq('user_id', userId)
-      .single()
 
     // Build search terms from query + user profile
     const userInterests = user.interests || []
@@ -580,29 +589,33 @@ export async function filterByDeadline(
  */
 export async function personalizedWebDiscovery(
   userId: string,
-  params: { topic?: string; category?: string }
+  params: { topic?: string; category?: string },
+  supabaseClient?: SupabaseClient<Database>
 ): Promise<ToolResult> {
   try {
-    const supabase = await createClient()
+    const supabase = (supabaseClient || await createClient()) as SupabaseClient<Database>
     const { topic, category } = params
 
-    // Get user profile for building personalized query
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .select('location, interests, skills')
-      .eq('id', userId)
-      .single()
+    // Get user and profile data in parallel for building personalized query
+    const [
+      { data: user, error: userError },
+      { data: userProfile }
+    ] = await Promise.all([
+      supabase
+        .from('users')
+        .select('location, interests, skills')
+        .eq('id', userId)
+        .single(),
+      supabase
+        .from('user_profiles')
+        .select('grade_level, preferred_opportunity_types, academic_strengths')
+        .eq('user_id', userId)
+        .single()
+    ])
 
     if (userError || !user) {
       return { success: false, error: 'User not found' }
     }
-
-    // Get user profile
-    const { data: userProfile } = await supabase
-      .from('user_profiles')
-      .select('grade_level, preferred_opportunity_types, academic_strengths')
-      .eq('user_id', userId)
-      .single()
 
     // Build a smart search query from user profile
     const queryParts: string[] = []
