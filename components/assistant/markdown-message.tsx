@@ -9,7 +9,7 @@
  * - Styled to match the chat bubble design system
  */
 
-import { useState, useEffect, useMemo, type ReactNode } from 'react'
+import { useState, useEffect, useMemo, memo, type ReactNode } from 'react'
 import ReactMarkdown from 'react-markdown'
 import type { Components } from 'react-markdown'
 import { OpportunityCardInline, type InlineOpportunity } from './opportunity-card-inline'
@@ -24,6 +24,37 @@ interface MarkdownMessageProps {
   onBookmark?: (id: string, title: string) => void
   bookmarkingId?: string
   bookmarkedIds?: Set<string>
+}
+
+function arePropsEqual(prevProps: MarkdownMessageProps, nextProps: MarkdownMessageProps) {
+  // Check simple props
+  if (prevProps.content !== nextProps.content) return false
+  if (prevProps.className !== nextProps.className) return false
+  if (prevProps.bookmarkingId !== nextProps.bookmarkingId) return false
+  if (prevProps.bookmarkedIds !== nextProps.bookmarkedIds) return false
+  if (prevProps.onBookmark !== nextProps.onBookmark) return false
+
+  // Check opportunityCache
+  // If references are same, return true
+  if (prevProps.opportunityCache === nextProps.opportunityCache) return true
+
+  // If references differ, check if contents are effectively the same
+  // We assume that if the keys and values (references) are the same, it's the same.
+  const prevCache = prevProps.opportunityCache || {}
+  const nextCache = nextProps.opportunityCache || {}
+
+  const prevKeys = Object.keys(prevCache)
+  const nextKeys = Object.keys(nextCache)
+
+  if (prevKeys.length !== nextKeys.length) return false
+
+  for (const key of prevKeys) {
+    if (prevCache[key] !== nextCache[key]) {
+      return false
+    }
+  }
+
+  return true
 }
 
 // Card syntax pattern: {{card:OPPORTUNITY_ID}}
@@ -153,7 +184,7 @@ function parseContentWithCards(content: string): Array<{ type: 'text' | 'card'; 
   return parts
 }
 
-export function MarkdownMessage({ 
+function MarkdownMessageComponent({
   content, 
   className = '',
   opportunityCache = {},
@@ -283,3 +314,5 @@ export function MarkdownMessage({
     </div>
   )
 }
+
+export const MarkdownMessage = memo(MarkdownMessageComponent, arePropsEqual)
