@@ -58,7 +58,7 @@ export function Sidebar({ isCollapsed = false, toggleCollapse }: SidebarProps) {
   // Full logo for expanded sidebar
   const logoSrc = hasMounted && theme === 'dark' ? '/networkly-logo-dark.png' : '/networkly-logo.png'
   // Mini logo for collapsed sidebar
-  const logoMiniSrc = hasMounted && theme === 'dark' ? '/networkly-logo-mini.png' : '/networkly-logo-mini-dark.png'
+  const logoMiniSrc = hasMounted && theme === 'dark' ? '/networkly-logo-mini-dark.png' : '/networkly-logo-mini.png'
 
   return (
     <aside

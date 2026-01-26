@@ -173,7 +173,22 @@ export default function SignupPage() {
     return (
         <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
             <div className="w-full max-w-sm space-y-6 rounded-xl border border-border bg-card p-6 shadow-lg">
-                <div className="space-y-2 text-center">
+                <div className="space-y-4 text-center">
+                    <div className="flex justify-center">
+                        <picture>
+                            <source srcSet="/networkly-logo-dark.png" media="(prefers-color-scheme: dark)" />
+                            <img
+                                src="/networkly-logo.png"
+                                alt="Networkly"
+                                className="h-10 object-contain dark:hidden"
+                            />
+                        </picture>
+                        <img
+                            src="/networkly-logo-dark.png"
+                            alt="Networkly"
+                            className="h-10 object-contain hidden dark:block"
+                        />
+                    </div>
                     <h1 className="text-2xl font-semibold">Create your account</h1>
                     <p className="text-sm text-muted-foreground">Start building your network</p>
                 </div>

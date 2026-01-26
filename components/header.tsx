@@ -99,7 +99,7 @@ export function Header() {
           }}
           className="pl-10 bg-muted/50 border-0 focus-visible:ring-1 focus-visible:ring-primary"
         />
-        
+
         <SearchResultsDropdown
           isOpen={isSearchOpen}
           isLoading={isSearching}
@@ -114,24 +114,6 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-2">
-        <Button variant="outline" size="sm" className="gap-2 bg-transparent">
-          <Plus className="h-4 w-4" />
-          <span className="hidden sm:inline">Create</span>
-        </Button>
-
-        <Button variant="ghost" size="icon" className="relative">
-          <MessageCircle className="h-5 w-5" />
-          <Badge className="absolute -right-1 -top-1 h-5 w-5 rounded-full p-0 text-xs" variant="destructive">
-            3
-          </Badge>
-        </Button>
-
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
-          <Badge className="absolute -right-1 -top-1 h-5 w-5 rounded-full p-0 text-xs" variant="destructive">
-            5
-          </Badge>
-        </Button>
 
         {hasMounted && (
           <DropdownMenu>
