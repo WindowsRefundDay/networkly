@@ -1362,7 +1362,6 @@ export interface Database {
         ]
       }
     }
-<<<<<<< HEAD
     Views: {
       [_ in never]: never
     }
@@ -1375,10 +1374,6 @@ export interface Database {
     CompositeTypes: {
       [_ in never]: never
     }
-=======
-    Views: {}
-    Functions: {}
->>>>>>> networkly-main
   }
 }
 
