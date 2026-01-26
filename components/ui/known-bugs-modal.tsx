@@ -7,6 +7,10 @@ import ReactMarkdown from "react-markdown"
 
 const STORAGE_KEY = "networkly-known-bugs-dismissed"
 const VERSION_KEY = "networkly-known-bugs-version"
+const LAST_SHOWN_KEY = "networkly-known-bugs-last-shown"
+
+// Cooldown period: 12 hours (in milliseconds)
+const SHOW_COOLDOWN = 12 * 60 * 60 * 1000;
 
 // Set this to false to hide the modal from all users
 const SHOW_KNOWN_BUGS_MODAL = true
@@ -42,10 +46,21 @@ export function KnownBugsModal() {
                 // 1. Never dismissed before, OR
                 // 2. Content has been updated (different version)
                 if (!isDismissed || dismissedVersion !== version) {
-                    setIsVisible(true)
-                    // Clear the dismissed flag if content changed
-                    if (dismissedVersion !== version) {
-                        localStorage.removeItem(STORAGE_KEY)
+                    const lastShown = localStorage.getItem(LAST_SHOWN_KEY)
+                    const now = Date.now()
+
+                    // Only show if content changed OR it's been longer than the cooldown
+                    if (dismissedVersion !== version || !lastShown || (now - parseInt(lastShown)) > SHOW_COOLDOWN) {
+                        // Add a delay to make it less aggressive
+                        setTimeout(() => {
+                            setIsVisible(true)
+                            localStorage.setItem(LAST_SHOWN_KEY, Date.now().toString())
+                        }, 3000)
+
+                        // Clear the dismissed flag if content changed
+                        if (dismissedVersion !== version) {
+                            localStorage.removeItem(STORAGE_KEY)
+                        }
                     }
                 }
             } catch (error) {
