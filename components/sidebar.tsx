@@ -46,7 +46,6 @@ export function Sidebar({ isCollapsed = false, toggleCollapse }: SidebarProps) {
   const { resolvedTheme } = useTheme()
   const hasMounted = useHasMounted()
 
-
   const userName =
     (user?.user_metadata?.full_name as string | undefined) ||
     (user?.user_metadata?.name as string | undefined) ||
@@ -54,11 +53,6 @@ export function Sidebar({ isCollapsed = false, toggleCollapse }: SidebarProps) {
     "User"
   const userAvatar = (user?.user_metadata?.avatar_url as string | undefined) || "/placeholder.svg"
   const userInitials = userName.split(" ").map(n => n[0]).join("").toUpperCase()
-
-  // Full logo for expanded sidebar
-  const logoSrc = hasMounted && resolvedTheme === 'dark' ? '/networkly-logo-dark.png' : '/networkly-logo.png'
-  // Mini logo for collapsed sidebar
-  const logoMiniSrc = hasMounted && resolvedTheme === 'dark' ? '/networkly-logo-mini-dark.png' : '/networkly-logo-mini.png'
 
   return (
     <aside
@@ -69,23 +63,43 @@ export function Sidebar({ isCollapsed = false, toggleCollapse }: SidebarProps) {
     >
       <div className={cn("flex h-16 items-center border-b border-border px-6", isCollapsed ? "justify-center px-0" : "gap-2")}>
         {!isCollapsed ? (
-          <Image
-            src={logoSrc}
-            alt="Networkly"
-            width={120}
-            height={40}
-            className="object-contain"
-            priority
-          />
+          <>
+            <Image
+              src="/networkly-logo-dark.png"
+              alt="Networkly"
+              width={120}
+              height={40}
+              className="object-contain dark:hidden"
+              priority
+            />
+            <Image
+              src="/networkly-logo.png"
+              alt="Networkly"
+              width={120}
+              height={40}
+              className="object-contain hidden dark:block"
+              priority
+            />
+          </>
         ) : (
-          <Image
-            src={logoMiniSrc}
-            alt="Networkly"
-            width={40}
-            height={40}
-            className="object-contain"
-            priority
-          />
+          <>
+            <Image
+              src="/networkly-logo-mini-dark.png"
+              alt="Networkly"
+              width={40}
+              height={40}
+              className="object-contain dark:hidden"
+              priority
+            />
+            <Image
+              src="/networkly-logo-mini.png"
+              alt="Networkly"
+              width={40}
+              height={40}
+              className="object-contain hidden dark:block"
+              priority
+            />
+          </>
         )}
       </div>
 
