@@ -123,13 +123,19 @@ class SitemapCrawler:
                 pass
             
             # Check common locations
-            for url in common_locations:
+            async def check_url(url):
                 try:
                     async with session.head(url, allow_redirects=True) as response:
                         if response.status == 200:
-                            sitemap_urls.append(url)
+                            return url
                 except Exception:
                     pass
+                return None
+
+            results = await asyncio.gather(*(check_url(url) for url in common_locations))
+            for url in results:
+                if url:
+                    sitemap_urls.append(url)
         
         return list(set(sitemap_urls))  # Remove duplicates
     
