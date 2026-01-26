@@ -9,6 +9,8 @@ import asyncio
 from typing import List, Optional
 from datetime import datetime, timedelta
 import uuid
+import re
+from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode
 
 from supabase import create_client, Client
 from postgrest.exceptions import APIError
@@ -46,6 +48,34 @@ class PostgresSync:
         if self._client is None:
             self._client = create_client(self.supabase_url, self.supabase_key)
         return self._client
+
+    def _normalize_url(self, url: str) -> str:
+        """Normalize URLs for deduplication."""
+        try:
+            parsed = urlparse(url)
+            scheme = parsed.scheme or "https"
+            netloc = parsed.netloc.lower()
+            if netloc.startswith("www."):
+                netloc = netloc[4:]
+            path = parsed.path.rstrip("/")
+            tracking_params = {
+                "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
+                "gclid", "fbclid", "mc_cid", "mc_eid",
+            }
+            query_params = [
+                (key, value)
+                for key, value in parse_qsl(parsed.query, keep_blank_values=False)
+                if key.lower() not in tracking_params
+            ]
+            query = urlencode(query_params, doseq=True)
+            return urlunparse((scheme, netloc, path, "", query, ""))
+        except Exception:
+            return url
+
+    def _normalize_text(self, value: str) -> str:
+        cleaned = re.sub(r"[^a-z0-9\s]", " ", (value or "").lower())
+        cleaned = re.sub(r"\s+", " ", cleaned).strip()
+        return cleaned
     
     async def connect(self) -> None:
         """Establish connection (no-op for Supabase, kept for API compatibility)."""
@@ -74,8 +104,12 @@ class PostgresSync:
         recheck_days = getattr(opportunity_card, 'recheck_days', 14)
         recheck_at = now + timedelta(days=recheck_days)
         
+        canonical_url = self._normalize_url(opportunity_card.url)
+        clean_title = " ".join((opportunity_card.title or "").split())
+        clean_org = " ".join((opportunity_card.organization or "Unknown").split())
+
         opportunity_data = {
-            "url": opportunity_card.url,
+            "url": canonical_url,
             "title": opportunity_card.title,
             "company": opportunity_card.organization or 'Unknown',
             "location": opportunity_card.location or 'Remote',
@@ -86,7 +120,7 @@ class PostgresSync:
             "skills": opportunity_card.tags or [],
             "description": opportunity_card.summary or '',
             "requirements": opportunity_card.requirements,
-            "source_url": opportunity_card.source_url,
+            "source_url": opportunity_card.source_url or opportunity_card.url,
             "extraction_confidence": opportunity_card.extraction_confidence,
             "is_active": True,
             "remote": opportunity_card.location_type.value == 'Online',
@@ -103,7 +137,7 @@ class PostgresSync:
         try:
             # Run Supabase calls synchronously (client is sync by default)
             # Check if URL already exists
-            existing = client.table("opportunities").select("id").eq("url", opportunity_card.url).limit(1).execute()
+            existing = client.table("opportunities").select("id").eq("url", canonical_url).limit(1).execute()
             
             if existing.data and len(existing.data) > 0:
                 # Update existing record
@@ -115,6 +149,22 @@ class PostgresSync:
                 client.table("opportunities").update(update_data).eq("id", opp_id).execute()
                 return opp_id
             else:
+                # Title + organization dedupe (case-insensitive exact match)
+                if clean_title and clean_org:
+                    alt_existing = (
+                        client.table("opportunities")
+                        .select("id")
+                        .ilike("title", clean_title)
+                        .ilike("company", clean_org)
+                        .limit(1)
+                        .execute()
+                    )
+                    if alt_existing.data and len(alt_existing.data) > 0:
+                        opp_id = alt_existing.data[0]["id"]
+                        update_data = {**opportunity_data, "updated_at": now.isoformat()}
+                        update_data.pop("created_at", None)
+                        client.table("opportunities").update(update_data).eq("id", opp_id).execute()
+                        return opp_id
                 # Insert new record
                 new_id = str(uuid.uuid4())
                 insert_data = {**opportunity_data, "id": new_id}

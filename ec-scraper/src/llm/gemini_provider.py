@@ -28,7 +28,31 @@ class GeminiProvider(LLMProvider):
     def __init__(self):
         """Initialize Gemini provider."""
         settings = get_settings()
-        self.client = genai.Client(api_key=settings.GOOGLE_API_KEY)
+        
+        # Initialize client based on Vertex AI mode
+        if settings.use_vertex_ai:
+            # Validate Vertex configuration
+            if not settings.vertex_project_id:
+                raise ValueError(
+                    "VERTEX_PROJECT_ID is required when USE_VERTEX_AI=true. "
+                    "Set it in your .env file or environment variables."
+                )
+            
+            # Use Vertex AI with IAM authentication
+            self.client = genai.Client(
+                vertexai=True,
+                project=settings.vertex_project_id,
+                location=settings.vertex_location,
+            )
+        else:
+            # Use Gemini Developer API with API key
+            if not settings.GOOGLE_API_KEY:
+                raise ValueError(
+                    "GOOGLE_API_KEY is required when USE_VERTEX_AI=false. "
+                    "Set it in your .env file or use Vertex AI mode."
+                )
+            self.client = genai.Client(api_key=settings.GOOGLE_API_KEY)
+        
         self.model = settings.gemini_pro_model
         self.fast_model = settings.gemini_flash_model
         self._llm_timeout = settings.llm_timeout_seconds

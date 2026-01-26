@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect, useRef, useCallback } from "react"
 import { useSearchParams } from "next/navigation"
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion"
 import { Input } from "@/components/ui/input"
+import { GlassCard } from "@/components/ui/glass-card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -11,7 +12,7 @@ import { Search, Sparkles, Bookmark, Send, Filter, Loader2, Globe, X } from "luc
 import { OpportunityList } from "@/components/opportunities/opportunity-list"
 import { ExpandedOpportunityCard } from "@/components/opportunities/expanded-opportunity-card"
 import { DiscoveryTriggerCard } from "@/components/opportunities/discovery-trigger-card"
-import { getOpportunities, searchOpportunities } from "@/app/actions/opportunities"
+import { getOpportunities, searchOpportunities, getOpportunitiesByIds } from "@/app/actions/opportunities"
 import { getUserProfile } from "@/app/actions/user"
 import { useHasMounted } from "@/hooks/use-has-mounted"
 import { useDebouncedCallback } from "@/hooks/use-debounced-callback"
@@ -37,6 +38,46 @@ export default function OpportunitiesPage() {
   const searchParams = useSearchParams()
 
   const discoveredQueriesRef = useRef<Set<string>>(new Set())
+  const pendingOpportunityIds = useRef<Set<string>>(new Set())
+
+  const fetchPendingOpportunities = useDebouncedCallback(async () => {
+    if (pendingOpportunityIds.current.size === 0) return
+
+    const idsToFetch = Array.from(pendingOpportunityIds.current)
+    pendingOpportunityIds.current.clear()
+
+    try {
+      const newOpportunities = await getOpportunitiesByIds(idsToFetch)
+      const mapped = newOpportunities.map(mapOpportunity)
+
+      setOpportunities((prev) => {
+        const existingIds = new Set(prev.map((o) => o.id))
+        const uniqueNew = mapped.filter((o) => !existingIds.has(o.id))
+        if (uniqueNew.length === 0) return prev
+        return [...uniqueNew, ...prev]
+      })
+
+      if (searchResults) {
+        setSearchResults((prev) => {
+          if (!prev) return prev
+          const existingIds = new Set(prev.map((o) => o.id))
+          const uniqueNew = mapped.filter((o) => !existingIds.has(o.id))
+          if (uniqueNew.length === 0) return prev
+          return [...uniqueNew, ...prev]
+        })
+      }
+    } catch (error) {
+      console.error("[OpportunitiesPage] Error fetching live opportunities:", error)
+    }
+  }, 1000)
+
+  const handleNewOpportunity = useCallback(
+    (opportunity: { id: string }) => {
+      pendingOpportunityIds.current.add(opportunity.id)
+      fetchPendingOpportunities()
+    },
+    [fetchPendingOpportunities]
+  )
 
   const mapOpportunity = useCallback((opp: any): Opportunity => ({
     id: opp.id,
@@ -267,68 +308,71 @@ export default function OpportunitiesPage() {
       <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        className="space-y-6 container mx-auto px-4 sm:px-6 max-w-7xl"
+        className="space-y-8 container mx-auto px-4 sm:px-6 max-w-7xl py-8"
       >
         <motion.div 
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sticky top-0 z-40 bg-background/80 backdrop-blur-md py-4 -my-4 px-1"
         >
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Opportunities</h1>
-          <p className="text-muted-foreground">
-            {isSearching ? (
-              <span className="flex items-center gap-2">
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                >
-                  <Loader2 className="h-3 w-3" />
-                </motion.div>
-                Searching...
-              </span>
-            ) : (
-              `Discover ${filteredOpportunities.length} opportunities curated for you`
-            )}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1 sm:w-72">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search opportunities..."
-              value={searchQuery}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              className="pl-10 bg-muted/50 border-border/50 focus:bg-background transition-colors"
-            />
-            {searchQuery && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
-                onClick={() => handleSearchChange("")}
-              >
-                <X className="h-3.5 w-3.5" />
-              </Button>
-            )}
-          </div>
-          <Select value={typeFilter} onValueChange={handleTypeFilterChange}>
-            <SelectTrigger className="w-[160px] bg-muted/50 border-border/50">
-              <Filter className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="All Types" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              {OPPORTUNITY_TYPES.map((type) => (
-                <SelectItem key={type.value} value={type.value}>
-                  {type.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </motion.div>
+          <GlassCard variant="compact" className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-5 sticky top-4 z-40 shadow-sm backdrop-blur-xl">
+            <div className="space-y-1">
+              <h1 className="text-2xl font-bold text-foreground tracking-tight">Opportunities</h1>
+              <div className="text-muted-foreground text-sm flex items-center gap-2">
+                {isSearching ? (
+                  <>
+                    <motion.span
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      className="inline-flex text-primary"
+                    >
+                      <Loader2 className="h-3.5 w-3.5" />
+                    </motion.span>
+                    <span>Searching...</span>
+                  </>
+                ) : (
+                  <span>Discover {filteredOpportunities.length} opportunities curated for you</span>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 w-full md:w-auto">
+              <div className="relative flex-1 md:w-80 group">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                <Input
+                  placeholder="Search opportunities..."
+                  value={searchQuery}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  className="pl-10 h-10 bg-muted/50 border-border/50 focus:bg-background focus:border-primary/20 transition-all rounded-lg"
+                />
+                {searchQuery && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 hover:bg-background/50"
+                    onClick={() => handleSearchChange("")}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+              <Select value={typeFilter} onValueChange={handleTypeFilterChange}>
+                <SelectTrigger className="w-[160px] h-10 bg-muted/50 border-border/50 focus:border-primary/20 rounded-lg">
+                  <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
+                  <SelectValue placeholder="All Types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  {OPPORTUNITY_TYPES.map((type) => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </GlassCard>
+        </motion.div>
 
       <AnimatePresence mode="wait">
         {discoveryStatus?.triggered && (
@@ -366,25 +410,38 @@ export default function OpportunitiesPage() {
         )}
       </AnimatePresence>
 
-      <div className="min-w-0">
+      <div className="min-w-0 mt-6">
         {hasMounted ? (
           <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="bg-muted/50 p-1">
-              <TabsTrigger value="all" className="gap-1.5 data-[state=active]:shadow-sm">
-                <Sparkles className="h-4 w-4" />
-                All ({filteredOpportunities.length})
-              </TabsTrigger>
-              <TabsTrigger value="saved" className="gap-1.5 data-[state=active]:shadow-sm">
-                <Bookmark className="h-4 w-4" />
-                Saved ({savedOpportunities.length})
-              </TabsTrigger>
-              <TabsTrigger value="applied" className="gap-1.5 data-[state=active]:shadow-sm">
-                <Send className="h-4 w-4" />
-                Applied (3)
-              </TabsTrigger>
-            </TabsList>
+            <div className="flex items-center justify-between mb-6">
+              <TabsList className="bg-muted/30 p-1 h-10 border border-border/40 backdrop-blur-sm">
+                <TabsTrigger value="all" className="gap-2 px-4 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                  <Sparkles className="h-4 w-4" />
+                  All <span className="opacity-60 text-xs ml-0.5">({filteredOpportunities.length})</span>
+                </TabsTrigger>
+                <TabsTrigger value="saved" className="gap-2 px-4 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                  <Bookmark className="h-4 w-4" />
+                  Saved <span className="opacity-60 text-xs ml-0.5">({savedOpportunities.length})</span>
+                </TabsTrigger>
+                <TabsTrigger value="applied" className="gap-2 px-4 data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                  <Send className="h-4 w-4" />
+                  Applied <span className="opacity-60 text-xs ml-0.5">(3)</span>
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
-            <TabsContent value="all" className="mt-6 space-y-8">
+            <TabsContent value="all" className="space-y-8 mt-0">
+              {/* Collapsible Discovery Trigger - Always visible at top */}
+              <DiscoveryTriggerCard
+                initialQuery={searchQuery}
+                onComplete={handleDiscoveryComplete}
+                onNewOpportunity={handleNewOpportunity}
+                personalizedEnabled={personalizedDiscovery}
+                onPersonalizedChange={setPersonalizedDiscovery}
+                userProfileId={userProfileId}
+                compact={true}
+              />
+
               <AnimatePresence mode="wait">
                 {filteredOpportunities.length === 0 ? (
                   searchQuery || typeFilter !== "all" ? (
@@ -413,18 +470,9 @@ export default function OpportunitiesPage() {
                   </motion.div>
                 )}
               </AnimatePresence>
-              
-                <DiscoveryTriggerCard
-                  initialQuery={searchQuery}
-                  onComplete={handleDiscoveryComplete}
-                  personalizedEnabled={personalizedDiscovery}
-                  onPersonalizedChange={setPersonalizedDiscovery}
-                  userProfileId={userProfileId}
-                  className="mt-8"
-                />
             </TabsContent>
 
-            <TabsContent value="saved" className="mt-6">
+            <TabsContent value="saved" className="mt-0">
               <AnimatePresence mode="wait">
                 {savedOpportunities.length === 0 ? (
                   <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -443,7 +491,7 @@ export default function OpportunitiesPage() {
               </AnimatePresence>
             </TabsContent>
 
-            <TabsContent value="applied" className="mt-6">
+            <TabsContent value="applied" className="mt-0">
               <EmptyState type="applied" />
             </TabsContent>
           </Tabs>

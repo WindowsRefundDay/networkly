@@ -2,6 +2,8 @@
 
 from typing import List
 import json
+import re
+from difflib import SequenceMatcher
 
 from ..llm import get_llm_provider, GenerationConfig
 
@@ -38,10 +40,58 @@ REQUIREMENTS:
 6. Each query should be 5-10 words
 
 Generate ONLY a JSON array of {count} search query strings. No explanations, no markdown.
+Use strict JSON with double quotes and no trailing commas.
 
 Example format:
 ["query 1", "query 2", "query 3", ...]
 """
+
+CATEGORY_KEYWORDS = {
+    "competitions": ["competition", "olympiad", "contest", "challenge"],
+    "internships": ["internship", "intern", "industry"],
+    "summer_programs": ["summer program", "camp", "workshop", "course"],
+    "scholarships": ["scholarship", "award", "grant"],
+    "research": ["research", "lab", "mentorship"],
+    "volunteering": ["volunteer", "community service", "ngo", "nonprofit"],
+}
+
+CATEGORY_TEMPLATES = {
+    "competitions": [
+        "{focus} olympiad high school 2026",
+        "{focus} competition for teenagers",
+        "{focus} challenge high school registration",
+    ],
+    "internships": [
+        "{focus} internship high school summer 2026",
+        "paid {focus} internship teenagers",
+        "remote {focus} internship students",
+    ],
+    "summer_programs": [
+        "{focus} summer program high school",
+        "university {focus} summer program",
+        "{focus} camp for teenagers",
+    ],
+    "scholarships": [
+        "{focus} scholarship high school students",
+        "{focus} merit scholarship application",
+        "{focus} scholarship competition 2026",
+    ],
+    "research": [
+        "{focus} research opportunity high school",
+        "{focus} science research program teenagers",
+        "{focus} lab mentorship high school",
+    ],
+    "volunteering": [
+        "{focus} volunteer opportunities youth",
+        "{focus} community service program high school",
+        "nonprofit {focus} volunteer high school",
+    ],
+    "general": [
+        "high school {focus} opportunities 2026",
+        "{focus} program for teenagers",
+        "{focus} opportunities students apply now",
+    ],
+}
 
 
 class QueryGenerator:
@@ -92,29 +142,23 @@ class QueryGenerator:
                 lines = response_text.split("\n")
                 # Remove first and last line (markdown fences)
                 response_text = "\n".join(lines[1:-1])
-            
-            # Parse JSON
-            queries = json.loads(response_text)
+
+            # Parse JSON (try extracting the JSON array if extra text appears)
+            queries = self._parse_json_array(response_text)
             
             # Validate and clean
             if not isinstance(queries, list):
                 raise ValueError("Response is not a list")
             
-            # Filter and deduplicate
-            unique_queries = []
-            seen = set()
-            for q in queries:
-                if isinstance(q, str) and q.strip():
-                    q_clean = q.strip()
-                    q_lower = q_clean.lower()
-                    if q_lower not in seen and len(q_clean) > 10:
-                        unique_queries.append(q_clean)
-                        seen.add(q_lower)
+            # Filter and deduplicate (with near-duplicate detection)
+            unique_queries = self._dedupe_queries(queries)
             
-            # Ensure we have at least some queries
-            if len(unique_queries) < 5:
-                fallback = self._fallback_queries(user_query, count - len(unique_queries))
-                unique_queries.extend(fallback)
+            # Ensure coverage across categories and sufficient count
+            unique_queries = self._ensure_category_coverage(
+                user_query,
+                unique_queries,
+                target_count=count,
+            )
             
             return unique_queries[:count]
             
@@ -136,21 +180,107 @@ class QueryGenerator:
             List of template-based queries
         """
         base = user_query.strip()
-        
-        templates = [
-            f"high school {base} 2026",
-            f"{base} internship for teenagers",
-            f"{base} competition registration",
-            f"{base} summer program application",
-            f"{base} scholarship high school students",
-            f"{base} research opportunity",
-            f"best {base} programs high school",
-            f"{base} volunteer opportunities youth",
-            f"{base} olympiad competition",
-            f"online {base} program for students",
-        ]
-        
+        templates: List[str] = []
+        for items in CATEGORY_TEMPLATES.values():
+            for template in items:
+                templates.append(template.format(focus=base))
         return templates[:count]
+
+    def _parse_json_array(self, response_text: str) -> List[str]:
+        try:
+            return json.loads(response_text)
+        except json.JSONDecodeError:
+            match = re.search(r"\[[\s\S]*\]", response_text)
+            if match:
+                return json.loads(match.group(0))
+            raise
+
+    def _normalize_query(self, query: str) -> str:
+        normalized = re.sub(r"[^a-z0-9\s]", " ", query.lower())
+        normalized = re.sub(r"\s+", " ", normalized).strip()
+        return normalized
+
+    def _tokenize(self, query: str) -> List[str]:
+        return [token for token in self._normalize_query(query).split() if token]
+
+    def _is_near_duplicate(self, query: str, existing: List[str]) -> bool:
+        query_norm = self._normalize_query(query)
+        query_tokens = set(self._tokenize(query))
+        for item in existing:
+            item_norm = self._normalize_query(item)
+            if query_norm == item_norm:
+                return True
+            ratio = SequenceMatcher(None, query_norm, item_norm).ratio()
+            if ratio >= 0.86:
+                return True
+            item_tokens = set(self._tokenize(item))
+            if query_tokens and item_tokens:
+                overlap = len(query_tokens & item_tokens) / max(len(query_tokens), len(item_tokens))
+                if overlap >= 0.8:
+                    return True
+        return False
+
+    def _dedupe_queries(self, queries: List[str]) -> List[str]:
+        unique_queries: List[str] = []
+        for q in queries:
+            if isinstance(q, str) and q.strip():
+                q_clean = q.strip()
+                if len(q_clean) < 10:
+                    continue
+                if not self._is_near_duplicate(q_clean, unique_queries):
+                    unique_queries.append(q_clean)
+        return unique_queries
+
+    def _categorize_query(self, query: str) -> str:
+        query_lower = query.lower()
+        for category, keywords in CATEGORY_KEYWORDS.items():
+            if any(keyword in query_lower for keyword in keywords):
+                return category
+        return "general"
+
+    def _ensure_category_coverage(
+        self,
+        user_query: str,
+        queries: List[str],
+        target_count: int,
+    ) -> List[str]:
+        base = user_query.strip()
+        categorized = {category: [] for category in CATEGORY_KEYWORDS.keys()}
+        categorized["general"] = []
+        for query in queries:
+            categorized[self._categorize_query(query)].append(query)
+
+        required_categories = [
+            "competitions",
+            "internships",
+            "summer_programs",
+            "scholarships",
+            "research",
+            "volunteering",
+        ]
+
+        filled = list(queries)
+        for category in required_categories:
+            if len(filled) >= target_count:
+                break
+            if categorized.get(category):
+                continue
+            for template in CATEGORY_TEMPLATES.get(category, []):
+                candidate = template.format(focus=base)
+                if not self._is_near_duplicate(candidate, filled):
+                    filled.append(candidate)
+                    categorized[category].append(candidate)
+                    break
+
+        if len(filled) < max(5, min(target_count, 6)):
+            fallback = self._fallback_queries(user_query, target_count - len(filled))
+            for candidate in fallback:
+                if len(filled) >= target_count:
+                    break
+                if not self._is_near_duplicate(candidate, filled):
+                    filled.append(candidate)
+
+        return filled
 
 
 # Singleton

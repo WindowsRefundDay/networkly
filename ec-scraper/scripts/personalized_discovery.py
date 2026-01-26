@@ -30,6 +30,28 @@ from src.db.url_cache import get_url_cache
 from src.db.models import OpportunityTiming
 
 
+CATEGORY_HINTS = {
+    "competitions": ["competition", "olympiad", "contest", "challenge"],
+    "internships": ["internship", "intern", "externship", "work experience"],
+    "summer_programs": ["summer program", "camp", "workshop", "course"],
+    "scholarships": ["scholarship", "grant", "award", "financial aid"],
+    "research": ["research", "lab", "mentorship"],
+    "volunteering": ["volunteer", "community service", "nonprofit", "ngo"],
+}
+
+
+def detect_query_category(queries: List[str], fallback: str) -> str:
+    counts = {category: 0 for category in CATEGORY_HINTS.keys()}
+    combined = " ".join(queries + [fallback]).lower()
+    for category, hints in CATEGORY_HINTS.items():
+        if any(hint in combined for hint in hints):
+            counts[category] += 1
+    top_category = max(counts.items(), key=lambda item: item[1])
+    if top_category[1] == 0:
+        return "general"
+    return top_category[0]
+
+
 PERSONALIZED_PROFILER_PROMPT = """You are an expert career advisor for high school students.
 
 STUDENT PROFILE:
@@ -301,14 +323,20 @@ async def main(user_id: str, search_query: str):
     semantic_filter = get_semantic_filter(similarity_threshold=0.60)
     
     try:
-        scored_urls = await semantic_filter.filter_results(all_results, max_results=200)
+        category = detect_query_category(search_queries, search_query)
+        scored_urls = await semantic_filter.filter_results(
+            all_results,
+            max_results=200,
+            category=category,
+        )
         
         emit_event("layer_complete", {
             "layer": "semantic_filter",
             "stats": {
                 "input": len(all_results),
                 "output": len(scored_urls),
-                "threshold": 0.60
+                "threshold": 0.60,
+                "category": category,
             }
         })
         

@@ -31,6 +31,29 @@ from src.crawlers.hybrid_crawler import get_hybrid_crawler
 from src.db.url_cache import get_url_cache
 
 
+# Query category hints for adaptive semantic thresholds
+CATEGORY_HINTS = {
+    "competitions": ["competition", "olympiad", "contest", "challenge"],
+    "internships": ["internship", "intern", "externship", "work experience"],
+    "summer_programs": ["summer program", "camp", "workshop", "course"],
+    "scholarships": ["scholarship", "grant", "award", "financial aid"],
+    "research": ["research", "lab", "mentorship"],
+    "volunteering": ["volunteer", "community service", "nonprofit", "ngo"],
+}
+
+
+def detect_query_category(queries: List[str], fallback: str) -> str:
+    counts = {category: 0 for category in CATEGORY_HINTS.keys()}
+    combined = " ".join(queries + [fallback]).lower()
+    for category, hints in CATEGORY_HINTS.items():
+        if any(hint in combined for hint in hints):
+            counts[category] += 1
+    top_category = max(counts.items(), key=lambda item: item[1])
+    if top_category[1] == 0:
+        return "general"
+    return top_category[0]
+
+
 # FastAPI app
 app = FastAPI(
     title="EC Scraper Discovery API",
@@ -274,10 +297,12 @@ async def run_quick_discovery(
         # Semantic filtering
         semantic_filter = get_semantic_filter()
         try:
+            category = detect_query_category(search_queries, query)
             scored_urls = await semantic_filter.filter_results(
                 all_results,
                 max_results=discovery_profile.max_crawl_urls,
                 threshold_override=discovery_profile.semantic_threshold,
+                category=category,
             )
             filtered_urls = [url for url, score in scored_urls]
         except Exception:

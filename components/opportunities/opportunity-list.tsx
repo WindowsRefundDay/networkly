@@ -178,7 +178,7 @@ export function OpportunityList({
   }
 
   return (
-    <div className="space-y-10 pb-20">
+    <div className="space-y-12 pb-20">
       
       {featured.length > 0 && (
           <motion.section
@@ -186,18 +186,18 @@ export function OpportunityList({
             initial="hidden"
             animate="visible"
           >
-            <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/20">
+                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 shadow-sm backdrop-blur-sm">
                   <Sparkles className="h-5 w-5 text-amber-500" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-foreground">Top Matches</h2>
+                  <h2 className="text-xl font-bold text-foreground tracking-tight">Top Matches</h2>
                   <p className="text-sm text-muted-foreground">Opportunities that best match your profile</p>
                 </div>
               </div>
-              <div className="hidden sm:flex items-center gap-1.5 text-sm text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-full">
-                <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+              <div className="hidden sm:flex items-center gap-1.5 text-xs font-medium text-emerald-600 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1 rounded-full">
+                <TrendingUp className="h-3.5 w-3.5" />
                 85%+ match score
               </div>
             </div>
@@ -205,7 +205,7 @@ export function OpportunityList({
               variants={containerVariants}
               initial="hidden"
               animate="visible"
-              className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5"
+              className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
             >
               {featured.map((opp) => (
                 <OpportunityCard
@@ -227,12 +227,12 @@ export function OpportunityList({
             initial="hidden"
             animate="visible"
           >
-            <div className="flex items-center gap-3 mb-5">
-              <div className="p-2 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-500/20">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 shadow-sm backdrop-blur-sm">
                 <Zap className="h-5 w-5 text-blue-500" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-foreground">Recommended for You</h2>
+                <h2 className="text-xl font-bold text-foreground tracking-tight">Recommended for You</h2>
                 <p className="text-sm text-muted-foreground">Good opportunities based on your interests</p>
               </div>
             </div>
@@ -240,7 +240,7 @@ export function OpportunityList({
               variants={containerVariants}
               initial="hidden"
               animate="visible"
-              className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5"
+              className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
             >
               {recommended.map((opp) => (
                 <OpportunityCard
@@ -262,12 +262,12 @@ export function OpportunityList({
             initial="hidden"
             animate="visible"
           >
-            <div className="flex items-center gap-3 mb-5">
-              <div className="p-2 rounded-xl bg-gradient-to-br from-slate-500/20 to-gray-500/20">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2.5 rounded-xl bg-slate-500/10 border border-slate-500/20 shadow-sm backdrop-blur-sm">
                 <Search className="h-5 w-5 text-slate-500" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-foreground">Browse All</h2>
+                <h2 className="text-xl font-bold text-foreground tracking-tight">Browse All</h2>
                 <p className="text-sm text-muted-foreground">{newest.length} more opportunities to explore</p>
               </div>
             </div>
@@ -275,7 +275,7 @@ export function OpportunityList({
               variants={containerVariants}
               initial="hidden"
               animate="visible"
-              className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5"
+              className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6"
             >
               {newest.map((opp) => (
                 <OpportunityCard

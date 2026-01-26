@@ -36,6 +36,16 @@ GUIDE_HINTS = [
     "resource", "resources", "2026 guide",
 ]
 
+PREFILTER_URL_HINTS = [
+    "/blog/", "/news/", "/article/", "/guides/", "/guide/", "/how-to/",
+    "/tips/", "/top-", "/best-", "/list-", "/lists/", "list-of",
+]
+
+PREFILTER_TEXT_HINTS = [
+    "ultimate guide", "how to", "step-by-step", "tips for", "tips to",
+    "best ", "top ", "list of", "ranking", "ranked",
+]
+
 
 class SemanticFilter:
     """Filter search results using embedding similarity.
@@ -58,6 +68,7 @@ class SemanticFilter:
         self._client = None
         self._model = None
         self._reference_embedding = None
+        self.last_prefilter_skipped = 0
     
     def set_threshold(self, threshold: float) -> None:
         """Update the similarity threshold dynamically."""
@@ -67,10 +78,32 @@ class SemanticFilter:
         """Lazy-load the Gemini client."""
         if self._client is None:
             settings = get_settings()
-            if not settings.GOOGLE_API_KEY:
-                raise ValueError("GOOGLE_API_KEY not set")
-            self._client = genai.Client(api_key=settings.GOOGLE_API_KEY)
-            self._model = settings.embedding_model  # text-embedding-005
+            
+            # Initialize client based on Vertex AI mode
+            if settings.use_vertex_ai:
+                # Validate Vertex configuration
+                if not settings.vertex_project_id:
+                    raise ValueError(
+                        "VERTEX_PROJECT_ID is required when USE_VERTEX_AI=true. "
+                        "Set it in your .env file or environment variables."
+                    )
+                
+                # Use Vertex AI with IAM authentication
+                self._client = genai.Client(
+                    vertexai=True,
+                    project=settings.vertex_project_id,
+                    location=settings.vertex_location,
+                )
+            else:
+                # Use Gemini Developer API with API key
+                if not settings.GOOGLE_API_KEY:
+                    raise ValueError(
+                        "GOOGLE_API_KEY is required when USE_VERTEX_AI=false. "
+                        "Set it in your .env file or use Vertex AI mode."
+                    )
+                self._client = genai.Client(api_key=settings.GOOGLE_API_KEY)
+            
+            self._model = settings.embedding_model  # text-embedding-004
         return self._client
     
     async def _get_reference_embedding(self) -> np.ndarray:
@@ -132,12 +165,22 @@ class SemanticFilter:
         if any(hint in text for hint in ["ultimate guide", "how to", "step-by-step", "tips for", "tips to"]):
             penalty += 0.08
         return min(penalty, 0.15)
+
+    def _should_prefilter(self, url: str, title: str, snippet: str) -> bool:
+        """Cheap filter to skip obvious listicles or guides before embeddings."""
+        url_lower = url.lower()
+        text = f"{title} {snippet}".lower()
+        url_hit = any(hint in url_lower for hint in PREFILTER_URL_HINTS)
+        text_hit = any(hint in text for hint in PREFILTER_TEXT_HINTS)
+        # Require at least two signals to avoid over-filtering
+        return url_hit and text_hit
     
     async def filter_results(
         self,
         results: List[Tuple[str, str, str]],  # (url, title, snippet)
         max_results: int = 35,
         threshold_override: Optional[float] = None,
+        category: Optional[str] = None,
     ) -> List[Tuple[str, float]]:
         """
         Filter search results by semantic similarity with retry logic.
@@ -157,6 +200,11 @@ class SemanticFilter:
         
         # Use override if provided
         threshold = threshold_override if threshold_override is not None else self.threshold
+        if category:
+            settings = get_settings()
+            category_bumps = getattr(settings, "semantic_category_bumps", {})
+            bump = category_bumps.get(category, 0.0)
+            threshold = max(0.0, min(0.95, threshold + bump))
         
         try:
             client = self._get_client()
@@ -164,10 +212,25 @@ class SemanticFilter:
             # Get reference embedding (cached, with retry)
             reference = await self._get_reference_embedding()
             
+            # Cheap prefilter to avoid embedding obvious guides/listicles
+            filtered_results = []
+            skipped_prefilter = 0
+            for url, title, snippet in results:
+                if self._should_prefilter(url, title, snippet):
+                    skipped_prefilter += 1
+                    continue
+                filtered_results.append((url, title, snippet))
+
+            if skipped_prefilter:
+                sys.stderr.write(
+                    f"[SemanticFilter] Prefilter skipped {skipped_prefilter} results\n"
+                )
+            self.last_prefilter_skipped = skipped_prefilter
+
             # Prepare texts for batch embedding (truncate snippets for speed)
             texts_to_embed = [
-                f"{title} {snippet[:200]}" 
-                for _, title, snippet in results
+                f"{title} {snippet[:200]}"
+                for _, title, snippet in filtered_results
             ]
             
             # BATCH EMBED - One API call for ALL texts (with retry)
@@ -195,7 +258,7 @@ class SemanticFilter:
             
             # Filter and score
             scored_results = []
-            for i, (url, title, snippet) in enumerate(results):
+            for i, (url, title, snippet) in enumerate(filtered_results):
                 similarity = similarities[i]
                 adjusted_similarity = similarity - self._guide_penalty(title, snippet)
                 if adjusted_similarity >= threshold:
@@ -206,7 +269,7 @@ class SemanticFilter:
             
             # Log stats
             sys.stderr.write(
-                f"[SemanticFilter] {len(results)} → {len(scored_results)} "
+                f"[SemanticFilter] {len(filtered_results)} → {len(scored_results)} "
                 f"(threshold={threshold})\n"
             )
             
@@ -231,9 +294,11 @@ class SemanticFilter:
 _filter_instance: Optional[SemanticFilter] = None
 
 
-def get_semantic_filter() -> SemanticFilter:
+def get_semantic_filter(similarity_threshold: Optional[float] = None) -> SemanticFilter:
     """Get the semantic filter singleton."""
     global _filter_instance
     if _filter_instance is None:
-        _filter_instance = SemanticFilter()
+        _filter_instance = SemanticFilter(similarity_threshold=similarity_threshold)
+    elif similarity_threshold is not None:
+        _filter_instance.set_threshold(similarity_threshold)
     return _filter_instance

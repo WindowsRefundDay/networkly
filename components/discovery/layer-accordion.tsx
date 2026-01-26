@@ -236,9 +236,9 @@ function LayerItems({ items, layerId }: LayerItemsProps) {
   if (layerId === 'query_generation') {
     return (
       <div className="flex flex-wrap gap-1.5">
-        {items.slice(0, 8).map((item) => (
+        {items.slice(0, 8).map((item, index) => (
           <span
-            key={item.id}
+            key={`${item.id}-${index}`}
             className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground truncate max-w-[200px]"
           >
             {item.label}
@@ -256,9 +256,9 @@ function LayerItems({ items, layerId }: LayerItemsProps) {
   if (layerId === 'ai_extraction') {
     return (
       <div className="space-y-1.5 max-h-[200px] overflow-y-auto">
-        {items.slice(0, 10).map((item) => (
+        {items.slice(0, 10).map((item, index) => (
           <div
-            key={item.id}
+            key={`${item.id}-${index}`}
             className={cn(
               'flex items-center gap-2 p-2 rounded text-xs',
               item.status === 'success' && 'bg-green-500/5 border border-green-500/20',
@@ -294,9 +294,9 @@ function LayerItems({ items, layerId }: LayerItemsProps) {
   // Default: show as pills (for web_search, parallel_crawl)
   return (
     <div className="flex flex-wrap gap-1.5">
-      {items.slice(0, 12).map((item) => (
+      {items.slice(0, 12).map((item, index) => (
         <motion.span
-          key={item.id}
+          key={`${item.id}-${index}`}
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
           className={cn(

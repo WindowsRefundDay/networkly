@@ -65,7 +65,13 @@ class Settings(BaseSettings):
     # API Mode: "gemini" uses Google Gemini for everything (default), "groq" uses Groq for LLM
     api_mode: Literal["gemini", "groq"] = "gemini"  # Default: Google Gemini
 
+    # Vertex AI Configuration (IAM auth - preferred for production)
+    use_vertex_ai: bool = True  # Use Vertex AI Gemini API instead of Developer API
+    vertex_project_id: Optional[str] = None  # GCP project ID (required if use_vertex_ai=True)
+    vertex_location: str = "us-central1"  # Vertex AI location
+
     # API Keys (both optional - use whichever matches api_mode)
+    # Note: GOOGLE_API_KEY only used when use_vertex_ai=False
     GOOGLE_API_KEY: Optional[str] = None
     GROQ_API_KEY: Optional[str] = None
 
@@ -107,6 +113,15 @@ class Settings(BaseSettings):
 
     # Semantic Filter Configuration
     default_semantic_threshold: float = 0.55
+    semantic_category_bumps: dict = {
+        "competitions": 0.02,
+        "internships": 0.02,
+        "summer_programs": 0.03,
+        "scholarships": 0.04,
+        "research": 0.02,
+        "volunteering": 0.02,
+        "general": 0.0,
+    }
 
     # Redis Configuration
     REDIS_URL: Optional[str] = None

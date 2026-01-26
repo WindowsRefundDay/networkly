@@ -12,6 +12,9 @@ export type Json =
   | Json[]
 
 export interface Database {
+  __InternalSupabase: {
+    PostgrestVersion: '12'
+  }
   public: {
     Tables: {
       users: {
@@ -1359,18 +1362,8 @@ export interface Database {
         ]
       }
     }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      [_ in never]: never
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+    Views: {}
+    Functions: {}
   }
 }
 

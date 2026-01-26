@@ -1,6 +1,7 @@
 """Gemini-powered opportunity extraction agent with structured JSON output."""
 
 import asyncio
+import re
 from datetime import datetime
 from typing import Optional
 
@@ -98,6 +99,46 @@ class ExtractorAgent:
         """Initialize the extractor."""
         self.provider = get_llm_provider()
 
+    def _is_likely_guide(self, content: str) -> bool:
+        """Heuristic to skip listicles/guides before LLM extraction."""
+        preview = content[:2000].lower()
+        signals = 0
+        guide_phrases = [
+            "ultimate guide", "how to", "step-by-step", "tips for", "tips to",
+            "best ", "top ", "list of", "ranking", "ranked",
+        ]
+        if any(phrase in preview for phrase in guide_phrases):
+            signals += 1
+        if "table of contents" in preview:
+            signals += 1
+        if re.search(r"\btop\s+\d+\b", preview):
+            signals += 1
+        if preview.count("\n- ") >= 8 or preview.count("\n* ") >= 8:
+            signals += 1
+        return signals >= 2
+
+    def _truncate_content(self, content: str, max_length: int) -> str:
+        """Keep the most relevant sections while trimming long pages."""
+        if len(content) <= max_length:
+            return content
+        head = content[:4000]
+        tail = content[-2000:]
+        keywords = [
+            "deadline", "apply", "application", "eligibility", "requirements",
+            "dates", "timeline", "program", "scholarship", "internship",
+            "competition", "start date", "end date",
+        ]
+        highlights = []
+        for line in content.splitlines():
+            line_lower = line.lower()
+            if any(keyword in line_lower for keyword in keywords):
+                highlights.append(line.strip())
+        highlights_text = "\n".join(highlights)
+        trimmed = "\n".join([head, highlights_text, tail])
+        if len(trimmed) > max_length:
+            trimmed = trimmed[:max_length] + "\n\n[Content truncated...]"
+        return trimmed
+
     async def extract(
         self,
         content: str,
@@ -124,11 +165,17 @@ class ExtractorAgent:
                 raw_content=content,
             )
 
+        # Pre-filter obvious guides/listicles to save tokens
+        if self._is_likely_guide(content):
+            return ExtractionResult(
+                success=False,
+                error="Rejected: likely guide/listicle",
+                raw_content=content[:500],
+            )
+
         # Truncate very long content to save tokens
-        max_content_length = 15000
-        truncated_content = content[:max_content_length]
-        if len(content) > max_content_length:
-            truncated_content += "\n\n[Content truncated...]"
+        max_content_length = 12000
+        truncated_content = self._truncate_content(content, max_content_length)
 
         # Build prompt (use replace to avoid issues with curly braces in content)
         prompt = EXTRACTION_PROMPT.replace("{content}", truncated_content)
@@ -181,7 +228,7 @@ class ExtractorAgent:
         
         config = GenerationConfig(
             temperature=0.1,
-            max_output_tokens=2000,
+            max_output_tokens=1500,
             use_fast_model=True,  # Use fast model for extraction
         )
         

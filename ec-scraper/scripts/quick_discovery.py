@@ -8,9 +8,11 @@ import asyncio
 import os
 import sys
 import json
+import re
+from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 from collections import Counter
 from dotenv import load_dotenv
 
@@ -39,6 +41,63 @@ def emit_event(type: str, data: dict):
     event = {"type": type, **data}
     print(json.dumps(event), flush=True)
     sys.stdout.flush()
+
+
+CATEGORY_HINTS = {
+    "competitions": ["competition", "olympiad", "contest", "challenge"],
+    "internships": ["internship", "intern", "externship", "work experience"],
+    "summer_programs": ["summer program", "camp", "workshop", "course"],
+    "scholarships": ["scholarship", "grant", "award", "financial aid"],
+    "research": ["research", "lab", "mentorship"],
+    "volunteering": ["volunteer", "community service", "nonprofit", "ngo"],
+}
+
+
+def detect_query_category(queries: List[str], fallback: str) -> str:
+    """Detect dominant category for adaptive semantic thresholds."""
+    counts = {category: 0 for category in CATEGORY_HINTS.keys()}
+    combined = " ".join(queries + [fallback]).lower()
+    for category, hints in CATEGORY_HINTS.items():
+        if any(hint in combined for hint in hints):
+            counts[category] += 1
+    top_category = max(counts.items(), key=lambda item: item[1])
+    if top_category[1] == 0:
+        return "general"
+    return top_category[0]
+
+
+TRACKING_PARAMS = {
+    "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
+    "gclid", "fbclid", "mc_cid", "mc_eid",
+}
+
+
+def normalize_url(url: str) -> str:
+    """Normalize URL for deduplication."""
+    try:
+        parsed = urlparse(url)
+        scheme = parsed.scheme or "https"
+        netloc = parsed.netloc.lower()
+        if netloc.startswith("www."):
+            netloc = netloc[4:]
+        path = parsed.path.rstrip("/")
+        query_params = [
+            (key, value)
+            for key, value in parse_qsl(parsed.query, keep_blank_values=False)
+            if key.lower() not in TRACKING_PARAMS
+        ]
+        query = urlencode(query_params, doseq=True)
+        normalized = urlunparse((scheme, netloc, path, "", query, ""))
+        return normalized
+    except Exception:
+        return url
+
+
+def normalize_text(value: str) -> str:
+    """Normalize text for title/org dedupe."""
+    cleaned = re.sub(r"[^a-z0-9\s]", " ", value.lower())
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned
 
 
 async def fetch_user_profile(user_profile_id: str, db_url: str) -> Optional[Dict[str, Any]]:
@@ -255,11 +314,17 @@ async def main(
                 f"{base_query} volunteer work for teens",
             ]
     
+    query_category = detect_query_category(search_queries, query)
+
     # Emit layer complete for query generation
     emit_event("layer_complete", {
         "layer": "query_generation",
         "stats": {"count": len(search_queries)},
         "items": search_queries
+    })
+    emit_event("query_report", {
+        "category": query_category,
+        "queries": search_queries,
     })
     
     # Search phase - run searches in parallel
@@ -303,10 +368,11 @@ async def main(
     
     for results in search_results:
         for result in results:
-            if result.url not in seen_urls:
-                seen_urls.add(result.url)
-                all_results.append((result.url, result.title or "", result.snippet or ""))
-                emit_event("found", {"url": result.url, "source": result.title or "Web Result"})
+            canonical_url = normalize_url(result.url)
+            if canonical_url not in seen_urls:
+                seen_urls.add(canonical_url)
+                all_results.append((canonical_url, result.title or "", result.snippet or ""))
+                emit_event("found", {"url": canonical_url, "source": result.title or "Web Result"})
     
     emit_event("layer_complete", {
         "layer": "web_search",
@@ -318,20 +384,27 @@ async def main(
     emit_event("layer_start", {"layer": "semantic_filter", "message": "Applying AI relevance filter..."})
     
     semantic_scored_urls = []
+    semantic_filter = get_semantic_filter()
     try:
-        semantic_filter = get_semantic_filter()
         emit_event("reasoning", {"layer": "semantic_filter", "thought": "Computing embeddings for relevance scoring..."})
         
         # Filter using embeddings with profile threshold (one batch API call for ALL results)
         semantic_scored_urls = await semantic_filter.filter_results(
             all_results, 
             max_results=discovery_profile.max_crawl_urls,
-            threshold_override=discovery_profile.semantic_threshold
+            threshold_override=discovery_profile.semantic_threshold,
+            category=query_category,
         )
         
         emit_event("layer_complete", {
             "layer": "semantic_filter",
-            "stats": {"input": len(all_results), "output": len(semantic_scored_urls), "threshold": discovery_profile.semantic_threshold}
+            "stats": {
+                "input": len(all_results),
+                "output": len(semantic_scored_urls),
+                "threshold": discovery_profile.semantic_threshold,
+                "category": query_category,
+                "prefilter_skipped": semantic_filter.last_prefilter_skipped,
+            }
         })
         
         # Log top results for debugging
@@ -357,6 +430,7 @@ async def main(
 
     # Filter out already-seen URLs using cache (check within last 7 days)
     unseen_urls = filtered_urls if ignore_cache else url_cache.filter_unseen(filtered_urls, within_days=7)
+    cache_skipped = len(filtered_urls) - len(unseen_urls)
     
     # Use profile settings for max URLs (personalized gets slightly fewer)
     max_urls = min(discovery_profile.max_crawl_urls, 25 if user_profile else discovery_profile.max_crawl_urls)
@@ -401,6 +475,8 @@ async def main(
     extraction_count = [0]  # Use list for mutable counter in closure
     rejection_counts = Counter()
     rejection_lock = asyncio.Lock()
+    dedupe_lock = asyncio.Lock()
+    seen_title_org = set()
 
     async def log_rejection(
         reason: str,
@@ -521,6 +597,23 @@ async def main(
                 # For expired recurring/annual opportunities, set priority recheck
                 if opp.is_expired and opp.timing_type in [OpportunityTiming.ANNUAL, OpportunityTiming.RECURRING, OpportunityTiming.SEASONAL]:
                     opp.recheck_days = 3
+
+                # Deduplicate within this run by normalized title + organization
+                title_key = normalize_text(opp.title or "")
+                org_key = normalize_text(opp.organization or "")
+                dedupe_key = f"{title_key}|{org_key}"
+                async with dedupe_lock:
+                    if dedupe_key in seen_title_org:
+                        url_cache.mark_seen(crawl_result.url, "duplicate", expires_days=30, notes="Duplicate title/org")
+                        await log_rejection(
+                            "duplicate_title_org",
+                            crawl_result.url,
+                            title=opp.title,
+                            content_type=opp.content_type.value,
+                            confidence=confidence,
+                        )
+                        return {"error": "Duplicate title/org", "url": crawl_result.url}
+                    seen_title_org.add(dedupe_key)
                 
                 # Sync to database (contributes to overall database)
                 if sync:
@@ -602,6 +695,16 @@ async def main(
 
     emit_event("rejection_summary", {
         "reasons": dict(rejection_counts),
+    })
+    emit_event("filter_report", {
+        "query_category": query_category,
+        "query_count": len(search_queries),
+        "search_results": len(all_results),
+        "semantic_prefilter_skipped": semantic_filter.last_prefilter_skipped,
+        "semantic_kept": len(semantic_scored_urls),
+        "cache_skipped": cache_skipped,
+        "urls_crawled": len(urls_to_process),
+        "rejections": dict(rejection_counts),
     })
     
     # DB sync layer (already done inline, just emit completion)
