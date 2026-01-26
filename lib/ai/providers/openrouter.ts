@@ -55,6 +55,15 @@ interface OpenRouterStreamDelta {
     delta: {
       content?: string
       role?: string
+      tool_calls?: Array<{
+        index: number
+        id?: string
+        type?: 'function'
+        function?: {
+          name?: string
+          arguments?: string
+        }
+      }>
     }
     finish_reason?: string
   }>
@@ -509,11 +518,19 @@ export class OpenRouterProvider extends BaseProvider {
       ? this.mapFinishReason(choice.finish_reason)
       : undefined
 
+    const toolCall = choice.delta?.tool_calls?.[0]
+
     return {
       id: data.id,
       content: choice.delta?.content || '',
       finishReason: finishReason === 'content_filter' ? 'stop' : finishReason,
       isLast: !!choice.finish_reason,
+      toolCallDelta: toolCall ? {
+        index: toolCall.index,
+        id: toolCall.id,
+        type: toolCall.type,
+        function: toolCall.function,
+      } : undefined,
     }
   }
 

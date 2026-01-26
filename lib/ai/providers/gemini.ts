@@ -352,15 +352,33 @@ export class GeminiProvider {
       let isFirst = true
       let totalContent = ''
       let promptTokens = this.estimateTokens(options.messages)
+      let hasToolCalls = false
 
-      for await (const text of result.textStream) {
-        if (text) {
-          totalContent += text
+      for await (const part of result.fullStream) {
+        if (part.type === 'text-delta') {
+          totalContent += part.textDelta
           yield {
             id: `gemini-stream-${Date.now()}`,
-            content: text,
+            content: part.textDelta,
             isFirst,
             isLast: false,
+          }
+          isFirst = false
+        } else if (part.type === 'tool-call') {
+          hasToolCalls = true
+          yield {
+            id: `gemini-stream-${Date.now()}`,
+            content: '',
+            isFirst,
+            isLast: false,
+            toolCalls: [{
+              id: part.toolCallId,
+              type: 'function',
+              function: {
+                name: part.toolName,
+                arguments: JSON.stringify(part.args),
+              },
+            }],
           }
           isFirst = false
         }
@@ -385,7 +403,7 @@ export class GeminiProvider {
       yield {
         id: `gemini-stream-${Date.now()}`,
         content: '',
-        finishReason: 'stop',
+        finishReason: hasToolCalls ? 'tool_calls' : 'stop',
         isLast: true,
       }
 

@@ -133,6 +133,23 @@ export interface StreamChunk {
   finishReason?: 'stop' | 'length' | 'function_call' | 'tool_calls'
   isFirst?: boolean
   isLast?: boolean
+  toolCalls?: Array<{
+    id: string
+    type: 'function'
+    function: {
+      name: string
+      arguments: string
+    }
+  }>
+  toolCallDelta?: {
+    index: number
+    id?: string
+    type?: 'function'
+    function?: {
+      name?: string
+      arguments?: string
+    }
+  }
 }
 
 // ============================================================================

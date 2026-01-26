@@ -208,116 +208,7 @@ async function handleStreamingResponse(
   // Run the streaming loop in background
   ;(async () => {
     try {
-      let currentMessages = [...messages]
-      let iterations = 0
-      const maxIterations = 10 // Prevent infinite loops
-
-      while (iterations < maxIterations) {
-        iterations++
-
-        // Make API call with tools
-        const result = await ai.complete({
-          messages: currentMessages,
-          useCase: 'chat',
-          temperature: 0.7,
-          maxTokens: 2048,
-          tools: AI_TOOLS,
-          toolChoice: 'auto',
-        }) as CompletionResult
-
-        // Check if we have tool calls
-        if (result.toolCalls && result.toolCalls.length > 0) {
-          // Send tool status (simple loading indicator)
-          const toolNames = result.toolCalls.map(tc => tc.function.name)
-          const loadingMessage = getLoadingMessage(toolNames)
-          
-          await writer.write(encoder.encode(`data: ${JSON.stringify({
-            type: 'tool-status',
-            status: loadingMessage,
-          })}\n\n`))
-
-          // Execute all tool calls
-          const toolResults: { toolCallId: string; result: ToolResult; name: string }[] = []
-          
-          for (const toolCall of result.toolCalls) {
-            const args = JSON.parse(toolCall.function.arguments || '{}')
-            const toolResult = await executeTool(toolCall.function.name, userId, args)
-            
-            toolResults.push({
-              toolCallId: toolCall.id,
-              result: toolResult,
-              name: toolCall.function.name,
-            })
-
-            // Special handling for web discovery trigger
-            if ((toolCall.function.name === 'trigger_web_discovery' || 
-                 toolCall.function.name === 'personalized_web_discovery') && toolResult.success) {
-              const data = toolResult.data as { triggerDiscovery: boolean; query: string; isPersonalized?: boolean }
-              if (data.triggerDiscovery) {
-                await writer.write(encoder.encode(`data: ${JSON.stringify({
-                  type: 'trigger_discovery',
-                  query: data.query,
-                  isPersonalized: data.isPersonalized || false,
-                })}\n\n`))
-              }
-            }
-
-            // Send opportunity results for rendering cards
-            if ((toolCall.function.name === 'search_opportunities' || 
-                 toolCall.function.name === 'smart_search_opportunities' ||
-                 toolCall.function.name === 'filter_by_deadline') && toolResult.success) {
-              const data = toolResult.data as { opportunities: unknown[] }
-              if (data.opportunities && data.opportunities.length > 0) {
-                await writer.write(encoder.encode(`data: ${JSON.stringify({
-                  type: 'opportunities',
-                  opportunities: data.opportunities,
-                  isPersonalized: toolCall.function.name === 'smart_search_opportunities',
-                })}\n\n`))
-              }
-            }
-          }
-
-          // Add assistant message with tool calls to history
-          currentMessages.push({
-            role: 'assistant',
-            content: result.content || '',
-            functionCall: result.toolCalls[0] ? {
-              name: result.toolCalls[0].function.name,
-              arguments: result.toolCalls[0].function.arguments,
-            } : undefined,
-          })
-
-          // Add tool results to messages
-          for (const { toolCallId, result: toolResult, name } of toolResults) {
-            currentMessages.push({
-              role: 'function',
-              name: name,
-              content: JSON.stringify(toolResult.data || { error: toolResult.error }),
-            })
-          }
-
-          // Continue the loop to get final response
-          continue
-        }
-
-        // No tool calls - stream the final response
-        if (result.content) {
-          // Send as streaming chunks for consistent UI
-          const words = result.content.split(' ')
-          for (let i = 0; i < words.length; i++) {
-            const chunk = (i === 0 ? '' : ' ') + words[i]
-            await writer.write(encoder.encode(`data: ${JSON.stringify({
-              type: 'text-delta',
-              textDelta: chunk,
-            })}\n\n`))
-            // Small delay for natural streaming feel
-            await new Promise(r => setTimeout(r, 20))
-          }
-        }
-
-        break // Exit loop after final response
-      }
-
+      await processStream(ai, messages, userId, writer, encoder)
       // Send done event
       await writer.write(encoder.encode('data: [DONE]\n\n'))
     } catch (error) {
@@ -339,6 +230,164 @@ async function handleStreamingResponse(
       'Connection': 'keep-alive',
     },
   })
+}
+
+interface AccumulatedToolCall {
+  id: string
+  name: string
+  arguments: string
+}
+
+async function processStream(
+  ai: ReturnType<typeof getAIManager>,
+  messages: Message[],
+  userId: string,
+  writer: WritableStreamDefaultWriter<Uint8Array>,
+  encoder: TextEncoder,
+  iteration: number = 0
+): Promise<void> {
+  const maxIterations = 10
+  if (iteration >= maxIterations) {
+    await writer.write(encoder.encode(`data: ${JSON.stringify({
+      type: 'error',
+      error: 'Max iterations reached'
+    })}\n\n`))
+    return
+  }
+
+  const stream = ai.stream({
+    messages,
+    useCase: 'chat',
+    temperature: 0.7,
+    maxTokens: 2048,
+    tools: AI_TOOLS,
+    toolChoice: 'auto',
+  })
+
+  let currentContent = ''
+  let currentToolCalls: Record<number, AccumulatedToolCall> = {}
+  let completedToolCalls: AccumulatedToolCall[] = []
+  let hasToolCalls = false
+
+  for await (const chunk of stream) {
+    if (chunk.content) {
+      currentContent += chunk.content
+      await writer.write(encoder.encode(`data: ${JSON.stringify({
+        type: 'text-delta',
+        textDelta: chunk.content,
+      })}\n\n`))
+    }
+
+    if (chunk.toolCalls) {
+        hasToolCalls = true
+        chunk.toolCalls.forEach((tc) => {
+            completedToolCalls.push({
+                id: tc.id,
+                name: tc.function.name,
+                arguments: tc.function.arguments
+            })
+        })
+    }
+
+    if (chunk.toolCallDelta) {
+        hasToolCalls = true
+        const delta = chunk.toolCallDelta
+        const idx = delta.index
+
+        if (!currentToolCalls[idx]) {
+            currentToolCalls[idx] = { name: '', arguments: '', id: delta.id || '' }
+        }
+
+        if (delta.function?.name) currentToolCalls[idx].name += delta.function.name
+        if (delta.function?.arguments) currentToolCalls[idx].arguments += delta.function.arguments
+        if (delta.id && !currentToolCalls[idx].id) currentToolCalls[idx].id = delta.id
+    }
+  }
+
+  // After stream ends for this turn
+  if (hasToolCalls) {
+      const toolCalls = [...Object.values(currentToolCalls), ...completedToolCalls]
+      const toolNames = toolCalls.map(tc => tc.name)
+      const loadingMessage = getLoadingMessage(toolNames)
+
+      await writer.write(encoder.encode(`data: ${JSON.stringify({
+        type: 'tool-status',
+        status: loadingMessage,
+      })}\n\n`))
+
+      const toolResults: { toolCallId: string; result: ToolResult; name: string }[] = []
+
+      // Add assistant message with tool calls to history
+      const assistantMessage: Message = {
+        role: 'assistant',
+        content: currentContent,
+        toolCalls: toolCalls.map(tc => ({
+            id: tc.id,
+            type: 'function',
+            function: {
+                name: tc.name,
+                arguments: tc.arguments,
+            }
+        }))
+      }
+      messages.push(assistantMessage)
+
+      // Execute tools
+      for (const toolCall of toolCalls) {
+        let args = {}
+        try {
+            args = JSON.parse(toolCall.arguments || '{}')
+        } catch (e) {
+            console.error('Failed to parse tool arguments', toolCall.arguments)
+        }
+
+        const toolResult = await executeTool(toolCall.name, userId, args)
+
+        toolResults.push({
+          toolCallId: toolCall.id,
+          result: toolResult,
+          name: toolCall.name,
+        })
+
+        // Special handling (web discovery, opportunities)
+        if ((toolCall.name === 'trigger_web_discovery' ||
+             toolCall.name === 'personalized_web_discovery') && toolResult.success) {
+             const data = toolResult.data as { triggerDiscovery: boolean; query: string; isPersonalized?: boolean }
+             if (data.triggerDiscovery) {
+                await writer.write(encoder.encode(`data: ${JSON.stringify({
+                  type: 'trigger_discovery',
+                  query: data.query,
+                  isPersonalized: data.isPersonalized || false,
+                })}\n\n`))
+             }
+        }
+
+        if ((toolCall.name === 'search_opportunities' ||
+             toolCall.name === 'smart_search_opportunities' ||
+             toolCall.name === 'filter_by_deadline') && toolResult.success) {
+             const data = toolResult.data as { opportunities: unknown[] }
+             if (data.opportunities && data.opportunities.length > 0) {
+                await writer.write(encoder.encode(`data: ${JSON.stringify({
+                  type: 'opportunities',
+                  opportunities: data.opportunities,
+                  isPersonalized: toolCall.name === 'smart_search_opportunities',
+                })}\n\n`))
+             }
+        }
+      }
+
+      // Add tool results to messages
+      for (const { toolCallId, result: toolResult, name } of toolResults) {
+        messages.push({
+          role: 'function',
+          name: name,
+          content: JSON.stringify(toolResult.data || { error: toolResult.error }),
+        })
+      }
+
+      // Recurse
+      await processStream(ai, messages, userId, writer, encoder, iteration + 1)
+  }
 }
 
 /**
