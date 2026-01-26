@@ -530,6 +530,206 @@ async def run_batch_discovery(
         await sync.close()
 
 
+@app.get("/discover/stream")
+async def discovery_stream(
+    query: str,
+    userProfileId: Optional[str] = None,
+    profile: str = "quick",
+    token: str = Depends(verify_token),
+):
+    """
+    Stream discovery events as Server-Sent Events (SSE).
+    """
+    if not query or len(query) < 3:
+        raise HTTPException(
+            status_code=400,
+            detail="Query must be at least 3 characters"
+        )
+    
+    db_url = os.getenv("DATABASE_URL")
+    if not db_url:
+        raise HTTPException(
+            status_code=500,
+            detail="DATABASE_URL not configured"
+        )
+
+    async def event_generator():
+        from src.embeddings import get_embeddings
+        from src.db.vector_db import get_vector_db
+        from src.db.models import OpportunityTiming, ContentType
+        import time
+        from collections import Counter
+        import re
+        from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode
+
+        start_time = time.time()
+        discovery_profile = get_discovery_profile(profile)
+        settings = get_settings()
+        
+        # Helper to yield JSON events
+        def emit(event_type: str, data: dict):
+            return f"data: {json.dumps({'type': event_type, **data})}\n\n"
+
+        yield emit("layer_start", {
+            "layer": "query_generation", 
+            "message": f"Analyzing: '{query}'",
+            "profile": discovery_profile.name
+        })
+
+        # Initialize components
+        search_client = get_searxng_client()
+        query_generator = get_query_generator()
+        crawler = get_hybrid_crawler()
+        extractor = get_extractor()
+        url_cache = get_url_cache()
+        sync = PostgresSync(db_url)
+        await sync.connect()
+
+        try:
+            # Generate search queries
+            yield emit("reasoning", {"layer": "query_generation", "thought": "Using AI to generate diverse queries..."})
+            try:
+                search_queries = await query_generator.generate_queries(query, count=discovery_profile.max_queries)
+            except Exception:
+                current_year = datetime.now().year
+                search_queries = [
+                    f"high school {query} summer program {current_year}",
+                    f"{query} internship for high school students",
+                    f"{query} research opportunities for high schoolers",
+                    f"{query} competitions high school {current_year}",
+                    f"{query} volunteer work for teens",
+                ]
+            
+            query_category = detect_query_category(search_queries, query)
+            yield emit("layer_complete", {
+                "layer": "query_generation",
+                "stats": {"count": len(search_queries)},
+                "items": search_queries
+            })
+
+            # Search phase
+            yield emit("layer_start", {"layer": "web_search", "message": f"Searching with {len(search_queries)} queries..."})
+            
+            all_results = []
+            seen_urls = set()
+            
+            for search_query in search_queries:
+                yield emit("search", {"query": search_query})
+                try:
+                    results = await search_client.search(search_query, max_results=10)
+                    for result in results:
+                        if result.url not in seen_urls:
+                            seen_urls.add(result.url)
+                            all_results.append((result.url, result.title or "", result.snippet or ""))
+                            yield emit("found", {"url": result.url, "source": result.title or "Web Result"})
+                except Exception:
+                    continue
+            
+            yield emit("layer_complete", {
+                "layer": "web_search",
+                "stats": {"total": len(all_results), "queries": len(search_queries)}
+            })
+
+            # Semantic filtering
+            yield emit("layer_start", {"layer": "semantic_filter", "message": "Applying AI relevance filter..."})
+            semantic_filter = get_semantic_filter()
+            try:
+                scored_urls = await semantic_filter.filter_results(
+                    all_results,
+                    max_results=discovery_profile.max_crawl_urls,
+                    threshold_override=discovery_profile.semantic_threshold,
+                    category=query_category,
+                )
+                filtered_urls = [url for url, score in scored_urls]
+            except Exception:
+                filtered_urls = [url for url, _, _ in all_results]
+            
+            yield emit("layer_complete", {
+                "layer": "semantic_filter",
+                "stats": {"input": len(all_results), "output": len(filtered_urls)}
+            })
+
+            # Filter already-seen URLs
+            unseen_urls = url_cache.filter_unseen(filtered_urls, within_days=7)
+            urls_to_process = unseen_urls[:discovery_profile.max_crawl_urls]
+            
+            if not urls_to_process:
+                yield emit("complete", {"count": 0, "message": "No new opportunities found"})
+                return
+
+            # Crawl
+            yield emit("layer_start", {"layer": "parallel_crawl", "message": f"Crawling {len(urls_to_process)} URLs..."})
+            for url in urls_to_process:
+                yield emit("analyzing", {"url": url})
+            
+            crawl_results = await crawler.crawl_batch(
+                urls_to_process, 
+                max_concurrent=discovery_profile.max_concurrent_crawls
+            )
+            
+            crawl_success = sum(1 for r in crawl_results if r.success)
+            yield emit("layer_complete", {
+                "layer": "parallel_crawl",
+                "stats": {"total": len(urls_to_process), "completed": crawl_success, "failed": len(urls_to_process) - crawl_success}
+            })
+
+            # Extract and save
+            yield emit("layer_start", {"layer": "ai_extraction", "message": f"Extracting from {crawl_success} pages..."})
+            
+            success_count = [0]
+            extraction_semaphore = asyncio.Semaphore(discovery_profile.max_concurrent_extractions)
+            
+            async def extract_and_save(crawl_result):
+                if not crawl_result.success:
+                    return
+                
+                async with extraction_semaphore:
+                    try:
+                        extraction = await extractor.extract(crawl_result.markdown, crawl_result.url)
+                        if extraction.success and extraction.opportunity_card:
+                            opp = extraction.opportunity_card
+                            # Save to database
+                            await sync.upsert_opportunity(opp)
+                            success_count[0] += 1
+                            # We can't yield from here easily, so we'll collect results
+                            return opp
+                    except Exception:
+                        pass
+                return None
+
+            tasks = [extract_and_save(cr) for cr in crawl_results]
+            results = await asyncio.gather(*tasks)
+            
+            for opp in results:
+                if opp:
+                    yield emit("opportunity_found", {
+                        "title": opp.title,
+                        "organization": opp.organization,
+                        "url": opp.url,
+                        "category": opp.category.value if opp.category else "Other",
+                    })
+
+            total_time = time.time() - start_time
+            yield emit("complete", {
+                "count": success_count[0],
+                "metrics": {"total_time_seconds": round(total_time, 2)}
+            })
+            yield emit("done", {"code": 0})
+
+        finally:
+            await sync.close()
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        }
+    )
+
+
 # For running with uvicorn
 if __name__ == "__main__":
     import uvicorn
