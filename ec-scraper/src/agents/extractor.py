@@ -2,8 +2,9 @@
 
 import asyncio
 import re
+from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 from ..config import get_settings
 from ..db.models import (
@@ -17,6 +18,16 @@ from ..db.models import (
     OpportunityTiming,
 )
 from ..llm import get_llm_provider, GenerationConfig
+
+
+@dataclass
+class MultiExtractionResult:
+    """Result of extracting multiple opportunities from a list page."""
+    success: bool
+    opportunities: List[OpportunityCard] = field(default_factory=list)
+    error: Optional[str] = None
+    is_list_page: bool = False
+    raw_content: Optional[str] = None
 
 
 EXTRACTION_PROMPT = """You are an expert at extracting information about opportunities for high school students.
@@ -92,6 +103,47 @@ WEBPAGE CONTENT:
 ---"""
 
 
+LIST_PAGE_EXTRACTION_PROMPT = """You are an expert at extracting information about HIGH SCHOOL opportunities from list pages.
+
+Current date: January 16, 2026
+
+This page lists MULTIPLE opportunities. Extract up to 7 distinct, high-quality opportunities suitable for high school students.
+
+SELECTION CRITERIA:
+- Focus on opportunities with SPECIFIC program names and organizations
+- Prioritize those with deadlines, application info, or official program details
+- Skip generic advice or vague mentions
+- Ensure each opportunity is DISTINCT (different program, not variations)
+
+For EACH opportunity, extract:
+- title: Specific program name (e.g., "NASA SEES Internship", not "NASA programs")
+- organization: Hosting organization name
+- summary: 1-2 sentence description
+- category: One of [STEM, Arts, Business, Humanities, Social_Sciences, Health, Sports, Community_Service, Other]
+- opportunity_type: One of [Competition, Internship, Summer_Program, Scholarship, Research, Volunteer, Award, Camp, Course, Other]
+- deadline: Application deadline if mentioned (YYYY-MM-DD format)
+- url: Direct link to the program if available in the content, otherwise null
+- location_type: One of [Online, In-Person, Hybrid]
+- grade_levels: Array of eligible grades [9, 10, 11, 12]
+
+Return a JSON object with:
+{{
+  "is_list_page": true,
+  "opportunities": [
+    {{ ...opportunity fields... }},
+    ...
+  ]
+}}
+
+If this is NOT a list page, return:
+{{ "is_list_page": false, "opportunities": [] }}
+
+WEBPAGE CONTENT:
+---
+{content}
+---"""
+
+
 class ExtractorAgent:
     """Agent that extracts opportunity information from webpage content using LLM provider."""
 
@@ -117,12 +169,44 @@ class ExtractorAgent:
             signals += 1
         return signals >= 2
 
+    def _is_likely_list_page(self, content: str) -> bool:
+        """Detect if content is a list page that may contain multiple opportunities."""
+        preview = content[:3000].lower()
+        list_signals = 0
+        
+        # Check for list-style indicators
+        list_phrases = [
+            "top ", "best ", " programs for ", " internships for ",
+            " scholarships for ", " competitions for ",
+            "here are", "we've compiled", "check out these",
+        ]
+        if any(phrase in preview for phrase in list_phrases):
+            list_signals += 1
+        
+        # Check for numbered lists or bullet points with program-like content
+        if re.search(r"\b\d+\.\s+[A-Z]", content[:3000]):  # "1. Program Name"
+            list_signals += 1
+        if preview.count("\n- ") >= 5 or preview.count("\n* ") >= 5:
+            list_signals += 1
+        
+        # Check for multiple organization/program mentions
+        org_patterns = [
+            r"university|college|institute|foundation|nasa|nsf",
+            r"program|internship|scholarship|competition",
+        ]
+        org_count = sum(len(re.findall(p, preview)) for p in org_patterns)
+        if org_count >= 10:
+            list_signals += 1
+        
+        # Needs at least 2 signals to be considered a list page
+        return list_signals >= 2
+
     def _truncate_content(self, content: str, max_length: int) -> str:
         """Keep the most relevant sections while trimming long pages."""
         if len(content) <= max_length:
             return content
-        head = content[:4000]
-        tail = content[-2000:]
+        head = content[:5000]  # Increased from 4000 for better context
+        tail = content[-3000:]  # Increased from 2000
         keywords = [
             "deadline", "apply", "application", "eligibility", "requirements",
             "dates", "timeline", "program", "scholarship", "internship",
@@ -217,6 +301,144 @@ class ExtractorAgent:
             raw_content=truncated_content[:1000],
         )
 
+    async def extract_list(
+        self,
+        content: str,
+        url: str,
+        source_url: Optional[str] = None,
+    ) -> MultiExtractionResult:
+        """
+        Extract multiple opportunities from a list/aggregator page.
+        
+        Args:
+            content: Markdown content from the webpage
+            url: The URL being processed
+            source_url: Where we discovered this URL
+            
+        Returns:
+            MultiExtractionResult with list of extracted opportunity cards
+        """
+        if not content or len(content.strip()) < 200:
+            return MultiExtractionResult(
+                success=False,
+                error="Content too short for list extraction",
+                is_list_page=False,
+                raw_content=content,
+            )
+
+        # Truncate for list pages (allow more content for multiple items)
+        max_content_length = 15000
+        truncated_content = self._truncate_content(content, max_content_length)
+        
+        # Build list extraction prompt
+        prompt = LIST_PAGE_EXTRACTION_PROMPT.replace("{content}", truncated_content)
+        
+        config = GenerationConfig(
+            temperature=0.2,
+            max_output_tokens=2000,  # More tokens for multiple items
+            use_fast_model=True,
+        )
+        
+        try:
+            from ..utils.json_parser import safe_json_loads
+            response = await self.provider.generate(prompt, config)
+            data = safe_json_loads(response, expected_type=dict, fallback={})
+            
+            if not data.get("is_list_page", False):
+                return MultiExtractionResult(
+                    success=False,
+                    is_list_page=False,
+                    raw_content=truncated_content[:500],
+                )
+            
+            opportunities: List[OpportunityCard] = []
+            raw_opps = data.get("opportunities") or []
+            
+            for opp_data in raw_opps[:7]:  # Max 7 from a single list page
+                try:
+                    opp_card = self._build_opportunity_card_from_list(opp_data, url, source_url)
+                    if opp_card and opp_card.title and opp_card.title != "Unknown Opportunity":
+                        opportunities.append(opp_card)
+                except Exception:
+                    continue
+            
+            return MultiExtractionResult(
+                success=len(opportunities) > 0,
+                opportunities=opportunities,
+                is_list_page=True,
+                raw_content=truncated_content[:500],
+            )
+            
+        except Exception as e:
+            return MultiExtractionResult(
+                success=False,
+                error=str(e),
+                is_list_page=False,
+                raw_content=truncated_content[:500],
+            )
+
+    def _build_opportunity_card_from_list(
+        self,
+        data: dict,
+        source_url: str,
+        discovery_url: Optional[str],
+    ) -> Optional[OpportunityCard]:
+        """Build an OpportunityCard from list-extracted data (minimal fields)."""
+        title = data.get("title")
+        if not title or title.lower() in ["unknown", "n/a", ""]:
+            return None
+        
+        # Parse category
+        category_str = data.get("category") or "Other"
+        try:
+            category = OpportunityCategory(category_str)
+        except ValueError:
+            category = OpportunityCategory.OTHER
+        
+        # Parse opportunity type
+        opp_type_str = data.get("opportunity_type") or "Other"
+        try:
+            opportunity_type = OpportunityType(opp_type_str)
+        except ValueError:
+            opportunity_type = OpportunityType.OTHER
+        
+        # Parse location type
+        loc_type_str = data.get("location_type") or "Online"
+        try:
+            location_type = LocationType(loc_type_str)
+        except ValueError:
+            location_type = LocationType.ONLINE
+        
+        # Parse deadline
+        deadline = self._parse_date(data.get("deadline"))
+        
+        # Grade levels
+        grade_levels = data.get("grade_levels") or [9, 10, 11, 12]
+        if not isinstance(grade_levels, list):
+            grade_levels = [9, 10, 11, 12]
+        
+        # URL: use provided URL or fall back to source
+        opp_url = data.get("url") or source_url
+        
+        return OpportunityCard(
+            url=opp_url,
+            source_url=discovery_url or source_url,
+            title=title,
+            summary=data.get("summary") or f"Opportunity: {title}",
+            organization=data.get("organization"),
+            content_type=ContentType.OPPORTUNITY,
+            category=category,
+            opportunity_type=opportunity_type,
+            tags=[],
+            grade_levels=grade_levels,
+            location_type=location_type,
+            location=data.get("location"),
+            deadline=deadline,
+            extraction_confidence=0.6,  # Lower confidence for list-extracted
+            timing_type=OpportunityTiming.ANNUAL,  # Default assumption
+            is_expired=False,
+        )
+
     async def _do_extraction(
         self,
         prompt: str,
@@ -228,8 +450,8 @@ class ExtractorAgent:
         
         config = GenerationConfig(
             temperature=0.1,
-            max_output_tokens=1200,  # Reduced from 1500 for speed
-            use_fast_model=True,  # Use fast model for extraction
+            max_output_tokens=4096,  # Increased for Gemini 2.5
+            use_fast_model=True,  # Start with Flash, will auto-upgrade on retry
         )
         
         try:
@@ -239,11 +461,33 @@ class ExtractorAgent:
                 config=config,
             )
         except Exception as e:
-            return ExtractionResult(
-                success=False,
-                error=f"Failed to parse response: {e}",
-                raw_content=truncated_content[:500],
-            )
+            # Retry logic for empty responses or token limits
+            error_msg = str(e)
+            if "Empty response" in error_msg or "truncated" in error_msg or "MAX_TOKENS" in error_msg:
+                try:
+                    # Retry with main model and higher token limit
+                    retry_config = GenerationConfig(
+                        temperature=0.1,
+                        max_output_tokens=3000,  # Increased significanty
+                        use_fast_model=False,    # Force main model
+                    )
+                    data = await self.provider.generate_structured(
+                        prompt=prompt,
+                        schema=ExtractionResponse,
+                        config=retry_config,
+                    )
+                except Exception as retry_e:
+                    return ExtractionResult(
+                        success=False,
+                        error=f"Failed after retry: {retry_e}",
+                        raw_content=truncated_content[:500],
+                    )
+            else:
+                return ExtractionResult(
+                    success=False,
+                    error=f"Failed to parse response: {e}",
+                    raw_content=truncated_content[:500],
+                )
 
         # Check if the content was validated as a real opportunity
         if not data.get("valid", True):

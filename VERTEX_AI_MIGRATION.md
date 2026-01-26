@@ -143,7 +143,7 @@ If you need to temporarily revert to the Gemini Developer API:
 ```bash
 # In ec-scraper/.env
 USE_VERTEX_AI=false
-GOOGLE_API_KEY=AIzaSyDDGaGA5UJrCzQ6F5tV0uo86mka2fFMzyU
+GOOGLE_API_KEY=your-gemini-api-key
 ```
 
 Note: This will use the free-tier API with lower quotas and may continue to experience 429 errors.

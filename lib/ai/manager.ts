@@ -205,7 +205,7 @@ const DEFAULT_USE_CASE_MODELS_INTERNAL: Record<UseCase, { primary: string; fallb
 
 
     // Gemini (Google AI)
-    const geminiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY
+    const geminiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY
     if (geminiKey) {
       providers.push({
         name: 'gemini',
@@ -219,7 +219,7 @@ const DEFAULT_USE_CASE_MODELS_INTERNAL: Record<UseCase, { primary: string; fallb
     }
 
     if (providers.length === 0) {
-      throw new Error('No AI providers configured. Set OPENROUTER_API_KEY or GEMINI_API_KEY.')
+      throw new Error('No AI providers configured. Set OPENROUTER_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY.')
     }
 
     this.initialize({

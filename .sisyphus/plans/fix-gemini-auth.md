@@ -15,7 +15,7 @@ The `@ai-sdk/google` SDK (v3.0.13) **ignores** the `apiKey` parameter passed to 
 
 Current `.env` has:
 ```
-GEMINI_API_KEY=AIzaSyDDGaGA5UJrCzQ6F5tV0uo86mka2fFMzyU
+GEMINI_API_KEY=your-gemini-api-key
 ```
 
 SDK expects:
@@ -63,7 +63,7 @@ Add the correct environment variable for @ai-sdk/google to read
   - Add the following line:
     ```
     # AI SDK Google Provider (required by @ai-sdk/google)
-    GOOGLE_GENERATIVE_AI_API_KEY=AIzaSyDDGaGA5UJrCzQ6F5tV0uo86mka2fFMzyU
+    GOOGLE_GENERATIVE_AI_API_KEY=your-gemini-api-key
     ```
 
   **Must NOT do**:

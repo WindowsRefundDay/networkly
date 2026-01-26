@@ -4,11 +4,11 @@ import { useState, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { 
-  Search, 
-  Globe, 
-  Sparkles, 
-  Loader2, 
+import {
+  Search,
+  Globe,
+  Sparkles,
+  Loader2,
   ArrowRight,
   Zap,
   CheckCircle2,
@@ -49,7 +49,7 @@ interface DiscoveryTriggerCardProps {
 const DISCOVERY_SUGGESTIONS = [
   "AI/ML internships",
   "Research programs",
-  "Summer fellowships", 
+  "Summer fellowships",
   "STEM competitions",
   "Volunteer opportunities",
 ]
@@ -102,8 +102,36 @@ export function DiscoveryTriggerCard({
   // Auto-expand when active or complete
   const isComplete = state?.status === "complete"
   const isRunning = state?.status === "running"
-  
+
   const showExpanded = isExpanded || isRunning || isComplete
+
+  const handleStartDiscovery = useCallback(() => {
+    if (query.trim().length < 2) return
+    startDiscovery(query, personalizedEnabled ? { isPersonalized: true, userProfileId } : undefined)
+    setShowSuggestions(false)
+  }, [query, startDiscovery, personalizedEnabled, userProfileId])
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault()
+      handleStartDiscovery()
+    }
+  }
+
+  const handleSuggestionClick = (suggestion: string) => {
+    setQuery(suggestion)
+    startDiscovery(suggestion, personalizedEnabled ? { isPersonalized: true, userProfileId } : undefined)
+    setShowSuggestions(false)
+  }
+
+  const handleDismiss = () => {
+    clearState()
+    setQuery("")
+    setShowSuggestions(true)
+    if (compact) {
+      setIsExpanded(false)
+    }
+  }
 
   return (
     <div

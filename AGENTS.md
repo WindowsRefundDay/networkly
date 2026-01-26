@@ -6,7 +6,7 @@
 
 ## OVERVIEW
 
-AI-powered professional networking platform. Next.js 16 + Prisma + multi-provider AI (Groq/Gemini/OpenRouter) + embedded Python scraper.
+AI-powered professional networking platform. Next.js 16 + Prisma + multi-provider AI (Gemini/OpenRouter) + embedded Python scraper.
 
 ## STRUCTURE
 
@@ -91,7 +91,7 @@ ec-scraper/           # Python discovery engine (polyglot repo)
 ## ANTI-PATTERNS (THIS PROJECT)
 
 **NEVER:**
-- Call AI providers directly (Groq/Gemini/OpenRouter SDKs) — Use `getAIManager()`
+- Call AI providers directly (Gemini/OpenRouter SDKs) — Use `getAIManager()`
 - Use `as any`, `@ts-ignore`, `@ts-expect-error` — Type errors are allowed in build but should be fixed
 - Import Prisma from anywhere except `@/lib/prisma`
 - Hardcode colors — Use OKLCH variables from `globals.css`
@@ -117,7 +117,7 @@ ec-scraper/           # Python discovery engine (polyglot repo)
 
 ### AI Model Management
 - **Use-case based** — System selects model based on task type, not manual choice
-- **Auto-fallback** — Groq fails → OpenRouter → Gemini
+- **Auto-fallback** — Gemini → OpenRouter
 - **Cost monitoring** — Every completion tracked in `data/ai-costs.json`
 
 ## COMMANDS

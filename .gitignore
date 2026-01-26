@@ -16,9 +16,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files - tracked in this private repo
-# NOTE: Only share these because this is a PRIVATE repository!
-# .env*
+# env files
+.env*
+!.env.example
 
 # vercel
 .vercel

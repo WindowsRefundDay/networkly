@@ -223,8 +223,10 @@ class DiscoveryAgent:
         url_lower = url.lower()
         
         # High-reputation domains (educational, government, major organizations)
-        if any(domain in url_lower for domain in ['.edu', '.gov', '.org']):
-            score += 0.2
+        if any(domain in url_lower for domain in ['.edu', '.gov']):
+            score += 0.25
+        elif '.org' in url_lower:
+            score += 0.15
         
         # Well-known opportunity platforms
         high_value_domains = [
@@ -234,6 +236,15 @@ class DiscoveryAgent:
         ]
         if any(domain in url_lower for domain in high_value_domains):
             score += 0.15
+
+        # Downrank known low-signal domains (SEO farms, generic content)
+        low_signal_domains = [
+            'faqtoids.com', 'simpli.com', 'smarter.com',
+            'usingenglish.com', 'consumersearch.com',
+            'bloglines.com', 'reference.com',
+        ]
+        if any(domain in url_lower for domain in low_signal_domains):
+            score -= 0.35
         
         # Positive URL patterns
         positive_patterns = [
@@ -249,7 +260,7 @@ class DiscoveryAgent:
             'blog', 'news', 'article', 'reddit', 'forum',
             'facebook', 'twitter', 'linkedin', 'indeed',
             '/blog/', '/guides/', '/guide/', '/article/', '/news/', '/post/', '/how-to/',
-            'how-to', 'ultimate-guide',
+            'how-to', 'ultimate-guide', 'top-10', 'best-', 'ranking', 'list-',
         ]
         if any(pattern in url_lower for pattern in negative_patterns):
             score -= 0.3

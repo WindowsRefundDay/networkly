@@ -31,8 +31,8 @@ function loadEnvFromFile(envPath: string): Record<string, string> {
         content.split("\n").forEach((line) => {
             const trimmed = line.trim();
             if (!trimmed || trimmed.startsWith("#")) return;
-                const [key, ...valueParts] = trimmed.split("=");
-                const value = valueParts.join("=").replace(/^["']|["']$/g, "");
+            const [key, ...valueParts] = trimmed.split("=");
+            const value = valueParts.join("=").replace(/^["']|["']$/g, "");
             env[key] = value;
         });
 
@@ -103,8 +103,26 @@ export async function triggerDiscovery(
 
             if (code === 0) {
                 // Parse the number of new opportunities from stdout
-                const match = stdout.match(/Added (\d+) real opportunities/);
-                const newCount = match ? parseInt(match[1], 10) : 0;
+                // The script emits JSON events, we need to find the "complete" event or count "opportunity_found" events
+                let newCount = 0;
+                try {
+                    const lines = stdout.split('\n');
+                    for (const line of lines) {
+                        try {
+                            const trimmed = line.trim();
+                            if (!trimmed.startsWith('{')) continue;
+
+                            const event = JSON.parse(trimmed);
+                            if (event.type === 'complete') {
+                                newCount = event.count || 0;
+                            }
+                        } catch (e) {
+                            // Ignore non-JSON lines
+                        }
+                    }
+                } catch (e) {
+                    console.error("Failed to parse discovery output:", e);
+                }
 
                 resolve({
                     success: true,
@@ -156,15 +174,15 @@ export async function triggerBatchDiscovery(
 
         // Build command arguments
         const args = [scriptPath];
-        
+
         if (sources.length === 1 && sources[0] !== "all") {
             args.push("--source", sources[0]);
         }
-        
+
         if (focusAreas.length > 0) {
             args.push("--focus", ...focusAreas);
         }
-        
+
         args.push("--limit", limit.toString());
 
         const pythonProcess = spawn("python", args, {

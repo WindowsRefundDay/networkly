@@ -205,6 +205,10 @@ async def main(
         user_profile_id: Optional user ID for personalized discovery
         profile: Discovery profile - 'quick' (on-demand) or 'daily' (batch)
     """
+    import time
+    start_time = time.time()
+    first_ec_time = None  # Track time to first EC
+    
     # Get discovery profile settings
     discovery_profile = get_discovery_profile(profile)
     emit_event("layer_start", {
@@ -425,6 +429,11 @@ async def main(
     
     # Get just the URLs (already sorted by relevance score)
     filtered_urls = [url for url, score in semantic_scored_urls]
+    # Prioritize high-signal URLs and drop low-score tail when enough candidates exist
+    min_semantic_score = 0.55
+    high_signal_urls = [url for url, score in semantic_scored_urls if score >= min_semantic_score]
+    if len(high_signal_urls) >= min(8, discovery_profile.max_crawl_urls):
+        filtered_urls = high_signal_urls
     
     # Optionally reset cache entries for this batch
     if reset_cache:
@@ -463,10 +472,16 @@ async def main(
             "urls_crawled": 0,
             "rejections": {},
         })
+        total_time = time.time() - start_time
         emit_event("complete", {
             "count": 0,
             "isPersonalized": user_profile is not None,
             "user_id": user_profile.get("user_id") if user_profile else None,
+            "metrics": {
+                "total_time_seconds": round(total_time, 2),
+                "time_to_first_ec": None,
+                "early_stopped": False,
+            }
         })
         if sync:
             await sync.close()
@@ -513,6 +528,8 @@ async def main(
     rejection_counts = Counter()
     rejection_lock = asyncio.Lock()
     dedupe_lock = asyncio.Lock()
+    saved_lock = asyncio.Lock()
+    saved_opportunities = []  # Track all saved opportunities
     seen_title_org = set()
 
     async def log_rejection(
@@ -535,6 +552,8 @@ async def main(
         })
     
     async def extract_and_save(crawl_result) -> dict | None:
+        """Extract from page - supports both single and list-page extraction."""
+        nonlocal first_ec_time
         if not crawl_result.success:
             url_cache.mark_seen(crawl_result.url, "failed", expires_days=7, notes=crawl_result.error)
             await log_rejection("crawl_failed", crawl_result.url, error=crawl_result.error)
@@ -547,11 +566,86 @@ async def main(
             return {"error": f"Content too short: {content_len} chars", "url": crawl_result.url}
         
         async with extraction_semaphore:
+            # Check if this looks like a list page and try multi-extraction
+            if extractor._is_likely_list_page(crawl_result.markdown):
+                list_result = await extractor.extract_list(crawl_result.markdown, crawl_result.url)
+                if list_result.success and list_result.opportunities:
+                    # Process multiple opportunities from list page
+                    saved_opps = []
+                    for opp in list_result.opportunities:
+                        # Apply same validation as single extraction
+                        if opp.title and opp.title != "Unknown Opportunity":
+                            # Deduplicate
+                            title_key = normalize_text(opp.title or "")
+                            org_key = normalize_text(opp.organization or "")
+                            dedupe_key = f"{title_key}|{org_key}"
+                            async with dedupe_lock:
+                                if dedupe_key in seen_title_org:
+                                    continue
+                                seen_title_org.add(dedupe_key)
+                            
+                            async with saved_lock:
+                                saved_opportunities.append(opp)
+                            saved_opps.append(opp)
+                            # Track time to first EC
+                            if first_ec_time is None:
+                                first_ec_time = time.time() - start_time
+                            # Stream each opportunity found
+                            emit_event("opportunity_found", {
+                                "title": opp.title,
+                                "organization": opp.organization,
+                                "url": opp.url,
+                                "category": opp.category.value if opp.category else "Other",
+                                "from_list_page": True,
+                            })
+                    
+                    if saved_opps:
+                        url_cache.mark_seen(crawl_result.url, "extracted_list", expires_days=7, notes=f"List: {len(saved_opps)} items")
+                        return {"success": True, "url": crawl_result.url, "count": len(saved_opps), "is_list": True}
+            
+            # Fall back to single extraction
             try:
                 extraction = await extractor.extract(crawl_result.markdown, crawl_result.url)
                 if not extraction.success:
+                    # If rejected as a listicle/ranking, try list extraction as fallback
+                    error_lower = (extraction.error or "").lower()
+                    if any(sig in error_lower for sig in ["listicle", "ranking", "multiple", "list"]):
+                        list_result = await extractor.extract_list(crawl_result.markdown, crawl_result.url)
+                        if list_result.success and list_result.opportunities:
+                            saved_opps = []
+                            for opp in list_result.opportunities:
+                                if opp.title and opp.title != "Unknown Opportunity":
+                                    title_key = normalize_text(opp.title or "")
+                                    org_key = normalize_text(opp.organization or "")
+                                    dedupe_key = f"{title_key}|{org_key}"
+                                    async with dedupe_lock:
+                                        if dedupe_key in seen_title_org:
+                                            continue
+                                        seen_title_org.add(dedupe_key)
+                                    async with saved_lock:
+                                        saved_opportunities.append(opp)
+                                    saved_opps.append(opp)
+                                    if first_ec_time is None:
+                                        first_ec_time = time.time() - start_time
+                                    emit_event("opportunity_found", {
+                                        "title": opp.title,
+                                        "organization": opp.organization,
+                                        "url": opp.url,
+                                        "category": opp.category.value if opp.category else "Other",
+                                        "from_list_page": True,
+                                    })
+                            if saved_opps:
+                                url_cache.mark_seen(crawl_result.url, "extracted_list", expires_days=7, notes=f"List: {len(saved_opps)} items")
+                                return {"success": True, "url": crawl_result.url, "count": len(saved_opps), "is_list": True}
+                    
                     url_cache.mark_seen(crawl_result.url, "failed", expires_days=14, notes=extraction.error)
-                    await log_rejection("extraction_failed", crawl_result.url, error=extraction.error)
+                    
+                    # Track empty responses specifically
+                    if "empty response" in error_lower:
+                        await log_rejection("empty_response", crawl_result.url, error=extraction.error)
+                    else:
+                        await log_rejection("extraction_failed", crawl_result.url, error=extraction.error)
+                        
                     return {"error": f"Extraction failed: {extraction.error}", "url": crawl_result.url}
                 
                 opp = extraction.opportunity_card
@@ -577,9 +671,9 @@ async def main(
                     )
                     return {"error": f"Non-opportunity content: {opp.content_type.value}", "url": crawl_result.url}
 
-                # Skip low-confidence extractions (stricter quality threshold)
+                # Skip low-confidence extractions (balanced quality threshold)
                 confidence = extraction.confidence or 0.0
-                if confidence < 0.5:  # Increased from 0.4 for higher quality
+                if confidence < 0.35:  # Relaxed threshold to capture more results
                     url_cache.mark_seen(crawl_result.url, "low_confidence", expires_days=30, notes=f"Confidence: {confidence:.2f}")
                     await log_rejection(
                         "low_confidence",
@@ -667,6 +761,9 @@ async def main(
                     "confidence": confidence,
                     "title": opp.title
                 })
+                # Track time to first EC
+                if first_ec_time is None:
+                    first_ec_time = time.time() - start_time
                 emit_event("opportunity_found", {
                     "id": opp.id,
                     "title": opp.title,
@@ -706,23 +803,50 @@ async def main(
                     "status": "failed",
                     "error": str(e)[:50]
                 })
-                await log_rejection("exception", crawl_result.url, error=str(e)[:200])
+                # Check for empty response in exception
+                if "empty response" in str(e).lower():
+                    await log_rejection("empty_response", crawl_result.url, error=str(e)[:200])
+                else:
+                    await log_rejection("exception", crawl_result.url, error=str(e)[:200])
                 return {"error": str(e)[:100], "url": crawl_result.url}
     
-    # Run extractions in parallel
-    extraction_tasks = [extract_and_save(cr) for cr in crawl_results]
-    results = await asyncio.gather(*extraction_tasks)
+    # Run extractions with early-stop: process in batches, stop once target reached
+    TARGET_OPPORTUNITIES = 7  # Stop once we have this many
+    BATCH_SIZE = 4  # Process this many URLs at a time
     
-    # Count results
     success_count = 0
     failed_count = 0
-    for result in results:
-        if result:
-            if result.get("success"):
-                success_count += 1
-                emit_event("extracted", {"card": result["card"]})
-            elif result.get("error"):
-                failed_count += 1
+    processed_count = 0
+    early_stopped = False
+    
+    for i in range(0, len(crawl_results), BATCH_SIZE):
+        # Check if we've reached target
+        async with saved_lock:
+            current_found = len(saved_opportunities)
+        if current_found >= TARGET_OPPORTUNITIES:
+            early_stopped = True
+            emit_event("early_stop", {"found": current_found, "target": TARGET_OPPORTUNITIES})
+            break
+        
+        batch = crawl_results[i:i + BATCH_SIZE]
+        extraction_tasks = [extract_and_save(cr) for cr in batch]
+        results = await asyncio.gather(*extraction_tasks)
+        
+        for result in results:
+            processed_count += 1
+            if result:
+                if result.get("success"):
+                    success_count += 1
+                    if result.get("is_list"):
+                        success_count += result.get("count", 1) - 1  # Adjust for list pages
+                    emit_event("extracted", {"card": result.get("card", {})})
+                elif result.get("error"):
+                    failed_count += 1
+    
+    # If we early-stopped, mark remaining URLs as skipped
+    if early_stopped:
+        remaining = len(crawl_results) - processed_count
+        failed_count += remaining
     
     # Complete AI extraction layer
     emit_event("layer_complete", {
@@ -752,10 +876,18 @@ async def main(
             "stats": {"inserted": success_count, "updated": 0, "skipped": failed_count}
         })
     
+    total_time = time.time() - start_time
     emit_event("complete", {
         "count": success_count,
         "isPersonalized": user_profile is not None,
         "user_id": user_profile.get("user_id") if user_profile else None,
+        "metrics": {
+            "total_time_seconds": round(total_time, 2),
+            "time_to_first_ec": round(first_ec_time, 2) if first_ec_time else None,
+            "early_stopped": early_stopped,
+            "rejection_reasons": dict(rejection_counts),
+            "empty_response_count": rejection_counts.get("empty_response", 0),
+        }
     })
     if sync:
         await sync.close()

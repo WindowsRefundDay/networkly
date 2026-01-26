@@ -32,10 +32,7 @@ class SearXNGClient:
     
     # Engines to exclude - those with consistent issues
     DEFAULT_EXCLUDED_ENGINES: List[str] = [
-        'duckduckgo',  # CAPTCHA errors
-        'brave',       # Rate limited
         'startpage',   # CAPTCHA issues
-        'mojeek',      # 403 Forbidden (blocked)
         'wikipedia',   # We filter Wikipedia anyway
     ]
     
@@ -47,6 +44,22 @@ class SearXNGClient:
         'program': ['program', 'initiative', 'opportunity'],
         'summer': ['summer', 'seasonal', 'vacation'],
         'research': ['research', 'lab', 'study'],
+    }
+
+    LOW_SIGNAL_DOMAINS = {
+        'faqtoids.com', 'simpli.com', 'smarter.com',
+        'usingenglish.com', 'consumersearch.com',
+        'bloglines.com', 'reference.com',
+        'worldscholarshipforum.com',  # Generic scholarship aggregator
+    }
+    
+    # High-value domains that frequently have real EC opportunities
+    HIGH_VALUE_DOMAINS = {
+        'nasa.gov', 'nsf.gov', 'nih.gov', 'doe.gov',
+        'collegeboard.org', 'commonapp.org',
+        'scienceolympiad.org', 'artofproblemsolving.com',
+        'firstinspires.org', 'mathcounts.org',
+        'mit.edu', 'stanford.edu', 'harvard.edu', 'cmu.edu',
     }
     
     def __init__(self, base_url: Optional[str] = None):
@@ -102,8 +115,15 @@ class SearXNGClient:
         seen_domains = {}  # domain -> count
         deduplicated = []
         blocked_count = 0
-        
-        for result in results:
+
+        # Prioritize higher-signal domains before deduplication
+        results_sorted = sorted(
+            results,
+            key=lambda r: (self._domain_priority(get_domain(r.url)), r.score),
+            reverse=True,
+        )
+
+        for result in results_sorted:
             # Skip exact URL duplicates
             if result.url in seen_urls:
                 continue
@@ -121,9 +141,10 @@ class SearXNGClient:
             except Exception:
                 domain = result.url
             
-            # Limit results per domain (max 3 from same domain)
+            # Limit results per domain based on quality signal
             domain_count = seen_domains.get(domain, 0)
-            if domain_count >= 3:
+            max_per_domain = self._max_results_per_domain(domain)
+            if domain_count >= max_per_domain:
                 continue
             
             seen_urls.add(result.url)
@@ -134,6 +155,36 @@ class SearXNGClient:
             sys.stderr.write(f"[SearXNG] Blocked {blocked_count} results from blocklist\n")
         
         return deduplicated
+
+    def _domain_priority(self, domain: str) -> float:
+        """Score domain quality for ordering search results."""
+        if not domain:
+            return 0.0
+        if domain in self.LOW_SIGNAL_DOMAINS:
+            return 0.1
+        # Check high-value domains first (exact or subdomain match)
+        for hv in self.HIGH_VALUE_DOMAINS:
+            if domain == hv or domain.endswith('.' + hv):
+                return 1.2
+        if domain.endswith(".edu") or domain.endswith(".gov"):
+            return 1.0
+        if domain.endswith(".org"):
+            return 0.7
+        return 0.4
+
+    def _max_results_per_domain(self, domain: str) -> int:
+        """Adjust per-domain caps based on quality signal."""
+        if not domain:
+            return 1
+        if domain in self.LOW_SIGNAL_DOMAINS:
+            return 1
+        # High-value domains get more slots
+        for hv in self.HIGH_VALUE_DOMAINS:
+            if domain == hv or domain.endswith('.' + hv):
+                return 4
+        if domain.endswith(".edu") or domain.endswith(".gov"):
+            return 3
+        return 2
     
     async def _execute_single_search(
         self,

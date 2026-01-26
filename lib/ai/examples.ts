@@ -114,7 +114,7 @@ async function customConfigExample() {
     providers: [
       {
         name: 'gemini',
-        apiKey: process.env.GEMINI_API_KEY!,
+        apiKey: (process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY)!,
         baseUrl: 'https://generativelanguage.googleapis.com',
         defaultModel: 'gemini-2.5-flash',
         enabled: true,
@@ -174,7 +174,9 @@ async function customConfigExample() {
  */
 async function directProviderExample() {
   // Create Gemini provider directly
-  const gemini = createGeminiProvider(process.env.GEMINI_API_KEY!)
+  const gemini = createGeminiProvider(
+    (process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY)!
+  )
 
   // List available models
   console.log('Gemini models:', gemini.getModels().map((m: { id: string }) => m.id))

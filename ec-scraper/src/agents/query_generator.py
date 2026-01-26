@@ -1,6 +1,6 @@
 """AI-powered query generator using lite model for diverse search queries."""
 
-from typing import List
+from typing import List, Optional, Dict, Any
 import json
 import re
 from difflib import SequenceMatcher
@@ -27,7 +27,7 @@ REQUIREMENTS:
    - Include year/season when relevant (2026, summer)
    - Include target audience (high school, teenagers, students)
    - Include location hints when relevant (USA, online, remote)
-   - Include application/registration terms
+   - Include application/registration/deadline terms
 
 3. VARY the query patterns:
    - Some broad: "STEM internships high school 2026"
@@ -35,9 +35,11 @@ REQUIREMENTS:
    - Some with organizations: "Science Olympiad registration"
    - Some with keywords: "coding competition teenagers deadline"
 
-4. AVOID duplicates or near-duplicates
-5. Focus on HIGH SCHOOL level opportunities only
-6. Each query should be 5-10 words
+4. Reduce listicle/guide results by avoiding phrases like:
+   - "top 10", "best", "ultimate guide", "ranking", "list of"
+5. AVOID duplicates or near-duplicates
+6. Focus on HIGH SCHOOL level opportunities only
+7. Each query should be 5-10 words
 
 Generate ONLY a JSON array of {count} search query strings. No explanations, no markdown.
 Use strict JSON with double quotes and no trailing commas.
@@ -93,6 +95,37 @@ CATEGORY_TEMPLATES = {
     ],
 }
 
+HIGH_SIGNAL_TEMPLATES = [
+    "{focus} application deadline high school",
+    "{focus} official program application",
+    "{focus} registration open high school",
+    "{focus} application requirements high school",
+    "{focus} apply now high school students",
+    "{focus} official site apply 2026",
+    "site:edu {focus} program application",
+    "site:edu {focus} program application",
+    "site:gov {focus} student program",
+    "{focus} for high school students 2026",
+    "apply to {focus} high school",
+    "best {focus} opportunities for high schoolers",
+    "{focus} program application deadline 2026",
+    "summer 2026 {focus} high school",
+    "free {focus} programs for high school students",
+    "virtual {focus} opportunities high school",
+]
+
+# User profile aware templates
+PROFILE_INTEREST_TEMPLATES = [
+    "{interest} {focus} high school program",
+    "{interest} {focus} summer opportunity",
+    "{interest} {focus} competition application",
+]
+
+PROFILE_LOCATION_TEMPLATES = [
+    "{focus} program {location} high school",
+    "{focus} opportunity {location} students",
+]
+
 
 class QueryGenerator:
     """AI-powered query generator using lite model for fast, diverse queries."""
@@ -105,6 +138,7 @@ class QueryGenerator:
         self,
         user_query: str,
         count: int = 10,
+        user_profile: Optional[Dict[str, Any]] = None,
     ) -> List[str]:
         """
         Generate diverse search queries using AI.
@@ -148,6 +182,13 @@ class QueryGenerator:
             # Filter and deduplicate (with near-duplicate detection)
             unique_queries = self._dedupe_queries(queries)
             
+            # Inject user-profile-aware queries if profile provided
+            if user_profile:
+                profile_queries = self._generate_profile_queries(user_query, user_profile)
+                for pq in profile_queries:
+                    if not self._is_near_duplicate(pq, unique_queries):
+                        unique_queries.append(pq)
+            
             # Ensure coverage across categories and sufficient count
             unique_queries = self._ensure_category_coverage(
                 user_query,
@@ -186,7 +227,44 @@ class QueryGenerator:
         for items in CATEGORY_TEMPLATES.values():
             for template in items:
                 templates.append(template.format(focus=base))
+        for template in HIGH_SIGNAL_TEMPLATES:
+            templates.append(template.format(focus=base))
         return templates[:count]
+
+    def _generate_profile_queries(
+        self,
+        user_query: str,
+        user_profile: Dict[str, Any],
+    ) -> List[str]:
+        """
+        Generate queries personalized to user profile attributes.
+        
+        Args:
+            user_query: Base search query
+            user_profile: Dict with keys like interests, location, grade_level
+            
+        Returns:
+            List of profile-aware queries
+        """
+        base = user_query.strip()
+        queries: List[str] = []
+        
+        # Extract profile attributes
+        interests = user_profile.get("interests") or []
+        location = user_profile.get("location") or user_profile.get("state") or ""
+        
+        # Interest-based queries
+        for interest in interests[:2]:  # Limit to top 2 interests
+            if interest and isinstance(interest, str):
+                for template in PROFILE_INTEREST_TEMPLATES:
+                    queries.append(template.format(interest=interest, focus=base))
+        
+        # Location-based queries
+        if location and isinstance(location, str):
+            for template in PROFILE_LOCATION_TEMPLATES:
+                queries.append(template.format(location=location, focus=base))
+        
+        return queries[:4]  # Limit total profile queries
 
     def _parse_json_array(self, response_text: str) -> List[str]:
         """Parse JSON array with fallback handling."""
@@ -195,9 +273,16 @@ class QueryGenerator:
         result = safe_json_loads(response_text, expected_type=list, fallback=[])
         
         # Validate that we got a list of strings
-        if isinstance(result, list) and all(isinstance(item, str) for item in result):
-            return result
+        if isinstance(result, list):
+            # Convert all items to strings and filter
+            queries = [str(item) for item in result if item]
+            if queries:
+                return queries
         
+        # If result is a single string (common failure mode), wrap it
+        if isinstance(result, str) and result.strip():
+             return [result.strip()]
+             
         # If parsing failed or returned wrong type, return empty list
         return []
 
@@ -279,6 +364,12 @@ class QueryGenerator:
                     break
 
         if len(filled) < max(5, min(target_count, 6)):
+            for template in HIGH_SIGNAL_TEMPLATES:
+                if len(filled) >= target_count:
+                    break
+                candidate = template.format(focus=base)
+                if not self._is_near_duplicate(candidate, filled):
+                    filled.append(candidate)
             fallback = self._fallback_queries(user_query, target_count - len(filled))
             for candidate in fallback:
                 if len(filled) >= target_count:

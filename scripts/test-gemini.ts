@@ -16,11 +16,11 @@ async function main() {
   console.log('\n✨ Testing Gemini Provider\n')
   console.log('═'.repeat(50))
 
-  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY
+  const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY
 
   if (!apiKey) {
     console.error('❌ No Gemini API key found!')
-    console.log('Set GEMINI_API_KEY or GOOGLE_AI_API_KEY in your .env file')
+    console.log('Set GOOGLE_GENERATIVE_AI_API_KEY or GEMINI_API_KEY in your .env file')
     process.exit(1)
   }
 

@@ -34,12 +34,12 @@ class DiscoveryProfile:
 # Discovery profiles: quick (on-demand) vs daily (batch)
 QUICK_PROFILE = DiscoveryProfile(
     name="quick",
-    semantic_threshold=0.65,  # Stricter - highest quality results only
+    semantic_threshold=0.62,  # Balanced quality threshold (was too strict at 0.65)
     max_crawl_urls=20,  # Reduced from 35 for speed
     max_concurrent_crawls=8,  # Reduced from 10 to prevent overwhelming
-    max_concurrent_extractions=4,  # Reduced from 6 for faster, focused extraction
+    max_concurrent_extractions=4,  # Reduced from 6 to avoid Vertex AI rate limits (4×30 RPM = 120 RPM max)
     search_timeout=15.0,  # Reduced from 20s
-    crawl_timeout=12.0,  # Reduced from 15s
+    crawl_timeout=15.0,  # Increased back to 15s for better content extraction
     max_queries=8,  # Reduced from 10 for speed
     description="On-demand quick search optimized for speed and quality",
 )
@@ -76,10 +76,10 @@ class Settings(BaseSettings):
 
     # Gemini Model Configuration
     # Main model: Used for discovery, planning, and complex reasoning tasks
-    gemini_pro_model: str = "gemini-2.5-flash"
+    gemini_pro_model: str = "gemini-2.5-pro-002"
     # Fast model: Used for extraction, matching, profiling (when use_fast_model=True)
     # Falls back to gemini_pro_model if unavailable
-    gemini_flash_model: str = "gemini-2.0-flash"
+    gemini_flash_model: str = "gemini-2.5-flash-002"
 
     # Embedding Configuration - text-embedding-004 for vectorization
     # Available models: text-embedding-004 (stable), gemini-embedding-001
