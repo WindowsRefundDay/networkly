@@ -13,7 +13,7 @@ export default function Home() {
         <img
           src="/networkly-welcome.png"
           alt="Networkly"
-          className="h-72 object-contain hidden dark:block"
+          className="h-72 object-contain hidden dark:block invert"
         />
       </div>
       <div className="flex gap-4">
