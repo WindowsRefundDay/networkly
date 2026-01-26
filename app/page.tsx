@@ -5,14 +5,11 @@ export default function Home() {
     <div className="relative flex flex-col items-center justify-center min-h-screen p-4 space-y-8 text-center">
       <KnownBugsModal />
       <div className="flex justify-center">
-        <picture>
-          <source srcSet="/networkly-welcome-dark.png" media="(prefers-color-scheme: dark)" />
-          <img
-            src="/networkly-welcome.png"
-            alt="Networkly"
-            className="h-72 object-contain dark:hidden"
-          />
-        </picture>
+        <img
+          src="/networkly-welcome.png"
+          alt="Networkly"
+          className="h-72 object-contain dark:hidden"
+        />
         <img
           src="/networkly-welcome-dark.png"
           alt="Networkly"

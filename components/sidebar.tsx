@@ -43,7 +43,7 @@ interface SidebarProps {
 export function Sidebar({ isCollapsed = false, toggleCollapse }: SidebarProps) {
   const pathname = usePathname()
   const { user } = useSupabaseUser()
-  const { theme } = useTheme()
+  const { resolvedTheme } = useTheme()
   const hasMounted = useHasMounted()
 
 
@@ -56,9 +56,9 @@ export function Sidebar({ isCollapsed = false, toggleCollapse }: SidebarProps) {
   const userInitials = userName.split(" ").map(n => n[0]).join("").toUpperCase()
 
   // Full logo for expanded sidebar
-  const logoSrc = hasMounted && theme === 'dark' ? '/networkly-logo-dark.png' : '/networkly-logo.png'
+  const logoSrc = hasMounted && resolvedTheme === 'dark' ? '/networkly-logo-dark.png' : '/networkly-logo.png'
   // Mini logo for collapsed sidebar
-  const logoMiniSrc = hasMounted && theme === 'dark' ? '/networkly-logo-mini-dark.png' : '/networkly-logo-mini.png'
+  const logoMiniSrc = hasMounted && resolvedTheme === 'dark' ? '/networkly-logo-mini-dark.png' : '/networkly-logo-mini.png'
 
   return (
     <aside

@@ -175,14 +175,11 @@ export default function SignupPage() {
             <div className="w-full max-w-sm space-y-6 rounded-xl border border-border bg-card p-6 shadow-lg">
                 <div className="space-y-4 text-center">
                     <div className="flex justify-center">
-                        <picture>
-                            <source srcSet="/networkly-logo-dark.png" media="(prefers-color-scheme: dark)" />
-                            <img
-                                src="/networkly-logo.png"
-                                alt="Networkly"
-                                className="h-10 object-contain dark:hidden"
-                            />
-                        </picture>
+                        <img
+                            src="/networkly-logo.png"
+                            alt="Networkly"
+                            className="h-10 object-contain dark:hidden"
+                        />
                         <img
                             src="/networkly-logo-dark.png"
                             alt="Networkly"
