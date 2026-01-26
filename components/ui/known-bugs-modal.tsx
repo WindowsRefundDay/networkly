@@ -9,7 +9,7 @@ const STORAGE_KEY = "networkly-known-bugs-dismissed"
 const VERSION_KEY = "networkly-known-bugs-version"
 
 // Set this to false to hide the modal from all users
-const SHOW_KNOWN_BUGS_MODAL = false
+const SHOW_KNOWN_BUGS_MODAL = true
 
 export function KnownBugsModal() {
     const [isVisible, setIsVisible] = useState(false)
@@ -98,16 +98,16 @@ export function KnownBugsModal() {
                     {/* Modal content */}
                     <motion.div
                         className="relative z-10 mx-4 max-w-2xl w-full max-h-[80vh] overflow-hidden"
-                        initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
                         transition={{
-                            duration: 0.4,
-                            ease: [0.4, 0, 0.2, 1]
+                            duration: 0.25,
+                            ease: "easeOut"
                         }}
                     >
                         {/* Glowing border effect */}
-                        <div className="absolute -inset-[1px] rounded-2xl bg-gradient-to-r from-amber-500/50 via-orange-500/50 to-red-500/50 blur-sm opacity-75" />
+                        <div className="absolute -inset-[1px] rounded-2xl bg-gradient-to-r from-amber-500/30 via-orange-500/30 to-red-500/30 blur-sm opacity-50" />
 
                         <div className="relative bg-background/95 backdrop-blur-xl rounded-2xl border border-border/50 shadow-2xl overflow-hidden">
                             {/* Header */}

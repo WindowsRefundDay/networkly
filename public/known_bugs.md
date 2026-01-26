@@ -4,22 +4,20 @@ _Last updated: 2026-01-26_
 
 ## Current Issues
 
-### High Priority
-- **Issue #1**: Description of the first high priority bug
-  - Steps to reproduce
-  - Expected behavior
-  - Current workaround (if any)
+### Important Notes
 
-### Medium Priority  
-- **Issue #2**: Description of medium priority bug
-
-### Low Priority
-- **Issue #3**: Minor UI glitch description
+1. **Most of the AI functionality is not ready yet.**
+   - We're working hard to bring you the full AI-powered experience
+   
+2. **There are some UI bugs, but that will be fixed in no time.**
+   - Visual inconsistencies and layout issues are being actively addressed
+   
+3. **We'll work on it as soon as possible.**
+   - Your patience is appreciated as we polish the platform
 
 ---
 
-## Recently Fixed ✅
-- Fixed login redirect issue (v0.0.1)
+**Remember, this is not what you're going to see in the final product.**
 
 ---
 
