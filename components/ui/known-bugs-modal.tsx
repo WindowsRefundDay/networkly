@@ -98,60 +98,53 @@ export function KnownBugsModal() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    transition={{ duration: 0.2 }}
+                    transition={{ duration: 0.3 }}
                 >
-                    {/* Simple Backdrop */}
                     <motion.div
-                        className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+                        className="absolute inset-0 bg-black/70 backdrop-blur-md"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={handleDismiss}
                     />
 
-                    {/* Modal content */}
                     <motion.div
-                        className="relative z-10 mx-4 max-w-lg w-full overflow-hidden"
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.2, ease: "easeOut" }}
+                        className="relative z-10 w-full max-w-md"
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{ duration: 0.2 }}
                     >
-                        <div className="relative bg-[#0a0a0a] rounded-2xl border border-white/5 p-8 shadow-2xl flex flex-col items-center text-center">
-                            {/* Icon */}
-                            <div className="mb-6 p-4 rounded-full bg-white/5 border border-white/10">
-                                <Bug className="w-8 h-8 text-amber-500" />
+                        <div className="bg-[#0a0a0a] rounded-3xl border border-white/10 p-8 shadow-2xl flex flex-col items-center text-center">
+                            <div className="mb-6 w-16 h-16 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+                                <Bug className="w-8 h-8 text-blue-500" />
                             </div>
 
-                            {/* Title */}
-                            <h2 className="text-2xl font-bold mb-4 text-white">
-                                Known Bugs & Updates 🐛
+                            <h2 className="text-2xl font-bold text-white mb-4">
+                                Updates & Bug Fixes
                             </h2>
 
-                            {/* Content */}
-                            <div className="prose prose-invert prose-sm max-w-none mb-8 text-gray-400">
+                            <div className="text-gray-400 text-sm mb-8 max-h-[40vh] overflow-y-auto w-full px-2 custom-scrollbar">
                                 <ReactMarkdown
                                     components={{
                                         p: ({ children }) => <p className="mb-4 last:mb-0 leading-relaxed">{children}</p>,
-                                        ul: ({ children }) => <ul className="list-none p-0 m-0 space-y-2">{children}</ul>,
-                                        li: ({ children }) => <li className="m-0 p-0 text-gray-400">{children}</li>,
-                                        strong: ({ children }) => <span className="font-semibold text-white">{children}</span>,
-                                        h1: () => null, // Hide h1 from markdown
-                                        h2: () => null, // Hide h2 from markdown
-                                        h3: () => null, // Hide h3 from markdown
-                                        hr: () => <div className="my-6 border-t border-white/10" />
+                                        ul: ({ children }) => <ul className="text-left space-y-2 mb-4">{children}</ul>,
+                                        li: ({ children }) => <li className="flex gap-2"><span>•</span>{children}</li>,
+                                        h1: () => null,
+                                        h2: () => null,
+                                        h3: () => null,
+                                        hr: () => <hr className="border-white/5 my-4" />
                                     }}
                                 >
                                     {content}
                                 </ReactMarkdown>
                             </div>
 
-                            {/* Dismiss button */}
                             <button
                                 onClick={handleDismiss}
-                                className="w-full py-4 px-6 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-semibold transition-all duration-200 shadow-[0_0_20px_rgba(217,119,6,0.2)] active:scale-[0.98]"
+                                className="w-full py-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-medium transition-colors shadow-lg shadow-blue-600/20 active:scale-[0.98]"
                             >
-                                Continue to Networkly
+                                Continue
                             </button>
                         </div>
                     </motion.div>
