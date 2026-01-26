@@ -12,6 +12,9 @@ export type Json =
   | Json[]
 
 export interface Database {
+  __InternalSupabase: {
+    PostgrestVersion: '12'
+  }
   public: {
     Tables: {
       users: {
@@ -1359,6 +1362,7 @@ export interface Database {
         ]
       }
     }
+<<<<<<< HEAD
     Views: {
       [_ in never]: never
     }
@@ -1371,6 +1375,10 @@ export interface Database {
     CompositeTypes: {
       [_ in never]: never
     }
+=======
+    Views: {}
+    Functions: {}
+>>>>>>> networkly-main
   }
 }
 

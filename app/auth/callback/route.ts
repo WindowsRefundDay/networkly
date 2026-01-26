@@ -14,18 +14,31 @@ export async function GET(request: Request) {
     if (!error && data.user) {
       const { data: existingUser } = await supabase
         .from("users")
-        .select("id")
+        .select("id, is_profile_complete")
         .eq("id", data.user.id)
         .maybeSingle()
 
+      let profileComplete = existingUser?.is_profile_complete ?? false
+
       if (!existingUser) {
         const fallbackName = data.user.email?.split("@")[0] || "User"
-        await supabase.from("users").insert({
-          id: data.user.id,
-          email: data.user.email!,
-          name: data.user.user_metadata.full_name || fallbackName,
-          avatar: data.user.user_metadata.avatar_url,
-        })
+        const { data: createdUser } = await supabase
+          .from("users")
+          .insert({
+            id: data.user.id,
+            email: data.user.email!,
+            name: data.user.user_metadata.full_name || fallbackName,
+            avatar: data.user.user_metadata.avatar_url,
+            is_profile_complete: false,
+          })
+          .select("is_profile_complete")
+          .single()
+
+        profileComplete = createdUser?.is_profile_complete ?? false
+      }
+
+      if (!profileComplete) {
+        return NextResponse.redirect(`${origin}/onboarding`)
       }
 
       return NextResponse.redirect(`${origin}${redirect}`)

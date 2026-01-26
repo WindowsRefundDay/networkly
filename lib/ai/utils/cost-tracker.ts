@@ -1,7 +1,7 @@
 /**
  * AI Cost Tracker - Track and persist AI API costs
  * 
- * Tracks per-request costs for Groq, Gemini, and OpenRouter APIs.
+ * Tracks per-request costs for Gemini and OpenRouter APIs.
  * Saves cost records to a local JSON file for persistence.
  */
 

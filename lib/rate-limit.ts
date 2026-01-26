@@ -1,4 +1,4 @@
-import { redis } from "./redis"
+import { redis, isRedisConfigured } from "./redis"
 
 interface RateLimitResult {
   success: boolean
@@ -20,6 +20,16 @@ export async function checkRateLimit(
 ): Promise<RateLimitResult> {
   const now = Date.now()
   const windowStart = now - windowSeconds * 1000
+
+  // If Redis is not configured, allow all requests (development mode)
+  if (!isRedisConfigured || !redis) {
+    return {
+      success: true,
+      remaining: limit,
+      reset: Math.ceil(Date.now() / 1000) + windowSeconds,
+      limit,
+    }
+  }
 
   try {
     // Use a sorted set to track requests with timestamps as scores

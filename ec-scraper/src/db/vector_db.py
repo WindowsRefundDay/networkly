@@ -73,7 +73,7 @@ class VectorDB:
             
             client.table("opportunity_embeddings").upsert(data, on_conflict="opportunity_id").execute()
         
-        asyncio.run(asyncio.to_thread(_add))
+        _add()
 
     def add_opportunity_with_embedding(
         self,
@@ -207,7 +207,7 @@ class VectorDB:
             
             return []
         
-        return asyncio.run(asyncio.to_thread(_search))
+        return _search()
 
     def delete_by_id(self, opportunity_id: str) -> None:
         """Delete an embedding by opportunity ID."""
@@ -216,7 +216,7 @@ class VectorDB:
         def _delete():
             client.table("opportunity_embeddings").delete().eq("opportunity_id", opportunity_id).execute()
         
-        asyncio.run(asyncio.to_thread(_delete))
+        _delete()
 
     def count(self) -> int:
         """Count total embeddings."""
@@ -226,7 +226,7 @@ class VectorDB:
             result = client.table("opportunity_embeddings").select("opportunity_id", count="exact").execute()
             return result.count if hasattr(result, 'count') else len(result.data) if result.data else 0
         
-        return asyncio.run(asyncio.to_thread(_count))
+        return _count()
 
     def clear(self) -> None:
         """Clear all embeddings (use with caution)."""
@@ -236,7 +236,7 @@ class VectorDB:
             # Delete all rows
             client.table("opportunity_embeddings").delete().neq("opportunity_id", "").execute()
         
-        asyncio.run(asyncio.to_thread(_clear))
+        _clear()
 
 
 # Singleton instance

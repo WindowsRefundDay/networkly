@@ -80,6 +80,9 @@ const MAX_RUNNING_STATE_AGE_MS = 180_000;
 export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): UseDiscoveryLayersReturn {
   const { onOpportunityFound, onComplete, persistState = true } = options
   
+  // Track last discovery to prevent duplicate runs
+  const lastDiscoveryRef = useRef<{ query: string; startedAt: number } | null>(null)
+  
   const [state, setState] = useState<DiscoveryState | null>(() => {
     // Try to restore from storage on initial load
     if (persistState && typeof window !== 'undefined') {
@@ -211,9 +214,10 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
             const existingItems = newState.layers.web_search.items || []
             const exists = existingItems.some((item) => item.label === query)
             if (!exists) {
+              const uniqueId = `q_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
               newState.layers.web_search.items = [
                 ...existingItems,
-                { id: `q_${Date.now()}`, label: query, status: 'running' },
+                { id: uniqueId, label: query, status: 'running' },
               ]
             }
           }
@@ -224,9 +228,11 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
           const { url, source } = event as { url?: string; source?: string }
           if (url) {
             const existingItems = newState.layers.web_search.items || []
+            // Use timestamp + random to ensure unique IDs even for duplicate URLs
+            const uniqueId = `url_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
             newState.layers.web_search.items = [
               ...existingItems,
-              { id: url, label: source || url, status: 'success', url },
+              { id: uniqueId, label: source || url, status: 'success', url },
             ]
             newState.layers.web_search.stats = {
               ...newState.layers.web_search.stats,
@@ -244,11 +250,13 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
             newState.layers.parallel_crawl.expanded = true
             
             const existingItems = newState.layers.parallel_crawl.items || []
-            const exists = existingItems.some((item) => item.id === url)
+            // Check by URL instead of ID to avoid duplicates
+            const exists = existingItems.some((item) => item.url === url)
             if (!exists) {
+              const uniqueId = `crawl_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
               newState.layers.parallel_crawl.items = [
                 ...existingItems,
-                { id: url, label: getDomain(url), status: 'running', url },
+                { id: uniqueId, label: getDomain(url), status: 'running', url },
               ]
             }
           }
@@ -263,9 +271,10 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
             newState.layers.ai_extraction.expanded = true
             
             const existingItems = newState.layers.ai_extraction.items || []
+            const uniqueId = `ext_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
             newState.layers.ai_extraction.items = [
               ...existingItems,
-              { id: `ext_${Date.now()}`, label: card.title, status: 'success' },
+              { id: uniqueId, label: card.title, status: 'success' },
             ]
           }
           break
@@ -292,10 +301,11 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
           
           // Add to extraction layer
           const existingItems = newState.layers.ai_extraction.items || []
+          const uniqueId = opp.id || `opp_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
           newState.layers.ai_extraction.items = [
             ...existingItems,
             {
-              id: opp.id || `opp_${Date.now()}`,
+              id: uniqueId,
               label: opp.title || 'Opportunity',
               status: 'success',
               confidence: opp.confidence,
@@ -337,7 +347,20 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
         }
 
         case 'error': {
-          const message = (event as { message?: string }).message
+          const { message, source } = event as { message?: string; source?: string }
+
+          // Ignore benign stderr messages or treat them as logs to avoid red UI
+          if (source === 'stderr') {
+            // Find currently running layer and update message only, don't fail
+            for (const id of LAYER_ORDER) {
+              if (newState.layers[id].status === 'running') {
+                newState.layers[id].message = message
+                break
+              }
+            }
+            break
+          }
+
           // Find the currently running layer and mark it as error
           for (const id of LAYER_ORDER) {
             if (newState.layers[id].status === 'running') {
@@ -393,19 +416,32 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
             }
             
             if (item) {
-              const existingIndex = layerState.items.findIndex((i) => i.label === item || i.id === item)
-              const newItem: LayerItem = {
-                id: item,
-                label: title || item,
-                status: status === 'complete' ? 'success' : status === 'failed' ? 'failed' : 'running',
-                confidence,
-                url,
-                error,
-              }
+              // Try to find existing item by URL (if provided) or by label
+              const existingIndex = url 
+                ? layerState.items.findIndex((i) => i.url === url)
+                : layerState.items.findIndex((i) => i.label === item)
               
               if (existingIndex >= 0) {
-                layerState.items[existingIndex] = { ...layerState.items[existingIndex], ...newItem }
+                // Update existing item, preserving its unique ID
+                layerState.items[existingIndex] = {
+                  ...layerState.items[existingIndex],
+                  label: title || item,
+                  status: status === 'complete' ? 'success' : status === 'failed' ? 'failed' : 'running',
+                  confidence,
+                  url,
+                  error,
+                }
               } else {
+                // Create new item with unique ID
+                const uniqueId = `${layer}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+                const newItem: LayerItem = {
+                  id: uniqueId,
+                  label: title || item,
+                  status: status === 'complete' ? 'success' : status === 'failed' ? 'failed' : 'running',
+                  confidence,
+                  url,
+                  error,
+                }
                 layerState.items.push(newItem)
               }
             }
@@ -430,8 +466,9 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
             }
             
             if (items) {
-              newState.layers[layer].items = items.map((item) => ({
-                id: item,
+              // Create unique IDs for items to prevent duplicate key warnings
+              newState.layers[layer].items = items.map((item, index) => ({
+                id: `${layer}_complete_${index}_${Date.now()}`,
                 label: item,
                 status: 'success' as const,
               }))
@@ -487,6 +524,30 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
   }, [onOpportunityFound, onComplete])
 
   const startDiscovery = useCallback((query: string, options: { isPersonalized?: boolean, userProfileId?: string } = {}) => {
+    const normalizedQuery = query.trim().toLowerCase()
+    const now = Date.now()
+    
+    // Prevent duplicate/overlapping runs
+    // Skip if already running or if same query was started within last 30 seconds
+    if (state?.status === 'running') {
+      console.log('[Discovery] Already running, skipping duplicate start')
+      return
+    }
+    
+    if (lastDiscoveryRef.current) {
+      const { query: lastQuery, startedAt } = lastDiscoveryRef.current
+      const timeSinceStart = now - startedAt
+      const DUPLICATE_WINDOW_MS = 60_000 // 60 seconds - aggressive deduplication
+      
+      if (lastQuery === normalizedQuery && timeSinceStart < DUPLICATE_WINDOW_MS) {
+        console.log(`[Discovery] Same query started ${Math.round(timeSinceStart / 1000)}s ago, skipping duplicate`)
+        return
+      }
+    }
+    
+    // Update last discovery tracking
+    lastDiscoveryRef.current = { query: normalizedQuery, startedAt: now }
+    
     cleanup()
     
     const { isPersonalized = false, userProfileId } = options
@@ -505,8 +566,8 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
     const es = new EventSource(buildUrl())
     eventSourceRef.current = es
     
-    // Timeout after 3 minutes (aligned with server-side: 2.5 min + buffer)
-    const CLIENT_TIMEOUT_MS = 180_000; // 3 minutes
+    // Timeout after 2 minutes (aggressive timeout for quick profile optimization)
+    const CLIENT_TIMEOUT_MS = 120_000; // 2 minutes
     timeoutRef.current = setTimeout(() => {
       es.close()
       processEvent({ type: 'error', message: 'Discovery timed out' } as DiscoveryEvent)
@@ -522,10 +583,10 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
       }
     }
     
-    // Track retry attempts
+    // Track retry attempts (reduced for faster failure)
     let retryCount = 0
-    const MAX_RETRIES = 2
-    const RETRY_DELAY_MS = 2000
+    const MAX_RETRIES = 1  // Fail fast - reduced from 2
+    const RETRY_DELAY_MS = 1000  // Reduced from 2000ms
     
     es.onerror = (err) => {
       // EventSource fires onerror on connection issues

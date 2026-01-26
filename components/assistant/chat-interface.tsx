@@ -268,7 +268,10 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
 
                 case 'opportunities':
                   if (event.opportunities) {
-                    accumulatedOpportunities = [...accumulatedOpportunities, ...event.opportunities]
+                    // Deduplicate by id, keeping newest occurrence
+                    const allOpps = [...accumulatedOpportunities, ...event.opportunities]
+                    const uniqueMap = new Map(allOpps.map(opp => [opp.id, opp]))
+                    accumulatedOpportunities = Array.from(uniqueMap.values())
                     // Build cache from opportunities
                     for (const opp of event.opportunities) {
                       opportunityCache[opp.id] = opp

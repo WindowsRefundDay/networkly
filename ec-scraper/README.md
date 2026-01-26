@@ -74,8 +74,95 @@ pip install -e .
 
 # Copy environment file
 cp .env.example .env
-# Edit .env with your API keys
+# Edit .env with your configuration (see Authentication section below)
 ```
+
+### Authentication
+
+The scraper supports two authentication modes. **See [VERTEX_AI_SETUP.md](VERTEX_AI_SETUP.md) for detailed setup instructions.**
+
+#### **Option 1: Vertex AI (Recommended for production)**
+
+Uses Google Cloud IAM authentication. No API keys required.
+
+**Development Setup (ADC):**
+```bash
+# Install Google Cloud CLI if not already installed
+# https://cloud.google.com/sdk/docs/install
+
+# Authenticate with your Google Cloud account
+gcloud auth application-default login
+
+# Set your .env configuration
+USE_VERTEX_AI=true
+VERTEX_PROJECT_ID=your-gcp-project-id
+VERTEX_LOCATION=us-central1
+```
+
+**Production Setup (Service Account):**
+```bash
+# Create a service account in Google Cloud Console with Vertex AI User role
+# Download the JSON key file
+
+# Set environment variable to point to the key file
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
+
+# Set your .env configuration
+USE_VERTEX_AI=true
+VERTEX_PROJECT_ID=your-gcp-project-id
+VERTEX_LOCATION=us-central1
+```
+
+#### **Option 2: Gemini Developer API (Simple, but has quota limits)**
+
+Uses API key authentication. Easier for testing but may hit free-tier quotas.
+
+```bash
+# Set your .env configuration
+USE_VERTEX_AI=false
+GOOGLE_API_KEY=your-gemini-api-key
+```
+
+### IAM Permissions & Troubleshooting
+
+#### Required IAM Roles for Vertex AI
+
+Your Google Cloud account or service account needs these roles:
+
+- **Vertex AI User** (`roles/aiplatform.user`) - For accessing Vertex AI API
+- **Service Account Token Creator** (only for service accounts used in production)
+
+To grant these roles:
+
+```bash
+# For your user account (development)
+gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
+    --member="user:your-email@gmail.com" \
+    --role="roles/aiplatform.user"
+
+# For a service account (production)
+gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
+    --member="serviceAccount:sa-name@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
+    --role="roles/aiplatform.user"
+```
+
+#### Common Issues
+
+**"VERTEX_PROJECT_ID is required" error:**
+- Ensure `USE_VERTEX_AI=true` and `VERTEX_PROJECT_ID=your-project-id` are set in `.env`
+
+**"Permission denied" or "403 Forbidden" errors:**
+- Run `gcloud auth application-default login` (for development)
+- Verify your account has Vertex AI User role
+- Check that billing is enabled for your GCP project
+
+**"Could not load credentials" errors:**
+- For development: Run `gcloud auth application-default login`
+- For production: Verify `GOOGLE_APPLICATION_CREDENTIALS` points to valid service account JSON
+
+**429 quota errors (with Gemini API key mode):**
+- Switch to Vertex AI mode (`USE_VERTEX_AI=true`) - Vertex AI has higher quotas for paid projects
+- Ensure billing is enabled in your GCP project
 
 ### Run Locally
 
@@ -83,7 +170,9 @@ cp .env.example .env
 # Set required environment variables
 export DISCOVERY_API_TOKEN=your-secret-token
 export DATABASE_URL=postgresql://...
-export GOOGLE_API_KEY=your-gemini-api-key
+
+# If using Vertex AI, ensure you've authenticated (see Authentication section)
+# If using Gemini API, ensure GOOGLE_API_KEY is set in .env
 
 # Run the server
 uvicorn src.api.server:app --reload --port 8000
@@ -101,6 +190,13 @@ curl -X POST http://localhost:8000/discover/quick \
   -H "Content-Type: application/json" \
   -d '{"query": "robotics"}'
 ```
+
+### Dry Run Reporting
+
+The quick discovery script emits structured events you can consume for audits:
+
+- `query_report`: Lists the final queries and inferred category.
+- `filter_report`: Summarizes filter counts (semantic filtering, cache skips, rejections).
 
 ### Bootstrap Curated Seed (First-Time DB Fill)
 
@@ -156,9 +252,24 @@ In Railway dashboard, set these environment variables:
 |----------|----------|-------------|
 | `DISCOVERY_API_TOKEN` | Yes | API authentication token |
 | `DATABASE_URL` | Yes | PostgreSQL connection string |
-| `GOOGLE_API_KEY` | Yes | Google Gemini API key |
+| `USE_VERTEX_AI` | Yes | Set to `true` for Vertex AI (recommended) |
+| `VERTEX_PROJECT_ID` | Yes* | GCP project ID (*if USE_VERTEX_AI=true) |
+| `VERTEX_LOCATION` | No | Vertex AI location (default: us-central1) |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Yes* | Path to service account JSON (*if USE_VERTEX_AI=true) |
+| `GOOGLE_API_KEY` | Yes* | Gemini API key (*if USE_VERTEX_AI=false) |
 | `GROQ_API_KEY` | No | Groq API key (optional) |
 | `SEARXNG_URL` | No | SearXNG instance URL |
+
+**For Vertex AI deployment (recommended):**
+1. Create a service account in Google Cloud Console with **Vertex AI User** role
+2. Download the JSON key file
+3. In Railway, either:
+   - Upload the JSON key as a file and set `GOOGLE_APPLICATION_CREDENTIALS` to its path
+   - Or encode the JSON as base64 and decode it at runtime (more secure)
+
+**For Gemini API deployment:**
+1. Set `USE_VERTEX_AI=false`
+2. Set `GOOGLE_API_KEY` to your Gemini Developer API key
 
 ### 3. Deploy
 

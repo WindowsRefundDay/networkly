@@ -5,6 +5,37 @@ import { revalidatePath } from "next/cache"
 import { createClient, requireAuth } from "@/lib/supabase/server"
 import { triggerDiscovery } from "@/app/actions/discovery"
 
+// Discovery cooldown tracking (in-memory, resets on server restart)
+const discoveryLocks = new Map<string, number>()
+const DISCOVERY_COOLDOWN_MS = 15 * 60 * 1000 // 15 minutes - aggressive cooldown for cost/speed optimization
+
+function normalizeQuery(query: string): string {
+  return query.trim().toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ')
+}
+
+function canTriggerDiscovery(query: string): boolean {
+  const normalized = normalizeQuery(query)
+  const lastTrigger = discoveryLocks.get(normalized)
+  
+  if (!lastTrigger) return true
+  
+  const timeSince = Date.now() - lastTrigger
+  return timeSince > DISCOVERY_COOLDOWN_MS
+}
+
+function markDiscoveryTriggered(query: string): void {
+  const normalized = normalizeQuery(query)
+  discoveryLocks.set(normalized, Date.now())
+  
+  // Clean up old entries (older than 15 minutes)
+  const cutoff = Date.now() - 15 * 60 * 1000
+  for (const [key, timestamp] of discoveryLocks.entries()) {
+    if (timestamp < cutoff) {
+      discoveryLocks.delete(key)
+    }
+  }
+}
+
 function formatDate(date: Date): string {
   return date.toLocaleDateString("en-US", {
     month: "short",
@@ -53,6 +84,90 @@ export async function getOpportunities(filters?: {
       .from("user_opportunities")
       .select("opportunity_id, match_score, match_reasons, status")
       .eq("user_id", authUser.id)
+
+    userOpportunities = (userOpps || []).reduce((acc, uo) => {
+      acc[uo.opportunity_id] = {
+        match_score: uo.match_score,
+        match_reasons: uo.match_reasons,
+        status: uo.status,
+      }
+      return acc
+    }, {} as Record<string, { match_score: number; match_reasons: unknown; status: string }>)
+  }
+
+  return (opportunities || []).map((opp) => {
+    const userOpp = userOpportunities[opp.id]
+    return {
+      id: opp.id,
+      url: opp.url,
+      title: opp.title,
+      company: opp.company,
+      location: opp.location,
+      type: opp.type,
+      category: opp.category,
+      suggestedCategory: opp.suggested_category,
+      gradeLevels: opp.grade_levels,
+      locationType: opp.location_type,
+      startDate: opp.start_date,
+      endDate: opp.end_date,
+      cost: opp.cost,
+      timeCommitment: opp.time_commitment,
+      prizes: opp.prizes,
+      contactEmail: opp.contact_email,
+      applicationUrl: opp.application_url,
+      matchScore: userOpp?.match_score || 0,
+      matchReasons: userOpp?.match_reasons || [],
+      deadline: opp.deadline ? formatDate(new Date(opp.deadline)) : null,
+      postedDate: getRelativeTime(new Date(opp.posted_date)),
+      logo: opp.logo,
+      skills: opp.skills,
+      description: opp.description,
+      salary: opp.salary,
+      duration: opp.duration,
+      remote: opp.remote,
+      applicants: opp.applicants,
+      requirements: opp.requirements,
+      sourceUrl: opp.source_url,
+      timingType: opp.timing_type,
+      extractionConfidence: opp.extraction_confidence,
+      isActive: opp.is_active,
+      isExpired: opp.is_expired,
+      lastVerified: opp.last_verified,
+      recheckAt: opp.recheck_at,
+      nextCycleExpected: opp.next_cycle_expected,
+      dateDiscovered: opp.date_discovered,
+      createdAt: opp.created_at,
+      updatedAt: opp.updated_at,
+      status: userOpp?.status || null,
+      saved: userOpp?.status === "saved",
+    }
+  })
+}
+
+export async function getOpportunitiesByIds(ids: string[]) {
+  const supabase = await createClient()
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser()
+
+  if (ids.length === 0) return []
+
+  const { data: opportunities, error } = await supabase
+    .from("opportunities")
+    .select("*")
+    .in("id", ids)
+
+  if (error) throw new Error(error.message)
+
+  let userOpportunities: Record<string, { match_score: number; match_reasons: unknown; status: string }> =
+    {}
+
+  if (authUser) {
+    const { data: userOpps } = await supabase
+      .from("user_opportunities")
+      .select("opportunity_id, match_score, match_reasons, status")
+      .eq("user_id", authUser.id)
+      .in("opportunity_id", ids)
 
     userOpportunities = (userOpps || []).reduce((acc, uo) => {
       acc[uo.opportunity_id] = {
@@ -235,8 +350,21 @@ export async function searchOpportunities(
     }
   }
 
-  // No results and query is long enough: trigger discovery
+  // No results and query is long enough: trigger discovery (with cooldown check)
   if (sanitizedQuery.length >= 3) {
+    // Check cooldown to prevent repeated discovery runs
+    if (!canTriggerDiscovery(sanitizedQuery)) {
+      console.log(`[Search] Discovery cooldown active for "${sanitizedQuery}", skipping`)
+      return {
+        opportunities: [],
+        discoveryTriggered: false,
+        newOpportunitiesFound: 0,
+      }
+    }
+    
+    // Mark as triggered before running to prevent concurrent runs
+    markDiscoveryTriggered(sanitizedQuery)
+    
     const discoveryResult = await triggerDiscovery(sanitizedQuery)
 
     if (discoveryResult.success && discoveryResult.newOpportunities && discoveryResult.newOpportunities > 0) {

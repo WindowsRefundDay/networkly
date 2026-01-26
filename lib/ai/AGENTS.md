@@ -4,7 +4,7 @@ Multi-provider AI orchestration with automatic fallback and use-case based routi
 
 ## OVERVIEW
 
-Centralized AI management system supporting Groq (primary), Gemini, and OpenRouter with automatic provider fallback, cost tracking, and use-case based model selection.
+Centralized AI management system supporting Gemini and OpenRouter with automatic provider fallback, cost tracking, and use-case based model selection.
 
 ## STRUCTURE
 
@@ -16,7 +16,6 @@ lib/ai/
 ├── index.ts             # Public exports
 ├── providers/
 │   ├── base.ts          # Abstract provider interface
-│   ├── groq.ts          # Groq implementation (566L)
 │   ├── gemini.ts        # Google Gemini implementation
 │   └── openrouter.ts    # OpenRouter implementation (543L)
 ├── tools/
@@ -63,19 +62,18 @@ System automatically selects optimal model based on use-case:
 
 | Use Case | Model Priority | When to Use |
 |----------|---------------|-------------|
-| `chat` | Groq Llama 3.3 70B | Interactive chat |
+| `chat` | Gemini 1.5 Flash | Interactive chat |
 | `analysis` | Gemini 1.5 Pro | Code analysis, complex reasoning |
-| `extraction` | Groq Llama 3.1 8B | Structured data extraction |
-| `fast-response` | Groq Llama 3.3 70B | Quick replies |
+| `extraction` | Gemini 1.5 Flash | Structured data extraction |
+| `fast-response` | Gemini 1.5 Flash | Quick replies |
 | `high-quality` | Gemini 1.5 Pro | Best possible output |
-| `cost-effective` | Groq models | Minimize API costs |
+| `cost-effective` | Gemini Flash models | Minimize API costs |
 
 ### Provider Fallback
 
 Automatic cascade on failure:
-1. **Groq** (primary) - Fast, cheap
+1. **Gemini** (primary) - Fast, high quality
 2. **OpenRouter** (fallback) - Multiple models
-3. **Gemini** (final fallback) - High quality
 
 ### Cost Tracking
 
@@ -89,7 +87,7 @@ pnpm costs:clear    # Reset tracking
 ## ANTI-PATTERNS
 
 **NEVER:**
-- Import provider classes directly (`GroqProvider`, `GeminiProvider`)
+- Import provider classes directly (`GeminiProvider`, `OpenRouterProvider`)
 - Hardcode model names - Use `useCase` abstraction
 - Skip error handling - AI calls can fail
 - Ignore rate limits - Providers have strict limits

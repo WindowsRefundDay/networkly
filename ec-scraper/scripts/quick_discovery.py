@@ -8,9 +8,11 @@ import asyncio
 import os
 import sys
 import json
+import re
+from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 from collections import Counter
 from dotenv import load_dotenv
 
@@ -39,6 +41,63 @@ def emit_event(type: str, data: dict):
     event = {"type": type, **data}
     print(json.dumps(event), flush=True)
     sys.stdout.flush()
+
+
+CATEGORY_HINTS = {
+    "competitions": ["competition", "olympiad", "contest", "challenge"],
+    "internships": ["internship", "intern", "externship", "work experience"],
+    "summer_programs": ["summer program", "camp", "workshop", "course"],
+    "scholarships": ["scholarship", "grant", "award", "financial aid"],
+    "research": ["research", "lab", "mentorship"],
+    "volunteering": ["volunteer", "community service", "nonprofit", "ngo"],
+}
+
+
+def detect_query_category(queries: List[str], fallback: str) -> str:
+    """Detect dominant category for adaptive semantic thresholds."""
+    counts = {category: 0 for category in CATEGORY_HINTS.keys()}
+    combined = " ".join(queries + [fallback]).lower()
+    for category, hints in CATEGORY_HINTS.items():
+        if any(hint in combined for hint in hints):
+            counts[category] += 1
+    top_category = max(counts.items(), key=lambda item: item[1])
+    if top_category[1] == 0:
+        return "general"
+    return top_category[0]
+
+
+TRACKING_PARAMS = {
+    "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
+    "gclid", "fbclid", "mc_cid", "mc_eid",
+}
+
+
+def normalize_url(url: str) -> str:
+    """Normalize URL for deduplication."""
+    try:
+        parsed = urlparse(url)
+        scheme = parsed.scheme or "https"
+        netloc = parsed.netloc.lower()
+        if netloc.startswith("www."):
+            netloc = netloc[4:]
+        path = parsed.path.rstrip("/")
+        query_params = [
+            (key, value)
+            for key, value in parse_qsl(parsed.query, keep_blank_values=False)
+            if key.lower() not in TRACKING_PARAMS
+        ]
+        query = urlencode(query_params, doseq=True)
+        normalized = urlunparse((scheme, netloc, path, "", query, ""))
+        return normalized
+    except Exception:
+        return url
+
+
+def normalize_text(value: str) -> str:
+    """Normalize text for title/org dedupe."""
+    cleaned = re.sub(r"[^a-z0-9\s]", " ", value.lower())
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned
 
 
 async def fetch_user_profile(user_profile_id: str, db_url: str) -> Optional[Dict[str, Any]]:
@@ -123,7 +182,10 @@ async def fetch_user_profile(user_profile_id: str, db_url: str) -> Optional[Dict
             await conn.close()
             
     except Exception as e:
-        sys.stderr.write(f"Error fetching user profile: {e}\n")
+        # Silently handle "relation does not exist" errors (table not created yet)
+        error_msg = str(e).lower()
+        if "relation" not in error_msg and "does not exist" not in error_msg:
+            sys.stderr.write(f"Error fetching user profile: {e}\n")
         return None
 
 
@@ -143,6 +205,10 @@ async def main(
         user_profile_id: Optional user ID for personalized discovery
         profile: Discovery profile - 'quick' (on-demand) or 'daily' (batch)
     """
+    import time
+    start_time = time.time()
+    first_ec_time = None  # Track time to first EC
+    
     # Get discovery profile settings
     discovery_profile = get_discovery_profile(profile)
     emit_event("layer_start", {
@@ -213,17 +279,17 @@ async def main(
         career_goals = user_profile.get("career_goals", "")
         preferred_types = user_profile.get("preferred_ec_types", [])
         
-        # Build personalized queries
+        # Build personalized queries (reduced for speed)
         search_queries = []
         
-        # Add interest-based queries
-        for interest in interests[:3]:
+        # Add interest-based queries (reduced from 3 to 2)
+        for interest in interests[:2]:
             search_queries.append(f"{interest} high school opportunities 2026")
             if location and location != "Any":
                 search_queries.append(f"{interest} programs {location}")
         
-        # Add type-specific queries
-        for ptype in preferred_types[:2]:
+        # Add type-specific queries (reduced from 2 to 1)
+        for ptype in preferred_types[:1]:
             search_queries.append(f"high school {ptype} {query} 2026")
         
         # Add career goal query
@@ -233,8 +299,8 @@ async def main(
         # Add the base query
         search_queries.append(f"{query} high school opportunities")
         
-        # Limit to 5 queries for personalized search
-        search_queries = search_queries[:5]
+        # Limit to 4 queries for personalized search (speed optimization)
+        search_queries = search_queries[:4]
         
     else:
         # Global: Use AI query generator for diverse queries
@@ -255,11 +321,17 @@ async def main(
                 f"{base_query} volunteer work for teens",
             ]
     
+    query_category = detect_query_category(search_queries, query)
+
     # Emit layer complete for query generation
     emit_event("layer_complete", {
         "layer": "query_generation",
         "stats": {"count": len(search_queries)},
         "items": search_queries
+    })
+    emit_event("query_report", {
+        "category": query_category,
+        "queries": search_queries,
     })
     
     # Search phase - run searches in parallel
@@ -273,8 +345,8 @@ async def main(
         })
         emit_event("search", {"query": search_query})
         try:
-            # Personalized searches get more results per query
-            max_results = 15 if user_profile else 10
+            # Reduced search results for speed optimization
+            max_results = 10 if user_profile else 8
             results = await search_client.search(search_query, max_results=max_results)
             emit_event("layer_progress", {
                 "layer": "web_search",
@@ -303,10 +375,11 @@ async def main(
     
     for results in search_results:
         for result in results:
-            if result.url not in seen_urls:
-                seen_urls.add(result.url)
-                all_results.append((result.url, result.title or "", result.snippet or ""))
-                emit_event("found", {"url": result.url, "source": result.title or "Web Result"})
+            canonical_url = normalize_url(result.url)
+            if canonical_url not in seen_urls:
+                seen_urls.add(canonical_url)
+                all_results.append((canonical_url, result.title or "", result.snippet or ""))
+                emit_event("found", {"url": canonical_url, "source": result.title or "Web Result"})
     
     emit_event("layer_complete", {
         "layer": "web_search",
@@ -318,20 +391,27 @@ async def main(
     emit_event("layer_start", {"layer": "semantic_filter", "message": "Applying AI relevance filter..."})
     
     semantic_scored_urls = []
+    semantic_filter = get_semantic_filter()
     try:
-        semantic_filter = get_semantic_filter()
         emit_event("reasoning", {"layer": "semantic_filter", "thought": "Computing embeddings for relevance scoring..."})
         
         # Filter using embeddings with profile threshold (one batch API call for ALL results)
         semantic_scored_urls = await semantic_filter.filter_results(
             all_results, 
             max_results=discovery_profile.max_crawl_urls,
-            threshold_override=discovery_profile.semantic_threshold
+            threshold_override=discovery_profile.semantic_threshold,
+            category=query_category,
         )
         
         emit_event("layer_complete", {
             "layer": "semantic_filter",
-            "stats": {"input": len(all_results), "output": len(semantic_scored_urls), "threshold": discovery_profile.semantic_threshold}
+            "stats": {
+                "input": len(all_results),
+                "output": len(semantic_scored_urls),
+                "threshold": discovery_profile.semantic_threshold,
+                "category": query_category,
+                "prefilter_skipped": semantic_filter.last_prefilter_skipped,
+            }
         })
         
         # Log top results for debugging
@@ -349,6 +429,11 @@ async def main(
     
     # Get just the URLs (already sorted by relevance score)
     filtered_urls = [url for url, score in semantic_scored_urls]
+    # Prioritize high-signal URLs and drop low-score tail when enough candidates exist
+    min_semantic_score = 0.55
+    high_signal_urls = [url for url, score in semantic_scored_urls if score >= min_semantic_score]
+    if len(high_signal_urls) >= min(8, discovery_profile.max_crawl_urls):
+        filtered_urls = high_signal_urls
     
     # Optionally reset cache entries for this batch
     if reset_cache:
@@ -357,10 +442,50 @@ async def main(
 
     # Filter out already-seen URLs using cache (check within last 7 days)
     unseen_urls = filtered_urls if ignore_cache else url_cache.filter_unseen(filtered_urls, within_days=7)
+    cache_skipped = len(filtered_urls) - len(unseen_urls)
     
-    # Use profile settings for max URLs (personalized gets slightly fewer)
-    max_urls = min(discovery_profile.max_crawl_urls, 25 if user_profile else discovery_profile.max_crawl_urls)
+    # Use profile settings for max URLs (personalized gets fewer for speed)
+    max_urls = min(discovery_profile.max_crawl_urls, 15 if user_profile else discovery_profile.max_crawl_urls)
     urls_to_process = unseen_urls[:max_urls]
+    
+    # Early exit if no URLs to process
+    if not urls_to_process:
+        emit_event("layer_complete", {
+            "layer": "parallel_crawl",
+            "stats": {"total": 0, "completed": 0, "failed": 0}
+        })
+        emit_event("layer_complete", {
+            "layer": "ai_extraction",
+            "stats": {"total": 0, "completed": 0, "failed": 0}
+        })
+        emit_event("layer_complete", {
+            "layer": "db_sync",
+            "stats": {"inserted": 0, "updated": 0, "skipped": 0}
+        })
+        emit_event("filter_report", {
+            "query_category": query_category,
+            "query_count": len(search_queries),
+            "search_results": len(all_results),
+            "semantic_prefilter_skipped": semantic_filter.last_prefilter_skipped,
+            "semantic_kept": len(semantic_scored_urls),
+            "cache_skipped": cache_skipped,
+            "urls_crawled": 0,
+            "rejections": {},
+        })
+        total_time = time.time() - start_time
+        emit_event("complete", {
+            "count": 0,
+            "isPersonalized": user_profile is not None,
+            "user_id": user_profile.get("user_id") if user_profile else None,
+            "metrics": {
+                "total_time_seconds": round(total_time, 2),
+                "time_to_first_ec": None,
+                "early_stopped": False,
+            }
+        })
+        if sync:
+            await sync.close()
+        return
     
     # Start parallel crawl layer
     emit_event("layer_start", {"layer": "parallel_crawl", "message": f"Crawling {len(urls_to_process)} URLs..."})
@@ -397,10 +522,15 @@ async def main(
     emit_event("layer_start", {"layer": "ai_extraction", "message": f"Extracting from {crawl_success} pages..."})
     
     # Filter successful crawls and extract in parallel
-    extraction_semaphore = asyncio.Semaphore(8)
+    # Use profile-based concurrency setting
+    extraction_semaphore = asyncio.Semaphore(discovery_profile.max_concurrent_extractions)
     extraction_count = [0]  # Use list for mutable counter in closure
     rejection_counts = Counter()
     rejection_lock = asyncio.Lock()
+    dedupe_lock = asyncio.Lock()
+    saved_lock = asyncio.Lock()
+    saved_opportunities = []  # Track all saved opportunities
+    seen_title_org = set()
 
     async def log_rejection(
         reason: str,
@@ -422,6 +552,8 @@ async def main(
         })
     
     async def extract_and_save(crawl_result) -> dict | None:
+        """Extract from page - supports both single and list-page extraction."""
+        nonlocal first_ec_time
         if not crawl_result.success:
             url_cache.mark_seen(crawl_result.url, "failed", expires_days=7, notes=crawl_result.error)
             await log_rejection("crawl_failed", crawl_result.url, error=crawl_result.error)
@@ -434,11 +566,86 @@ async def main(
             return {"error": f"Content too short: {content_len} chars", "url": crawl_result.url}
         
         async with extraction_semaphore:
+            # Check if this looks like a list page and try multi-extraction
+            if extractor._is_likely_list_page(crawl_result.markdown):
+                list_result = await extractor.extract_list(crawl_result.markdown, crawl_result.url)
+                if list_result.success and list_result.opportunities:
+                    # Process multiple opportunities from list page
+                    saved_opps = []
+                    for opp in list_result.opportunities:
+                        # Apply same validation as single extraction
+                        if opp.title and opp.title != "Unknown Opportunity":
+                            # Deduplicate
+                            title_key = normalize_text(opp.title or "")
+                            org_key = normalize_text(opp.organization or "")
+                            dedupe_key = f"{title_key}|{org_key}"
+                            async with dedupe_lock:
+                                if dedupe_key in seen_title_org:
+                                    continue
+                                seen_title_org.add(dedupe_key)
+                            
+                            async with saved_lock:
+                                saved_opportunities.append(opp)
+                            saved_opps.append(opp)
+                            # Track time to first EC
+                            if first_ec_time is None:
+                                first_ec_time = time.time() - start_time
+                            # Stream each opportunity found
+                            emit_event("opportunity_found", {
+                                "title": opp.title,
+                                "organization": opp.organization,
+                                "url": opp.url,
+                                "category": opp.category.value if opp.category else "Other",
+                                "from_list_page": True,
+                            })
+                    
+                    if saved_opps:
+                        url_cache.mark_seen(crawl_result.url, "extracted_list", expires_days=7, notes=f"List: {len(saved_opps)} items")
+                        return {"success": True, "url": crawl_result.url, "count": len(saved_opps), "is_list": True}
+            
+            # Fall back to single extraction
             try:
                 extraction = await extractor.extract(crawl_result.markdown, crawl_result.url)
                 if not extraction.success:
+                    # If rejected as a listicle/ranking, try list extraction as fallback
+                    error_lower = (extraction.error or "").lower()
+                    if any(sig in error_lower for sig in ["listicle", "ranking", "multiple", "list"]):
+                        list_result = await extractor.extract_list(crawl_result.markdown, crawl_result.url)
+                        if list_result.success and list_result.opportunities:
+                            saved_opps = []
+                            for opp in list_result.opportunities:
+                                if opp.title and opp.title != "Unknown Opportunity":
+                                    title_key = normalize_text(opp.title or "")
+                                    org_key = normalize_text(opp.organization or "")
+                                    dedupe_key = f"{title_key}|{org_key}"
+                                    async with dedupe_lock:
+                                        if dedupe_key in seen_title_org:
+                                            continue
+                                        seen_title_org.add(dedupe_key)
+                                    async with saved_lock:
+                                        saved_opportunities.append(opp)
+                                    saved_opps.append(opp)
+                                    if first_ec_time is None:
+                                        first_ec_time = time.time() - start_time
+                                    emit_event("opportunity_found", {
+                                        "title": opp.title,
+                                        "organization": opp.organization,
+                                        "url": opp.url,
+                                        "category": opp.category.value if opp.category else "Other",
+                                        "from_list_page": True,
+                                    })
+                            if saved_opps:
+                                url_cache.mark_seen(crawl_result.url, "extracted_list", expires_days=7, notes=f"List: {len(saved_opps)} items")
+                                return {"success": True, "url": crawl_result.url, "count": len(saved_opps), "is_list": True}
+                    
                     url_cache.mark_seen(crawl_result.url, "failed", expires_days=14, notes=extraction.error)
-                    await log_rejection("extraction_failed", crawl_result.url, error=extraction.error)
+                    
+                    # Track empty responses specifically
+                    if "empty response" in error_lower:
+                        await log_rejection("empty_response", crawl_result.url, error=extraction.error)
+                    else:
+                        await log_rejection("extraction_failed", crawl_result.url, error=extraction.error)
+                        
                     return {"error": f"Extraction failed: {extraction.error}", "url": crawl_result.url}
                 
                 opp = extraction.opportunity_card
@@ -464,9 +671,9 @@ async def main(
                     )
                     return {"error": f"Non-opportunity content: {opp.content_type.value}", "url": crawl_result.url}
 
-                # Skip low-confidence extractions
+                # Skip low-confidence extractions (balanced quality threshold)
                 confidence = extraction.confidence or 0.0
-                if confidence < 0.4:
+                if confidence < 0.35:  # Relaxed threshold to capture more results
                     url_cache.mark_seen(crawl_result.url, "low_confidence", expires_days=30, notes=f"Confidence: {confidence:.2f}")
                     await log_rejection(
                         "low_confidence",
@@ -521,6 +728,23 @@ async def main(
                 # For expired recurring/annual opportunities, set priority recheck
                 if opp.is_expired and opp.timing_type in [OpportunityTiming.ANNUAL, OpportunityTiming.RECURRING, OpportunityTiming.SEASONAL]:
                     opp.recheck_days = 3
+
+                # Deduplicate within this run by normalized title + organization
+                title_key = normalize_text(opp.title or "")
+                org_key = normalize_text(opp.organization or "")
+                dedupe_key = f"{title_key}|{org_key}"
+                async with dedupe_lock:
+                    if dedupe_key in seen_title_org:
+                        url_cache.mark_seen(crawl_result.url, "duplicate", expires_days=30, notes="Duplicate title/org")
+                        await log_rejection(
+                            "duplicate_title_org",
+                            crawl_result.url,
+                            title=opp.title,
+                            content_type=opp.content_type.value,
+                            confidence=confidence,
+                        )
+                        return {"error": "Duplicate title/org", "url": crawl_result.url}
+                    seen_title_org.add(dedupe_key)
                 
                 # Sync to database (contributes to overall database)
                 if sync:
@@ -537,6 +761,9 @@ async def main(
                     "confidence": confidence,
                     "title": opp.title
                 })
+                # Track time to first EC
+                if first_ec_time is None:
+                    first_ec_time = time.time() - start_time
                 emit_event("opportunity_found", {
                     "id": opp.id,
                     "title": opp.title,
@@ -576,23 +803,50 @@ async def main(
                     "status": "failed",
                     "error": str(e)[:50]
                 })
-                await log_rejection("exception", crawl_result.url, error=str(e)[:200])
+                # Check for empty response in exception
+                if "empty response" in str(e).lower():
+                    await log_rejection("empty_response", crawl_result.url, error=str(e)[:200])
+                else:
+                    await log_rejection("exception", crawl_result.url, error=str(e)[:200])
                 return {"error": str(e)[:100], "url": crawl_result.url}
     
-    # Run extractions in parallel
-    extraction_tasks = [extract_and_save(cr) for cr in crawl_results]
-    results = await asyncio.gather(*extraction_tasks)
+    # Run extractions with early-stop: process in batches, stop once target reached
+    TARGET_OPPORTUNITIES = 7  # Stop once we have this many
+    BATCH_SIZE = 4  # Process this many URLs at a time
     
-    # Count results
     success_count = 0
     failed_count = 0
-    for result in results:
-        if result:
-            if result.get("success"):
-                success_count += 1
-                emit_event("extracted", {"card": result["card"]})
-            elif result.get("error"):
-                failed_count += 1
+    processed_count = 0
+    early_stopped = False
+    
+    for i in range(0, len(crawl_results), BATCH_SIZE):
+        # Check if we've reached target
+        async with saved_lock:
+            current_found = len(saved_opportunities)
+        if current_found >= TARGET_OPPORTUNITIES:
+            early_stopped = True
+            emit_event("early_stop", {"found": current_found, "target": TARGET_OPPORTUNITIES})
+            break
+        
+        batch = crawl_results[i:i + BATCH_SIZE]
+        extraction_tasks = [extract_and_save(cr) for cr in batch]
+        results = await asyncio.gather(*extraction_tasks)
+        
+        for result in results:
+            processed_count += 1
+            if result:
+                if result.get("success"):
+                    success_count += 1
+                    if result.get("is_list"):
+                        success_count += result.get("count", 1) - 1  # Adjust for list pages
+                    emit_event("extracted", {"card": result.get("card", {})})
+                elif result.get("error"):
+                    failed_count += 1
+    
+    # If we early-stopped, mark remaining URLs as skipped
+    if early_stopped:
+        remaining = len(crawl_results) - processed_count
+        failed_count += remaining
     
     # Complete AI extraction layer
     emit_event("layer_complete", {
@@ -603,6 +857,16 @@ async def main(
     emit_event("rejection_summary", {
         "reasons": dict(rejection_counts),
     })
+    emit_event("filter_report", {
+        "query_category": query_category,
+        "query_count": len(search_queries),
+        "search_results": len(all_results),
+        "semantic_prefilter_skipped": semantic_filter.last_prefilter_skipped,
+        "semantic_kept": len(semantic_scored_urls),
+        "cache_skipped": cache_skipped,
+        "urls_crawled": len(urls_to_process),
+        "rejections": dict(rejection_counts),
+    })
     
     # DB sync layer (already done inline, just emit completion)
     if sync:
@@ -612,10 +876,18 @@ async def main(
             "stats": {"inserted": success_count, "updated": 0, "skipped": failed_count}
         })
     
+    total_time = time.time() - start_time
     emit_event("complete", {
         "count": success_count,
         "isPersonalized": user_profile is not None,
         "user_id": user_profile.get("user_id") if user_profile else None,
+        "metrics": {
+            "total_time_seconds": round(total_time, 2),
+            "time_to_first_ec": round(first_ec_time, 2) if first_ec_time else None,
+            "early_stopped": early_stopped,
+            "rejection_reasons": dict(rejection_counts),
+            "empty_response_count": rejection_counts.get("empty_response", 0),
+        }
     })
     if sync:
         await sync.close()

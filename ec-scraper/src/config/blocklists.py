@@ -58,6 +58,11 @@ BLOCKED_DOMAINS: Set[str] = {
     'substack.com', 'ghost.io',
     'yelp.com', 'tripadvisor.com',
     'weather.com', 'accuweather.com',
+
+    # Low-quality SEO farms / content mills
+    'faqtoids.com', 'simpli.com', 'smarter.com',
+    'usingenglish.com', 'consumersearch.com',
+    'bloglines.com', 'reference.com',
 }
 
 # Domains that require JavaScript rendering (for hybrid crawler routing)
