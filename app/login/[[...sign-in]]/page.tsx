@@ -87,7 +87,7 @@ export default function LoginPage() {
                         <img
                             src="/networkly-logo.png"
                             alt="Networkly"
-                            className="h-10 object-contain hidden dark:block"
+                            className="h-10 object-contain hidden dark:block invert"
                         />
                     </div>
                     <h1 className="text-2xl font-semibold">Welcome back</h1>
