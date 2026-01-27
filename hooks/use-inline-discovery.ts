@@ -169,13 +169,18 @@ export function useInlineDiscovery(options: UseInlineDiscoveryOptions = {}): Use
               description: data.summary,
             }
 
-            opportunitiesRef.current.push(opportunity)
+            const existingIndex = opportunitiesRef.current.findIndex(opp => opp.id === opportunity.id)
+            if (existingIndex === -1) {
+              opportunitiesRef.current.push(opportunity)
+            } else {
+              opportunitiesRef.current[existingIndex] = opportunity
+            }
 
             setProgress(prev => ({
               ...prev,
-              foundCount: prev.foundCount + 1,
+              foundCount: opportunitiesRef.current.length,
               opportunities: [...opportunitiesRef.current],
-              message: `Found ${prev.foundCount + 1} opportunities...`,
+              message: `Found ${opportunitiesRef.current.length} opportunities...`,
             }))
 
             onOpportunityFound?.(opportunity)
