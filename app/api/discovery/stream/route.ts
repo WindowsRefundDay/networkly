@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: "Query parameter required" }, { status: 400 });
     }
 
-    const SCRAPER_API_URL = process.env.SCRAPER_API_URL || "http://localhost:8000";
+    const SCRAPER_API_URL = process.env.SCRAPER_API_URL || "http://localhost:8080";
     const API_TOKEN = process.env.DISCOVERY_API_TOKEN;
 
     if (!API_TOKEN) {
