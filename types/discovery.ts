@@ -6,7 +6,7 @@
  */
 
 // Layer identifiers
-export type LayerId = 
+export type LayerId =
   | 'query_generation'
   | 'web_search'
   | 'semantic_filter'
@@ -78,7 +78,9 @@ export type DiscoveryEventType =
   | 'search'
   | 'found'
   | 'analyzing'
+  | 'evaluating'
   | 'extracted'
+  | 'extracting'
   | 'opportunity_found'
   | 'complete'
   | 'done'
@@ -117,6 +119,18 @@ export interface FoundEvent extends DiscoveryEventBase {
 // Analyzing event
 export interface AnalyzingEvent extends DiscoveryEventBase {
   type: 'analyzing'
+  url: string
+}
+
+// Evaluating event (alias for analyzing)
+export interface EvaluatingEvent extends DiscoveryEventBase {
+  type: 'evaluating'
+  url: string
+}
+
+// Extracting event (alias for extracted)
+export interface ExtractingEvent extends DiscoveryEventBase {
+  type: 'extracting'
   url: string
 }
 
@@ -221,7 +235,9 @@ export type DiscoveryEvent =
   | SearchEvent
   | FoundEvent
   | AnalyzingEvent
+  | EvaluatingEvent
   | ExtractedEvent
+  | ExtractingEvent
   | OpportunityFoundEvent
   | CompleteEvent
   | DoneEvent

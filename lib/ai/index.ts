@@ -40,7 +40,6 @@
 export { AIModelManager, getAIManager, createAIManager } from './manager'
 
 // Providers
-export { OpenRouterProvider, createOpenRouterProvider } from './providers/openrouter'
 export { GeminiProvider, createGeminiProvider } from './providers/gemini'
 export { BaseProvider } from './providers/base'
 

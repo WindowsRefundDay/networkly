@@ -146,7 +146,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         type: 'bookmark_result',
         success: result.success,
-        message: result.success 
+        message: result.success
           ? `Done! ✓ I've saved "${confirmBookmark.opportunityTitle}" to your bookmarks.`
           : 'Sorry, I couldn\'t save that opportunity. Please try again.',
       })
@@ -183,10 +183,10 @@ export async function POST(req: NextRequest) {
 
   } catch (error) {
     console.error('[Chat API Error]', error)
-    
+
     const message = error instanceof Error ? error.message : 'Internal server error'
-    const status = error instanceof Error && 'statusCode' in error 
-      ? (error as { statusCode: number }).statusCode 
+    const status = error instanceof Error && 'statusCode' in error
+      ? (error as { statusCode: number }).statusCode
       : 500
 
     return NextResponse.json({ error: message }, { status })
@@ -205,23 +205,23 @@ async function handleStreamingResponse(
   const stream = new TransformStream()
   const writer = stream.writable.getWriter()
 
-  // Run the streaming loop in background
-  ;(async () => {
-    try {
-      await processStream(ai, messages, userId, writer, encoder)
-      // Send done event
-      await writer.write(encoder.encode('data: [DONE]\n\n'))
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Stream error'
-      console.error('[Chat Stream Error]', error)
-      await writer.write(encoder.encode(`data: ${JSON.stringify({ 
-        type: 'error', 
-        error: errorMessage 
-      })}\n\n`))
-    } finally {
-      await writer.close()
-    }
-  })()
+    // Run the streaming loop in background
+    ; (async () => {
+      try {
+        await processStream(ai, messages, userId, writer, encoder)
+        // Send done event
+        await writer.write(encoder.encode('data: [DONE]\n\n'))
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Stream error'
+        console.error('[Chat Stream Error]', error)
+        await writer.write(encoder.encode(`data: ${JSON.stringify({
+          type: 'error',
+          error: errorMessage
+        })}\n\n`))
+      } finally {
+        await writer.close()
+      }
+    })()
 
   return new NextResponse(stream.readable, {
     headers: {
@@ -279,114 +279,116 @@ async function processStream(
     }
 
     if (chunk.toolCalls) {
-        hasToolCalls = true
-        chunk.toolCalls.forEach((tc) => {
-            completedToolCalls.push({
-                id: tc.id,
-                name: tc.function.name,
-                arguments: tc.function.arguments
-            })
+      hasToolCalls = true
+      chunk.toolCalls.forEach((tc) => {
+        completedToolCalls.push({
+          id: tc.id,
+          name: tc.function.name,
+          arguments: tc.function.arguments
         })
+      })
     }
 
     if (chunk.toolCallDelta) {
-        hasToolCalls = true
-        const delta = chunk.toolCallDelta
-        const idx = delta.index
+      hasToolCalls = true
+      const delta = chunk.toolCallDelta
+      const idx = delta.index
 
-        if (!currentToolCalls[idx]) {
-            currentToolCalls[idx] = { name: '', arguments: '', id: delta.id || '' }
-        }
+      if (!currentToolCalls[idx]) {
+        currentToolCalls[idx] = { name: '', arguments: '', id: delta.id || '' }
+      }
 
-        if (delta.function?.name) currentToolCalls[idx].name += delta.function.name
-        if (delta.function?.arguments) currentToolCalls[idx].arguments += delta.function.arguments
-        if (delta.id && !currentToolCalls[idx].id) currentToolCalls[idx].id = delta.id
+      if (delta.function?.name) currentToolCalls[idx].name += delta.function.name
+      if (delta.function?.arguments) currentToolCalls[idx].arguments += delta.function.arguments
+      if (delta.id && !currentToolCalls[idx].id) currentToolCalls[idx].id = delta.id
     }
   }
 
   // After stream ends for this turn
   if (hasToolCalls) {
-      const toolCalls = [...Object.values(currentToolCalls), ...completedToolCalls]
-      const toolNames = toolCalls.map(tc => tc.name)
-      const loadingMessage = getLoadingMessage(toolNames)
+    const toolCalls = [...Object.values(currentToolCalls), ...completedToolCalls]
+    const toolNames = toolCalls.map(tc => tc.name)
+    const loadingMessage = getLoadingMessage(toolNames)
 
-      await writer.write(encoder.encode(`data: ${JSON.stringify({
-        type: 'tool-status',
-        status: loadingMessage,
-      })}\n\n`))
+    await writer.write(encoder.encode(`data: ${JSON.stringify({
+      type: 'tool-status',
+      status: loadingMessage,
+    })}\n\n`))
 
-      const toolResults: { toolCallId: string; result: ToolResult; name: string }[] = []
+    const toolResults: { toolCallId: string; result: ToolResult; name: string }[] = []
 
-      // Add assistant message with tool calls to history
-      const assistantMessage: Message = {
-        role: 'assistant',
-        content: currentContent,
-        toolCalls: toolCalls.map(tc => ({
-            id: tc.id,
-            type: 'function',
-            function: {
-                name: tc.name,
-                arguments: tc.arguments,
-            }
-        }))
+    // Add assistant message with tool calls to history
+    const assistantMessage: Message = {
+      role: 'assistant',
+      content: currentContent,
+      toolCalls: toolCalls.map(tc => ({
+        id: tc.id,
+        type: 'function',
+        function: {
+          name: tc.name,
+          arguments: tc.arguments,
+        }
+      }))
+    }
+    messages.push(assistantMessage)
+
+    // Execute tools
+    for (const toolCall of toolCalls) {
+      let args = {}
+      try {
+        args = JSON.parse(toolCall.arguments || '{}')
+      } catch (e) {
+        console.error('Failed to parse tool arguments', toolCall.arguments)
       }
-      messages.push(assistantMessage)
 
-      // Execute tools
-      for (const toolCall of toolCalls) {
-        let args = {}
-        try {
-            args = JSON.parse(toolCall.arguments || '{}')
-        } catch (e) {
-            console.error('Failed to parse tool arguments', toolCall.arguments)
-        }
+      const toolResult = await executeTool(toolCall.name, userId, args)
 
-        const toolResult = await executeTool(toolCall.name, userId, args)
+      toolResults.push({
+        toolCallId: toolCall.id,
+        result: toolResult,
+        name: toolCall.name,
+      })
 
-        toolResults.push({
-          toolCallId: toolCall.id,
-          result: toolResult,
-          name: toolCall.name,
-        })
-
-        // Special handling (web discovery, opportunities)
-        if ((toolCall.name === 'trigger_web_discovery' ||
-             toolCall.name === 'personalized_web_discovery') && toolResult.success) {
-             const data = toolResult.data as { triggerDiscovery: boolean; query: string; isPersonalized?: boolean }
-             if (data.triggerDiscovery) {
-                await writer.write(encoder.encode(`data: ${JSON.stringify({
-                  type: 'trigger_discovery',
-                  query: data.query,
-                  isPersonalized: data.isPersonalized || false,
-                })}\n\n`))
-             }
-        }
-
-        if ((toolCall.name === 'search_opportunities' ||
-             toolCall.name === 'smart_search_opportunities' ||
-             toolCall.name === 'filter_by_deadline') && toolResult.success) {
-             const data = toolResult.data as { opportunities: unknown[] }
-             if (data.opportunities && data.opportunities.length > 0) {
-                await writer.write(encoder.encode(`data: ${JSON.stringify({
-                  type: 'opportunities',
-                  opportunities: data.opportunities,
-                  isPersonalized: toolCall.name === 'smart_search_opportunities',
-                })}\n\n`))
-             }
+      // Special handling (web discovery, opportunities)
+      if ((toolCall.name === 'trigger_web_discovery' ||
+        toolCall.name === 'personalized_web_discovery') && toolResult.success) {
+        const data = toolResult.data as { triggerDiscovery: boolean; query: string; isPersonalized?: boolean }
+        if (data.triggerDiscovery) {
+          await writer.write(encoder.encode(`data: ${JSON.stringify({
+            type: 'trigger_discovery',
+            query: data.query,
+            isPersonalized: data.isPersonalized || false,
+          })}\n\n`))
         }
       }
 
-      // Add tool results to messages
-      for (const { toolCallId, result: toolResult, name } of toolResults) {
-        messages.push({
-          role: 'function',
-          name: name,
-          content: JSON.stringify(toolResult.data || { error: toolResult.error }),
-        })
+      if ((toolCall.name === 'search_opportunities' ||
+        toolCall.name === 'smart_search_opportunities' ||
+        toolCall.name === 'filter_by_deadline') && toolResult.success) {
+        const data = toolResult.data as { opportunities: unknown[] }
+        if (data.opportunities && data.opportunities.length > 0) {
+          await writer.write(encoder.encode(`data: ${JSON.stringify({
+            type: 'opportunities',
+            opportunities: data.opportunities,
+            isPersonalized: toolCall.name === 'smart_search_opportunities',
+          })}\n\n`))
+        }
       }
+    }
 
-      // Recurse
-      await processStream(ai, messages, userId, writer, encoder, iteration + 1)
+    // Add tool results to messages
+    for (const { toolCallId, result: toolResult, name } of toolResults) {
+      messages.push({
+        role: 'function',
+        name: name,
+        content: JSON.stringify(toolResult.data || { error: toolResult.error }),
+        // @ts-ignore - Adding specific field for AI SDK conversion
+        toolCallId: toolCallId,
+      })
+    }
+
+    // Recurse
+    await processStream(ai, messages, userId, writer, encoder, iteration + 1)
   }
 }
 
@@ -422,9 +424,9 @@ async function handleNonStreamingResponse(
         const toolResult = await executeTool(toolCall.function.name, userId, args)
 
         // Collect opportunities for response
-        if ((toolCall.function.name === 'search_opportunities' || 
-             toolCall.function.name === 'smart_search_opportunities' ||
-             toolCall.function.name === 'filter_by_deadline') && toolResult.success) {
+        if ((toolCall.function.name === 'search_opportunities' ||
+          toolCall.function.name === 'smart_search_opportunities' ||
+          toolCall.function.name === 'filter_by_deadline') && toolResult.success) {
           const data = toolResult.data as { opportunities: unknown[] }
           if (data.opportunities) {
             opportunitiesFound.push(...data.opportunities)

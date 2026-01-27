@@ -27,7 +27,6 @@ import type {
 
 import { AIProviderError, AIManagerConfigSchema } from './types'
 import { BaseProvider } from './providers/base'
-import { OpenRouterProvider } from './providers/openrouter'
 
 import { GeminiProvider } from './providers/gemini'
 import { logger } from './utils/logger'
@@ -122,10 +121,6 @@ export class AIModelManager {
       let provider: BaseProvider
 
       switch (providerConfig.name) {
-        case 'openrouter':
-          provider = new OpenRouterProvider(providerConfig)
-          break
-
         case 'gemini':
           // Gemini uses a different provider class
           this.geminiProvider = new GeminiProvider(providerConfig)
@@ -146,21 +141,6 @@ export class AIModelManager {
           logger.warn('AIManager', `Unknown provider: ${providerConfig.name}`)
           continue
       }
-
-      this.providers.set(providerConfig.name, provider)
-      this.providerStatuses.set(providerConfig.name, {
-        name: providerConfig.name,
-        healthy: true,
-        lastCheck: new Date(),
-        consecutiveFailures: 0,
-        averageLatencyMs: 0,
-        modelsHealthy: provider.getModels().length,
-        modelsUnhealthy: 0,
-      })
-
-      logger.info('AIManager', `Initialized provider: ${providerConfig.name}`, {
-        models: provider.getModels().length,
-      })
     }
 
     // Configure use cases
@@ -188,29 +168,10 @@ export class AIModelManager {
   initializeFromEnv(): void {
     const providers: AIManagerConfig['providers'] = []
 
-    // OpenRouter
-    const openrouterKey = process.env.OPENROUTER_API_KEY
-    if (openrouterKey) {
-      providers.push({
-        name: 'openrouter',
-        apiKey: openrouterKey,
-        baseUrl: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1/chat/completions',
-        defaultModel: process.env.OPENROUTER_DEFAULT_MODEL || 'openai/gpt-4o',
-        enabled: true,
-        timeout: parseInt(process.env.AI_TIMEOUT || '30000', 10),
-        maxRetries: parseInt(process.env.AI_MAX_RETRIES || '3', 10),
-      })
-      console.log('[AIManager] Initialized with OpenRouter')
-    } else {
-      console.warn('[AIManager] OPENROUTER_API_KEY not found')
-    }
-
-    // Gemini - check Vertex AI first, fallback to API key
-    const useVertexAI = process.env.USE_VERTEX_AI !== 'false' // Default to true
+    // Vertex AI (Gemini)
     const vertexProject = process.env.GOOGLE_VERTEX_PROJECT
-    const geminiApiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY
 
-    if (useVertexAI && vertexProject) {
+    if (vertexProject) {
       // Vertex AI mode
       providers.push({
         name: 'gemini',
@@ -223,25 +184,24 @@ export class AIModelManager {
         useVertexAI: true,
         vertexConfig: {
           project: vertexProject,
-          location: process.env.GOOGLE_VERTEX_LOCATION,
+          location: process.env.GOOGLE_VERTEX_LOCATION || 'us-central1',
         },
       })
       console.log(`[AIManager] Initialized with Gemini (Vertex AI) - Project: ${vertexProject}`)
-    } else if (geminiApiKey) {
-      // Fallback: API key mode
+    } else {
+      console.warn('[AIManager] Gemini (Vertex AI) not configured. Configuring generic provider for health checks only.')
+      // Fallback configuration ensuring manager doesn't crash, but it won't work for inference without project ID
       providers.push({
         name: 'gemini',
-        apiKey: geminiApiKey,
+        apiKey: 'placeholder',
         baseUrl: 'https://generativelanguage.googleapis.com',
-        defaultModel: process.env.GEMINI_DEFAULT_MODEL || 'gemini-2.5-flash-lite',
+        defaultModel: 'gemini-2.5-flash-lite',
         enabled: true,
-        timeout: parseInt(process.env.AI_TIMEOUT || '60000', 10),
-        maxRetries: parseInt(process.env.AI_MAX_RETRIES || '3', 10),
-        useVertexAI: false,
+        timeout: 60000,
+        maxRetries: 3,
+        useVertexAI: true,
+        vertexConfig: { project: 'placeholder', location: 'us-central1' }
       })
-      console.log('[AIManager] Initialized with Gemini (API Key mode)')
-    } else {
-      console.warn('[AIManager] Gemini not configured: Set GOOGLE_VERTEX_PROJECT for Vertex AI or GOOGLE_GENERATIVE_AI_API_KEY for API key mode')
     }
 
     if (providers.length === 0) {
@@ -649,4 +609,4 @@ export function createAIManager(config: AIManagerConfig): AIModelManager {
 }
 
 // Re-export providers for direct use if needed
-export { OpenRouterProvider, GeminiProvider }
+export { GeminiProvider }

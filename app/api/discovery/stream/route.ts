@@ -43,12 +43,16 @@ export async function GET(req: NextRequest) {
         scraperUrl.searchParams.set("query", query);
         if (userProfileId) scraperUrl.searchParams.set("userProfileId", userProfileId);
 
+        console.log(`[Discovery] Calling scraper: ${scraperUrl.toString()}`);
+
         const response = await fetch(scraperUrl.toString(), {
             headers: {
                 "Authorization": `Bearer ${API_TOKEN}`,
                 "Accept": "text/event-stream",
             },
         });
+
+        console.log(`[Discovery] Scraper responded: ${response.status} ${response.statusText}`);
 
         if (!response.ok) {
             const error = await response.text();

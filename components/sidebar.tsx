@@ -15,7 +15,8 @@ import {
   Settings,
   Sparkles,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  GraduationCap
 } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useSupabaseUser } from "@/hooks/use-supabase-user"
@@ -31,6 +32,7 @@ const navigation = [
   { name: "Projects", href: "/projects", icon: FolderKanban },
   { name: "AI Assistant", href: "/assistant", icon: Sparkles },
   { name: "Network", href: "/network", icon: MessageSquare },
+  { name: "Mentors", href: "/mentors", icon: GraduationCap },
   { name: "Events", href: "/events", icon: Calendar },
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
 ]

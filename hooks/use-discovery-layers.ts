@@ -38,7 +38,7 @@ interface UseDiscoveryLayersReturn {
 
 function createInitialState(query: string, isPersonalized: boolean = false): DiscoveryState {
   const layers = {} as Record<LayerId, LayerState>
-  
+
   for (const id of LAYER_ORDER) {
     layers[id] = {
       id,
@@ -79,10 +79,10 @@ const MAX_RUNNING_STATE_AGE_MS = 180_000;
 
 export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): UseDiscoveryLayersReturn {
   const { onOpportunityFound, onComplete, persistState = true } = options
-  
+
   // Track last discovery to prevent duplicate runs
   const lastDiscoveryRef = useRef<{ query: string; startedAt: number } | null>(null)
-  
+
   const [state, setState] = useState<DiscoveryState | null>(() => {
     // Try to restore from storage on initial load
     if (persistState && typeof window !== 'undefined') {
@@ -90,7 +90,7 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
         const stored = sessionStorage.getItem(STORAGE_KEY)
         if (stored) {
           const parsed = JSON.parse(stored) as DiscoveryState
-          
+
           // Only restore if it was running (not complete)
           if (parsed.status === 'running') {
             // STALE STATE GUARD: Don't restore if too old (no active connection)
@@ -104,7 +104,7 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
             // Mark it as complete to prevent showing stuck UI
             return { ...parsed, status: 'complete', endTime: Date.now() }
           }
-          
+
           // Restore completed states for display
           if (parsed.status === 'complete') {
             return parsed
@@ -116,7 +116,7 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
     }
     return null
   })
-  
+
   const eventSourceRef = useRef<EventSource | null>(null)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -140,7 +140,7 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
   }, [])
 
   const isActive = state?.status === 'running'
-  
+
   const activeLayer = state
     ? LAYER_ORDER.find((id) => state.layers[id]?.status === 'running') ?? null
     : null
@@ -159,14 +159,14 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
   const processEvent = useCallback((event: DiscoveryEvent) => {
     setState((prev) => {
       if (!prev) return prev
-      
+
       const newState = { ...prev }
-      
+
       switch (event.type) {
         // Legacy events - map to layer system
         case 'plan': {
           const message = (event as { message?: string }).message || ''
-          
+
           // Detect which layer based on message content
           if (message.includes('query') || message.includes('Query')) {
             newState.layers.query_generation = {
@@ -242,13 +242,14 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
           break
         }
 
+        case 'evaluating':
         case 'analyzing': {
           const url = (event as { url?: string }).url
           if (url) {
             // Move to crawl layer
             newState.layers.parallel_crawl.status = 'running'
             newState.layers.parallel_crawl.expanded = true
-            
+
             const existingItems = newState.layers.parallel_crawl.items || []
             // Check by URL instead of ID to avoid duplicates
             const exists = existingItems.some((item) => item.url === url)
@@ -263,18 +264,25 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
           break
         }
 
+        case 'extracting':
         case 'extracted': {
           const card = (event as { card?: { title: string } }).card
-          if (card) {
+          const url = (event as { url?: string }).url
+          if (card || url) {
             // Move to extraction layer
             newState.layers.ai_extraction.status = 'running'
             newState.layers.ai_extraction.expanded = true
-            
+
             const existingItems = newState.layers.ai_extraction.items || []
             const uniqueId = `ext_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
             newState.layers.ai_extraction.items = [
               ...existingItems,
-              { id: uniqueId, label: card.title, status: 'success' },
+              {
+                id: uniqueId,
+                label: (card as any)?.title || (url ? getDomain(url) : 'Extracting...'),
+                status: card ? 'success' : 'running',
+                url
+              },
             ]
           }
           break
@@ -287,18 +295,18 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
             confidence?: number
             url?: string
           }
-          
+
           newState.foundCount += 1
           newState.layers.ai_extraction.status = 'running'
           newState.layers.ai_extraction.expanded = true
-          
+
           // Update crawl item to success
           if (opp.url) {
             newState.layers.parallel_crawl.items = newState.layers.parallel_crawl.items.map(
               (item) => item.url === opp.url ? { ...item, status: 'success' } : item
             )
           }
-          
+
           // Add to extraction layer
           const existingItems = newState.layers.ai_extraction.items || []
           const uniqueId = opp.id || `opp_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
@@ -312,7 +320,7 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
               url: opp.url,
             },
           ]
-          
+
           onOpportunityFound?.(event)
           break
         }
@@ -323,25 +331,25 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
           const count = completeEvent.count || newState.foundCount
           // Handle both camelCase and snake_case from backend
           const isPersonalized = completeEvent.isPersonalized ?? completeEvent.is_personalized ?? newState.isPersonalized
-          
+
           // Mark all layers as complete
           for (const id of LAYER_ORDER) {
             if (newState.layers[id].status === 'running') {
               newState.layers[id].status = 'complete'
             }
           }
-          
+
           // Collapse all except last active
           for (const id of LAYER_ORDER) {
             newState.layers[id].expanded = false
           }
-          
+
           newState.status = 'complete'
           newState.endTime = Date.now()
           newState.overallProgress = 100
           newState.foundCount = count
           newState.isPersonalized = isPersonalized
-          
+
           onComplete?.(count)
           break
         }
@@ -383,7 +391,7 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
               newState.layers[prevLayer].status = 'complete'
               newState.layers[prevLayer].expanded = false
             }
-            
+
             newState.layers[layer] = {
               ...newState.layers[layer],
               status: 'running',
@@ -407,20 +415,20 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
             url?: string
             error?: string
           }
-          
+
           if (layer && newState.layers[layer]) {
             const layerState = newState.layers[layer]
-            
+
             if (current !== undefined && total !== undefined) {
               layerState.stats = { ...layerState.stats, completed: current, total }
             }
-            
+
             if (item) {
               // Try to find existing item by URL (if provided) or by label
-              const existingIndex = url 
+              const existingIndex = url
                 ? layerState.items.findIndex((i) => i.url === url)
                 : layerState.items.findIndex((i) => i.label === item)
-              
+
               if (existingIndex >= 0) {
                 // Update existing item, preserving its unique ID
                 layerState.items[existingIndex] = {
@@ -455,7 +463,7 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
             stats: Partial<LayerState['stats']>
             items?: string[]
           }
-          
+
           if (layer && newState.layers[layer]) {
             newState.layers[layer] = {
               ...newState.layers[layer],
@@ -464,7 +472,7 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
               duration: Date.now() - (newState.layers[layer].startTime || newState.startTime),
               stats: { ...newState.layers[layer].stats, ...stats },
             }
-            
+
             if (items) {
               // Create unique IDs for items to prevent duplicate key warnings
               newState.layers[layer].items = items.map((item, index) => ({
@@ -486,7 +494,7 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
             pending: number
             activeUrls?: string[]
           }
-          
+
           if (layer && newState.layers[layer]) {
             newState.layers[layer].stats = {
               ...newState.layers[layer].stats,
@@ -507,7 +515,7 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
           break
         }
       }
-      
+
       // Calculate overall progress
       const completedLayers = LAYER_ORDER.filter(
         (id) => newState.layers[id].status === 'complete'
@@ -518,7 +526,7 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
       newState.overallProgress = Math.round(
         ((completedLayers + runningLayers * 0.5) / LAYER_ORDER.length) * 100
       )
-      
+
       return newState
     })
   }, [onOpportunityFound, onComplete])
@@ -526,35 +534,35 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
   const startDiscovery = useCallback((query: string, options: { isPersonalized?: boolean, userProfileId?: string } = {}) => {
     const normalizedQuery = query.trim().toLowerCase()
     const now = Date.now()
-    
+
     // Prevent duplicate/overlapping runs
     // Skip if already running or if same query was started within last 30 seconds
     if (state?.status === 'running') {
       console.log('[Discovery] Already running, skipping duplicate start')
       return
     }
-    
+
     if (lastDiscoveryRef.current) {
       const { query: lastQuery, startedAt } = lastDiscoveryRef.current
       const timeSinceStart = now - startedAt
       const DUPLICATE_WINDOW_MS = 60_000 // 60 seconds - aggressive deduplication
-      
+
       if (lastQuery === normalizedQuery && timeSinceStart < DUPLICATE_WINDOW_MS) {
         console.log(`[Discovery] Same query started ${Math.round(timeSinceStart / 1000)}s ago, skipping duplicate`)
         return
       }
     }
-    
+
     // Update last discovery tracking
     lastDiscoveryRef.current = { query: normalizedQuery, startedAt: now }
-    
+
     cleanup()
-    
+
     const { isPersonalized = false, userProfileId } = options
     const initialState = createInitialState(query, isPersonalized)
     initialState.status = 'running'
     setState(initialState)
-    
+
     const buildUrl = () => {
       let url = `/api/discovery/stream?query=${encodeURIComponent(query)}`
       if (isPersonalized && userProfileId) {
@@ -562,10 +570,10 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
       }
       return url
     }
-    
+
     const es = new EventSource(buildUrl())
     eventSourceRef.current = es
-    
+
     // Timeout after 2 minutes (aggressive timeout for quick profile optimization)
     const CLIENT_TIMEOUT_MS = 120_000; // 2 minutes
     timeoutRef.current = setTimeout(() => {
@@ -573,7 +581,7 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
       processEvent({ type: 'error', message: 'Discovery timed out' } as DiscoveryEvent)
       processEvent({ type: 'complete', count: 0 } as DiscoveryEvent)
     }, CLIENT_TIMEOUT_MS)
-    
+
     es.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data) as DiscoveryEvent
@@ -582,12 +590,12 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
         console.error('[Discovery] Parse error:', e)
       }
     }
-    
+
     // Track retry attempts (reduced for faster failure)
     let retryCount = 0
     const MAX_RETRIES = 1  // Fail fast - reduced from 2
     const RETRY_DELAY_MS = 1000  // Reduced from 2000ms
-    
+
     es.onerror = (err) => {
       // EventSource fires onerror on connection issues
       // Check if the connection is actually closed (readyState === 2)
@@ -595,17 +603,17 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
         if (retryCount < MAX_RETRIES) {
           retryCount++
           console.log(`[Discovery] Connection lost, retry ${retryCount}/${MAX_RETRIES}...`)
-          
+
           // Close current connection
           es.close()
-          
+
           // Retry after delay
           setTimeout(() => {
             if (eventSourceRef.current === es) {
               // Re-initiate connection with same parameters
               const newEs = new EventSource(buildUrl())
               eventSourceRef.current = newEs
-              
+
               newEs.onmessage = es.onmessage
               newEs.onerror = es.onerror
             }

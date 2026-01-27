@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef, useCallback } from "react"
 import { motion, AnimatePresence, LayoutGroup } from "framer-motion"
+import { cn } from "@/lib/utils"
 import { Input } from "@/components/ui/input"
 import { GlassCard } from "@/components/ui/glass-card"
 import { Button } from "@/components/ui/button"
@@ -21,6 +22,16 @@ import { OPPORTUNITY_TYPES } from "@/types/opportunity"
 interface OpportunitiesClientProps {
   initialHighlightId?: string | null
 }
+
+const CATEGORIES = [
+  "All",
+  "Internship",
+  "Research",
+  "Competition",
+  "Program",
+  "Event",
+  "Job"
+]
 
 export default function OpportunitiesClient({ initialHighlightId }: OpportunitiesClientProps) {
   const [searchQuery, setSearchQuery] = useState("")
@@ -327,9 +338,10 @@ export default function OpportunitiesClient({ initialHighlightId }: Opportunitie
         >
           <GlassCard
             variant="compact"
-            className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-5 sticky top-4 z-40 shadow-sm backdrop-blur-xl"
+            className="p-4 sm:p-5 flex flex-col gap-5 sticky top-4 z-40 shadow-sm backdrop-blur-xl"
           >
-            <div className="space-y-1">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
+              <div className="space-y-1">
               <h1 className="text-2xl font-bold text-foreground tracking-tight">Opportunities</h1>
               <div className="text-muted-foreground text-sm flex items-center gap-2">
                 {isSearching ? (
@@ -369,22 +381,31 @@ export default function OpportunitiesClient({ initialHighlightId }: Opportunitie
                   </Button>
                 )}
               </div>
-              <Select value={typeFilter} onValueChange={handleTypeFilterChange}>
-                <SelectTrigger className="w-[160px] h-10 bg-muted/50 border-border/50 focus:border-primary/20 rounded-lg">
-                  <Filter className="h-4 w-4 mr-2 text-muted-foreground" />
-                  <SelectValue placeholder="All Types" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  {OPPORTUNITY_TYPES.map((type) => (
-                    <SelectItem key={type.value} value={type.value}>
-                      {type.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
+          </div>
           </GlassCard>
+
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none mask-fade-right">
+            {CATEGORIES.map((cat) => {
+              const value = cat === "All" ? "all" : cat.toLowerCase()
+              const isActive = typeFilter.toLowerCase() === value
+              
+              return (
+                <button
+                  key={cat}
+                  onClick={() => handleTypeFilterChange(value)}
+                  className={cn(
+                    "px-4 py-1.5 rounded-full text-sm font-medium transition-all whitespace-nowrap border",
+                    isActive
+                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                      : "bg-background/50 text-muted-foreground border-border hover:bg-accent hover:text-accent-foreground"
+                  )}
+                >
+                  {cat}
+                </button>
+              )
+            })}
+          </div>
         </motion.div>
 
         <AnimatePresence mode="wait">

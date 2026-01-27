@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 
 import { createClient, requireAuth } from "@/lib/supabase/server"
+import { triggerDiscovery } from "@/app/actions/discovery"
 
 // ============================================================================
 // GET USER GOAL
@@ -103,6 +104,11 @@ export async function createGoal(goalText: string) {
   if (error || !goal) {
     console.error("[createGoal]", error)
     throw new Error("Failed to create goal")
+  }
+
+  try {
+    triggerDiscovery(goalText).catch(console.error)
+  } catch (e) {
   }
 
   revalidatePath("/dashboard")
