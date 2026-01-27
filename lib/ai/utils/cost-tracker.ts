@@ -1,18 +1,56 @@
 /**
  * AI Cost Tracker - Track and persist AI API costs
  * 
- * Tracks per-request costs for Gemini and OpenRouter APIs.
+ * Tracks per-request costs for Gemini API.
  * Saves cost records to a local JSON file for persistence.
  */
 
 import { promises as fs } from 'fs'
 import path from 'path'
-import type { ProviderName, CostRecord, CostSummary, UseCase } from '../types'
 import { MODEL_PRICING } from '../types'
 import { logger } from './logger'
 
+// Define minimal required types locally to avoid dependency issues during rewrite
+type ProviderName = 'gemini' | string
+type UseCase = string
+
+export interface CostRecord {
+  id: string
+  timestamp: string
+  provider: ProviderName
+  model: string
+  inputTokens: number
+  outputTokens: number
+  totalTokens: number
+  inputCost: number
+  outputCost: number
+  totalCost: number
+  latencyMs: number
+  useCase?: UseCase
+  cached?: boolean
+}
+
+export interface CostSummary {
+  totalCost: number
+  totalInputTokens: number
+  totalOutputTokens: number
+  totalRequests: number
+  byProvider: Record<string, {
+    cost: number
+    inputTokens: number
+    outputTokens: number
+    requests: number
+  }>
+  byModel: Record<string, {
+    cost: number
+    inputTokens: number
+    outputTokens: number
+    requests: number
+  }>
+}
+
 const COST_FILE_PATH = path.join(process.cwd(), 'data', 'ai-costs.json')
-const MAX_RECORDS = 10000 // Keep last 10k records to prevent file from growing too large
+const MAX_RECORDS = 10000 // Keep last 10k records
 
 interface CostData {
   records: CostRecord[]
@@ -24,9 +62,6 @@ class CostTracker {
   private initialized = false
   private saveDebounceTimer: NodeJS.Timeout | null = null
 
-  /**
-   * Initialize the cost tracker by loading existing records
-   */
   async initialize(): Promise<void> {
     if (this.initialized) return
 
@@ -43,9 +78,6 @@ class CostTracker {
     }
   }
 
-  /**
-   * Record a new cost entry
-   */
   async recordCost(params: {
     provider: ProviderName
     model: string
@@ -81,12 +113,10 @@ class CostTracker {
 
     this.records.push(record)
 
-    // Trim old records if we exceed max
     if (this.records.length > MAX_RECORDS) {
       this.records = this.records.slice(-MAX_RECORDS)
     }
 
-    // Debounced save to avoid too many file writes
     this.debouncedSave()
 
     logger.debug('CostTracker', 'Recorded cost', {
@@ -98,9 +128,6 @@ class CostTracker {
     return record
   }
 
-  /**
-   * Calculate cost based on model pricing
-   */
   calculateCost(
     model: string,
     inputTokens: number,
@@ -115,34 +142,22 @@ class CostTracker {
     return { inputCost, outputCost, totalCost }
   }
 
-  /**
-   * Get total cost across all records
-   */
   getTotalCost(): number {
     return this.records.reduce((sum, r) => sum + r.totalCost, 0)
   }
 
-  /**
-   * Get cost by provider
-   */
   getCostByProvider(provider: ProviderName): number {
     return this.records
       .filter(r => r.provider === provider)
       .reduce((sum, r) => sum + r.totalCost, 0)
   }
 
-  /**
-   * Get cost by model
-   */
   getCostByModel(model: string): number {
     return this.records
       .filter(r => r.model === model)
       .reduce((sum, r) => sum + r.totalCost, 0)
   }
 
-  /**
-   * Get costs since a specific date
-   */
   getCostsSince(date: Date): number {
     const timestamp = date.toISOString()
     return this.records
@@ -150,16 +165,13 @@ class CostTracker {
       .reduce((sum, r) => sum + r.totalCost, 0)
   }
 
-  /**
-   * Get a full cost summary
-   */
   getSummary(): CostSummary {
     const summary: CostSummary = {
       totalCost: 0,
       totalInputTokens: 0,
       totalOutputTokens: 0,
       totalRequests: this.records.length,
-      byProvider: {} as CostSummary['byProvider'],
+      byProvider: {},
       byModel: {},
     }
 
@@ -200,37 +212,23 @@ class CostTracker {
     return summary
   }
 
-  /**
-   * Get recent records
-   */
   getRecentRecords(limit = 100): CostRecord[] {
     return this.records.slice(-limit).reverse()
   }
 
-  /**
-   * Get all records
-   */
   getAllRecords(): CostRecord[] {
     return [...this.records]
   }
 
-  /**
-   * Clear all records
-   */
   async clearRecords(): Promise<void> {
     this.records = []
     await this.saveRecords()
     logger.info('CostTracker', 'Cleared all cost records')
   }
 
-  /**
-   * Force save records to file
-   */
   async save(): Promise<void> {
     await this.saveRecords()
   }
-
-  // Private methods
 
   private async ensureDataDirectory(): Promise<void> {
     const dataDir = path.dirname(COST_FILE_PATH)
@@ -267,7 +265,7 @@ class CostTracker {
       this.saveRecords().catch(err => {
         logger.error('CostTracker', 'Failed to save records', { error: String(err) })
       })
-    }, 1000) // Save at most once per second
+    }, 1000)
   }
 
   private generateId(): string {
@@ -278,9 +276,6 @@ class CostTracker {
 // Singleton instance
 let trackerInstance: CostTracker | null = null
 
-/**
- * Get the singleton cost tracker instance
- */
 export function getCostTracker(): CostTracker {
   if (!trackerInstance) {
     trackerInstance = new CostTracker()

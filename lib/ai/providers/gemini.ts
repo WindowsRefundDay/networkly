@@ -456,9 +456,10 @@ export class GeminiProvider {
 
         // Handle tool calls
         if (msg.toolCalls && msg.toolCalls.length > 0) {
-          // If we have tool calls, content can be empty if it's undefined/null
-          // But AI SDK might require non-empty string or undefined.
-          coreMsg.content = msg.content || undefined
+          // FIX: Ensure content is strictly a string, even if empty.
+          // The AI SDK schema requires 'content' to be a string, not undefined.
+          coreMsg.content = (msg.content && typeof msg.content === 'string') ? msg.content : ''
+
           coreMsg.toolCalls = msg.toolCalls.map((tc: any) => ({
             type: 'function',
             toolCallId: tc.id || tc.toolCallId,

@@ -1,18 +1,17 @@
-/**
- * AI Tools - Export all tool definitions and executors
- */
-
-export { AI_TOOLS, TOOL_ACTIONS } from './definitions'
-export type { ToolDefinition } from './definitions'
-
 export { 
-  executeTool,
-  getUserProfile,
-  getExtracurriculars,
-  getSavedOpportunities,
-  getProjects,
-  getGoals,
-  searchOpportunities,
-  bookmarkOpportunity,
-} from './executors'
-export type { ToolResult } from './executors'
+  TOOLS, 
+  TOOL_NAMES,
+  type ToolContext, 
+  type ToolResult,
+  get_user_profile,
+  get_extracurriculars,
+  get_saved_opportunities,
+  get_projects,
+  get_goals,
+  search_opportunities,
+  smart_search_opportunities,
+  filter_by_deadline,
+  bookmark_opportunity,
+  trigger_web_discovery,
+  personalized_web_discovery,
+} from './tools'

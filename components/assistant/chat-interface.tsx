@@ -102,16 +102,19 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
     return cache
   }, [messages])
 
+  const [currentDiscoveryId, setCurrentDiscoveryId] = useState<string | null>(null)
+
   // Inline discovery hook
   const { progress: discoveryProgress, isActive: isDiscovering, startDiscovery, stopDiscovery } = useInlineDiscovery({
     onOpportunityFound: (opportunity) => {
-      // Update the discovery message with new opportunity
+      // Update discovery message with new opportunity
       setMessages(prev => {
-        const discoveryMsgIndex = prev.findIndex(m => m.id === 'discovery-results')
+        if (!currentDiscoveryId) return prev
+        const discoveryMsgIndex = prev.findIndex(m => m.id === currentDiscoveryId)
         if (discoveryMsgIndex >= 0) {
           const msg = prev[discoveryMsgIndex]
           const newOpps = [...(msg.opportunities || []), opportunity]
-          // Also update the cache
+          // Also update cache
           const newCache = { ...(msg.opportunityCache || {}), [opportunity.id]: opportunity }
           return [
             ...prev.slice(0, discoveryMsgIndex),
@@ -125,9 +128,10 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
     onComplete: (opportunities) => {
       setPendingDiscoveryQuery(null)
 
-      // Update or add the final discovery message
+      // Update or add final discovery message
       setMessages(prev => {
-        const discoveryMsgIndex = prev.findIndex(m => m.id === 'discovery-results')
+        if (!currentDiscoveryId) return prev
+        const discoveryMsgIndex = prev.findIndex(m => m.id === currentDiscoveryId)
         const content = opportunities.length > 0
           ? `Great news! I found ${opportunities.length} opportunities for you:`
           : "I searched the web but couldn't find any new opportunities matching your criteria. Try a different search term?"
@@ -147,13 +151,14 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
         }
 
         return [...prev, {
-          id: 'discovery-results',
+          id: currentDiscoveryId,
           role: 'assistant' as const,
           content,
           opportunities,
           opportunityCache: cache,
         }]
       })
+      setCurrentDiscoveryId(null)
     },
     onError: (error) => {
       setPendingDiscoveryQuery(null)
