@@ -189,6 +189,22 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
   // Generate unique message ID
   const generateId = () => `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 
+  const getEmbeddedCardIds = (content: string): string[] => {
+    const cardPattern = /\{\{card:([a-zA-Z0-9-_]+)\}\}/g
+    const ids: string[] = []
+    let match
+    while ((match = cardPattern.exec(content)) !== null) {
+      ids.push(match[1])
+    }
+    return ids
+  }
+
+  const filterOpportunitiesForGrid = (opportunities: InlineOpportunity[], content: string): InlineOpportunity[] => {
+    const embeddedIds = getEmbeddedCardIds(content)
+    const embeddedIdSet = new Set(embeddedIds)
+    return opportunities.filter(opp => !embeddedIdSet.has(opp.id))
+  }
+
   // Send message to API
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || isLoading) return
@@ -414,9 +430,12 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
   const handleConfirmDiscovery = () => {
     if (!pendingDiscoveryQuery) return
 
+    const discoveryId = generateId()
+    setCurrentDiscoveryId(discoveryId)
+
     // Add placeholder for discovery results
     setMessages(prev => [...prev, {
-      id: generateId(),
+      id: discoveryId,
       role: 'assistant',
       content: '',
       opportunities: [],
@@ -570,7 +589,7 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
                     {message.opportunities && message.opportunities.length > 0 && (
                       <div className="mt-4">
                         <OpportunityGrid
-                          opportunities={message.opportunities}
+                          opportunities={filterOpportunitiesForGrid(message.opportunities, message.content)}
                           onBookmark={handleBookmark}
                           bookmarkingId={bookmarkingId || undefined}
                           bookmarkedIds={bookmarkedIds}
