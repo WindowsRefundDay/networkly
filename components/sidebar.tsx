@@ -136,21 +136,37 @@ export function Sidebar({ isCollapsed = false, toggleCollapse }: SidebarProps) {
             size="icon"
             className="w-full flex items-center justify-center h-8 hover:bg-muted"
             onClick={toggleCollapse}
+            aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           </Button>
         )}
 
-        <Link
-          href="/settings"
-          className={cn(
-            "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-            isCollapsed && "justify-center px-0"
-          )}
-        >
-          <Settings className="h-5 w-5 shrink-0" />
-          {!isCollapsed && "Settings"}
-        </Link>
+        {isCollapsed ? (
+          <Tooltip delayDuration={0}>
+            <TooltipTrigger asChild>
+              <Link
+                href="/settings"
+                aria-label="Settings"
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                  isCollapsed && "justify-center px-0"
+                )}
+              >
+                <Settings className="h-5 w-5 shrink-0" />
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent side="right">Settings</TooltipContent>
+          </Tooltip>
+        ) : (
+          <Link
+            href="/settings"
+            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <Settings className="h-5 w-5 shrink-0" />
+            <span>Settings</span>
+          </Link>
+        )}
 
         <div className={cn("flex items-center gap-3 rounded-lg bg-muted/50 p-3", isCollapsed && "justify-center p-2 bg-transparent")}>
           <Avatar className="h-10 w-10 shrink-0">

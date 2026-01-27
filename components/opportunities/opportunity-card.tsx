@@ -121,8 +121,12 @@ export function OpportunityCard({
               </div>
               
               <div className="flex flex-col items-center">
-                <div className="relative">
-                  <svg className="h-12 w-12 -rotate-90">
+                <div
+                  className="relative"
+                  role="img"
+                  aria-label={`Match score: ${opportunity.matchScore}%`}
+                >
+                  <svg className="h-12 w-12 -rotate-90" aria-hidden="true">
                     <circle
                       className="text-muted/30"
                       strokeWidth="3"
@@ -265,6 +269,7 @@ export function OpportunityCard({
                 }`}
                 onClick={(e) => onToggleSave(e, opportunity.id)}
                 disabled={saving}
+                aria-label={opportunity.saved ? "Remove from saved" : "Save opportunity"}
               >
                 {opportunity.saved ? (
                   <BookmarkCheck className="h-4 w-4" />
