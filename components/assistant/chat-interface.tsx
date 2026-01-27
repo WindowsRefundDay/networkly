@@ -516,57 +516,7 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
   }
 
   return (
-    <div className="flex flex-col h-full bg-background rounded-2xl border border-border shadow-sm">
-      <div className="flex-none border-b border-border p-6 bg-card rounded-t-2xl">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary shadow-md">
-              <Sparkles className="h-7 w-7 text-primary-foreground" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-foreground">Networkly AI Assistant</h2>
-              <p className="text-sm text-muted-foreground">Your personal career guide</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {hasSavedSession && messages.length === 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleLoadChat}
-                className="h-9 text-sm"
-              >
-                <History className="h-4 w-4 mr-2" />
-                Load Saved
-              </Button>
-            )}
-            {messages.length > 0 && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSaveChat}
-                  className="h-9 text-sm"
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  Save
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleNewChat}
-                  className="h-9 text-sm"
-                >
-                  <RotateCcw className="h-4 w-4 mr-2" />
-                  New
-                </Button>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
+    <div className="flex flex-col h-full bg-background rounded-2xl border border-border shadow-sm overflow-hidden">
       <div className="flex-1 overflow-hidden bg-background">
         <div className="h-full overflow-y-auto p-6" ref={scrollAreaRef}>
           {messages.length === 0 ? (
@@ -657,15 +607,6 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
                   )}
                 </div>
               ))}
-
-              {toolStatus && (
-                <div className="flex gap-4">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary">
-                    <Sparkles className="h-6 w-6 text-primary-foreground" />
-                  </div>
-                  <SimpleLoading message={toolStatus} />
-                </div>
-              )}
 
               {pendingDiscoveryQuery && !isDiscovering && (
                 <div className="flex gap-4">

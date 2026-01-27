@@ -333,7 +333,7 @@ export const get_goals = tool({
  * Search for opportunities in database
  */
 export const search_opportunities = tool({
-  description: 'Basic search for opportunities. Use smart_search_opportunities instead for personalized results.',
+  description: 'SECONDARY search tool. Only use this if smart_search_opportunities fails or for very simple keyword lookups.',
   inputSchema: z.object({
     query: z.string().describe('Search query (e.g., "robotics", "STEM internship")'),
     category: z.enum(['STEM', 'Arts', 'Business', 'Community Service', 'Sports', 'Other']).optional().describe('Category filter'),
@@ -410,9 +410,9 @@ export const search_opportunities = tool({
  * Automatically fetches user profile and filters/ranks by relevance
  */
 export const smart_search_opportunities = tool({
-  description: 'Search opportunities with automatic personalization based on user profile. PREFERRED search tool.',
+  description: 'PRIMARY & PREFERRED search tool. Use this for all internship, job, and program searches. It automatically personalizes results based on the user profile.',
   inputSchema: z.object({
-    query: z.string().optional().describe('Search query. Can be empty for general personalized recommendations.'),
+    query: z.string().optional().describe('Short, broad keywords (e.g., "robotics", "medicine"). Avoid long sentences.'),
     category: z.enum(['STEM', 'Arts', 'Business', 'Community Service', 'Sports', 'Other']).optional().describe('Category filter'),
     type: z.enum(['Internship', 'Competition', 'Summer Program', 'Research', 'Volunteer', 'Scholarship']).optional().describe('Type filter'),
     limit: z.number().optional().describe('Maximum results')
