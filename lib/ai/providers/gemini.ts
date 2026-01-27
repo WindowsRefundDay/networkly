@@ -6,6 +6,7 @@
  */
 
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
+import { createVertex } from '@ai-sdk/google-vertex'
 import { generateText, streamText, jsonSchema } from 'ai'
 import type {
   ProviderName,
@@ -16,6 +17,7 @@ import type {
   StreamChunk,
   HealthCheckResult,
   ToolDefinition,
+  VertexConfig,
 } from '../types'
 import { AIProviderError, AuthenticationError } from '../types'
 import { logger } from '../utils/logger'
@@ -34,7 +36,7 @@ const GEMINI_MODELS: Record<string, Omit<ModelInfo, 'id' | 'provider'>> = {
   // =========================================================================
   // GEMINI 3 - LATEST PREVIEW MODELS (January 2026)
   // =========================================================================
-  
+
   'gemini-3-pro-preview': {
     name: 'Gemini 3 Pro Preview',
     contextLength: 1048576,
@@ -47,7 +49,7 @@ const GEMINI_MODELS: Record<string, Omit<ModelInfo, 'id' | 'provider'>> = {
     supportsFunctionCalling: true,
     tier: 'premium',
   },
-  
+
   'gemini-3-flash-preview': {
     name: 'Gemini 3 Flash Preview',
     contextLength: 1048576,
@@ -60,11 +62,11 @@ const GEMINI_MODELS: Record<string, Omit<ModelInfo, 'id' | 'provider'>> = {
     supportsFunctionCalling: true,
     tier: 'premium',
   },
-  
+
   // =========================================================================
   // GEMINI 2.5 - STABLE PRODUCTION MODELS (January 2026)
   // =========================================================================
-  
+
   'gemini-2.5-pro': {
     name: 'Gemini 2.5 Pro',
     contextLength: 1048576,
@@ -77,7 +79,7 @@ const GEMINI_MODELS: Record<string, Omit<ModelInfo, 'id' | 'provider'>> = {
     supportsFunctionCalling: true,
     tier: 'premium',
   },
-  
+
   'gemini-2.5-flash': {
     name: 'Gemini 2.5 Flash',
     contextLength: 1048576,
@@ -90,7 +92,7 @@ const GEMINI_MODELS: Record<string, Omit<ModelInfo, 'id' | 'provider'>> = {
     supportsFunctionCalling: true,
     tier: 'standard',
   },
-  
+
   'gemini-2.5-flash-lite': {
     name: 'Gemini 2.5 Flash Lite',
     contextLength: 1048576,
@@ -168,25 +170,78 @@ function convertToolChoice(toolChoice: CompletionOptions['toolChoice']): 'auto' 
 export class GeminiProvider {
   private config: ProviderConfig
   private models: Map<string, ModelInfo> = new Map()
-  private googleProvider: ReturnType<typeof createGoogleGenerativeAI>
+  private googleProvider: ReturnType<typeof createGoogleGenerativeAI> | ReturnType<typeof createVertex>
+  private useVertexAI: boolean
 
-  constructor(config: Partial<ProviderConfig> & { apiKey: string }) {
-    const { apiKey, ...restConfig } = config
+  constructor(config: Partial<ProviderConfig> & { apiKey?: string; useVertexAI?: boolean; vertexConfig?: VertexConfig }) {
+    const { apiKey, useVertexAI, vertexConfig, ...restConfig } = config
+
+    // Determine authentication mode
+    this.useVertexAI = useVertexAI ?? true // Default to Vertex AI
+
     this.config = {
       name: 'gemini',
-      apiKey,
+      apiKey: apiKey || '', // May be empty for Vertex AI
       baseUrl: 'https://generativelanguage.googleapis.com',
       defaultModel: restConfig.defaultModel || DEFAULT_MODEL,
       enabled: restConfig.enabled ?? true,
       timeout: restConfig.timeout ?? 60000,
       maxRetries: restConfig.maxRetries ?? 3,
+      useVertexAI: this.useVertexAI,
+      vertexConfig,
       ...restConfig,
     }
 
-    // Create Google provider instance with API key
-    this.googleProvider = createGoogleGenerativeAI({
-      apiKey: this.config.apiKey,
-    })
+    // Initialize provider based on authentication mode
+    if (this.useVertexAI) {
+      // Vertex AI mode - uses Google Cloud authentication
+      const project = vertexConfig?.project || process.env.GOOGLE_VERTEX_PROJECT
+      const location = vertexConfig?.location || process.env.GOOGLE_VERTEX_LOCATION || 'us-central1'
+
+      if (!project) {
+        throw new Error('GOOGLE_VERTEX_PROJECT is required when useVertexAI is true')
+      }
+
+      // Check for JSON credentials in env var (for Vercel deployment)
+      let credentials = vertexConfig?.credentials
+      if (!credentials && process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
+        try {
+          const parsed = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON)
+          credentials = {
+            client_email: parsed.client_email,
+            private_key: parsed.private_key,
+          }
+        } catch (error) {
+          console.error('[GeminiProvider] Failed to parse GOOGLE_APPLICATION_CREDENTIALS_JSON:', error)
+        }
+      }
+
+      this.googleProvider = createVertex({
+        project,
+        location,
+        googleAuthOptions: credentials ? {
+          credentials,
+        } : {
+          // Use Application Default Credentials (ADC)
+          // This works with: gcloud auth application-default login
+          // Or GOOGLE_APPLICATION_CREDENTIALS env var pointing to JSON file
+          keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+        },
+      })
+
+      logger.info('GeminiProvider', `Initialized with Vertex AI (${project}, ${location})`)
+    } else {
+      // API key mode - traditional Gemini Developer API
+      if (!apiKey) {
+        throw new Error('apiKey is required when useVertexAI is false')
+      }
+
+      this.googleProvider = createGoogleGenerativeAI({
+        apiKey,
+      })
+
+      logger.info('GeminiProvider', 'Initialized with API key authentication')
+    }
 
     this.initializeModels()
   }

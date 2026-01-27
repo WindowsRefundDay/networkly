@@ -32,3 +32,5 @@ ec-scraper/config_hybrid.env
 
 # AI cost tracking data (may contain usage patterns)
 /data/ai-costs.json
+.env*.local
+*.json

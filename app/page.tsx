@@ -6,12 +6,12 @@ export default function Home() {
       <KnownBugsModal />
       <div className="flex justify-center">
         <img
-          src="/networkly-welcome-dark.png"
+          src="/networkly-welcome.png"
           alt="Networkly"
           className="h-72 object-contain dark:hidden"
         />
         <img
-          src="/networkly-welcome.png"
+          src="/networkly-welcome-dark.png"
           alt="Networkly"
           className="h-72 object-contain hidden dark:block invert"
         />

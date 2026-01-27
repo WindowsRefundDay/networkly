@@ -38,7 +38,7 @@ try {
   const loggerModule = require('./query-logger')
   logQueryFn = loggerModule.logQuery
 } catch (e) {
-  logQueryFn = async () => {}
+  logQueryFn = async () => { }
 }
 
 // Use case to model mapping defaults - Using latest Gemini models
@@ -84,7 +84,7 @@ const DEFAULT_USE_CASE_MODELS_INTERNAL: Record<UseCase, { primary: string; fallb
   },
 }
 
-  export class AIModelManager {
+export class AIModelManager {
   private providers: Map<ProviderName, BaseProvider> = new Map()
   private geminiProvider: GeminiProvider | null = null
   private useCaseConfigs: Map<UseCase, UseCaseConfig> = new Map()
@@ -200,26 +200,55 @@ const DEFAULT_USE_CASE_MODELS_INTERNAL: Record<UseCase, { primary: string; fallb
         timeout: parseInt(process.env.AI_TIMEOUT || '30000', 10),
         maxRetries: parseInt(process.env.AI_MAX_RETRIES || '3', 10),
       })
+      console.log('[AIManager] Initialized with OpenRouter')
+    } else {
+      console.warn('[AIManager] OPENROUTER_API_KEY not found')
     }
 
+    // Gemini - check Vertex AI first, fallback to API key
+    const useVertexAI = process.env.USE_VERTEX_AI !== 'false' // Default to true
+    const vertexProject = process.env.GOOGLE_VERTEX_PROJECT
+    const geminiApiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY
 
-
-    // Gemini (Google AI)
-    const geminiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.GEMINI_API_KEY
-    if (geminiKey) {
+    if (useVertexAI && vertexProject) {
+      // Vertex AI mode
       providers.push({
         name: 'gemini',
-        apiKey: geminiKey,
+        apiKey: '', // Not needed for Vertex AI
+        baseUrl: 'https://generativelanguage.googleapis.com', // Ignored by Vertex
+        defaultModel: process.env.GEMINI_DEFAULT_MODEL || 'gemini-2.5-flash-lite',
+        enabled: true,
+        timeout: parseInt(process.env.AI_TIMEOUT || '60000', 10),
+        maxRetries: parseInt(process.env.AI_MAX_RETRIES || '3', 10),
+        useVertexAI: true,
+        vertexConfig: {
+          project: vertexProject,
+          location: process.env.GOOGLE_VERTEX_LOCATION,
+        },
+      })
+      console.log(`[AIManager] Initialized with Gemini (Vertex AI) - Project: ${vertexProject}`)
+    } else if (geminiApiKey) {
+      // Fallback: API key mode
+      providers.push({
+        name: 'gemini',
+        apiKey: geminiApiKey,
         baseUrl: 'https://generativelanguage.googleapis.com',
         defaultModel: process.env.GEMINI_DEFAULT_MODEL || 'gemini-2.5-flash-lite',
         enabled: true,
         timeout: parseInt(process.env.AI_TIMEOUT || '60000', 10),
         maxRetries: parseInt(process.env.AI_MAX_RETRIES || '3', 10),
+        useVertexAI: false,
       })
+      console.log('[AIManager] Initialized with Gemini (API Key mode)')
+    } else {
+      console.warn('[AIManager] Gemini not configured: Set GOOGLE_VERTEX_PROJECT for Vertex AI or GOOGLE_GENERATIVE_AI_API_KEY for API key mode')
     }
 
     if (providers.length === 0) {
-      throw new Error('No AI providers configured. Set OPENROUTER_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY.')
+      const errorMsg = 'No AI providers configured. Set OPENROUTER_API_KEY or configure Gemini (GOOGLE_VERTEX_PROJECT for Vertex AI or GOOGLE_GENERATIVE_AI_API_KEY for API key mode) in Vercel environment variables.'
+      console.error(`[AIManager] ${errorMsg}`)
+      // Don't throw here, allow the manager to be created but it will fail on completion
+      // This prevents the whole API route from crashing on startup
     }
 
     this.initialize({
@@ -346,13 +375,13 @@ const DEFAULT_USE_CASE_MODELS_INTERNAL: Record<UseCase, { primary: string; fallb
             success: true,
             latencyMs: Date.now() - startTime,
             tokensUsed: result.usage?.totalTokens
-          }).catch(() => {})
+          }).catch(() => { })
         }
 
         return result
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error))
-        
+
         if (status) {
           status.consecutiveFailures++
           if (status.consecutiveFailures >= 3) {
@@ -376,7 +405,7 @@ const DEFAULT_USE_CASE_MODELS_INTERNAL: Record<UseCase, { primary: string; fallb
         success: false,
         error: lastError?.message || 'All models failed',
         latencyMs: Date.now() - startTime
-      }).catch(() => {})
+      }).catch(() => { })
     }
 
     throw lastError || new Error('All models failed')

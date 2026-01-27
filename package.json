@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.13",
+    "@ai-sdk/google-vertex": "^4.0.31",
     "@ai-sdk/react": "3.0.19",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "1.2.2",

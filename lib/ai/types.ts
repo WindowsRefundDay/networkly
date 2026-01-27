@@ -11,7 +11,7 @@ import { z } from 'zod'
 
 export type ProviderName = 'openrouter' | 'gemini'
 
-export type ModelCapability = 
+export type ModelCapability =
   | 'chat'
   | 'completion'
   | 'vision'
@@ -49,6 +49,15 @@ export interface ModelInfo {
   tier: 'free' | 'standard' | 'premium'
 }
 
+export interface VertexConfig {
+  project?: string
+  location?: string
+  credentials?: {
+    client_email: string
+    private_key: string
+  }
+}
+
 export interface ProviderConfig {
   name: ProviderName
   apiKey: string
@@ -60,6 +69,8 @@ export interface ProviderConfig {
   timeout?: number
   maxRetries?: number
   headers?: Record<string, string>
+  useVertexAI?: boolean
+  vertexConfig?: VertexConfig
 }
 
 // ============================================================================
@@ -236,7 +247,7 @@ export class AuthenticationError extends AIProviderError {
 
 export const ProviderConfigSchema = z.object({
   name: z.enum(['openrouter', 'gemini']),
-  apiKey: z.string().min(1, 'API key is required'),
+  apiKey: z.string().default(''),
   baseUrl: z.string().url(),
   defaultModel: z.string(),
   enabled: z.boolean().default(true),
@@ -245,6 +256,15 @@ export const ProviderConfigSchema = z.object({
   timeout: z.number().positive().default(30000),
   maxRetries: z.number().min(0).max(10).default(3),
   headers: z.record(z.string()).optional(),
+  useVertexAI: z.boolean().optional(),
+  vertexConfig: z.object({
+    project: z.string().optional(),
+    location: z.string().optional(),
+    credentials: z.object({
+      client_email: z.string(),
+      private_key: z.string(),
+    }).optional(),
+  }).optional(),
 })
 
 export const UseCaseConfigSchema = z.object({

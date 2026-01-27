@@ -2,6 +2,8 @@
 
 Networkly is an AI-powered professional networking platform designed to help students and professionals connect, grow, and succeed.
 
+> **🚀 New**: The AI assistant now uses Google Cloud Vertex AI for production deployment! See [Vertex AI Setup Guide](docs/VERTEX_AI_SETUP_FRONTEND.md) for configuration instructions.
+
 ## Features
 
 - **AI-Powered Networking:** Personalized connection suggestions and conversation starters

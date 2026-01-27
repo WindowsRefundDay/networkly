@@ -80,12 +80,12 @@ export default function LoginPage() {
                 <div className="space-y-4 text-center">
                     <div className="flex justify-center">
                         <img
-                            src="/networkly-logo-dark.png"
+                            src="/networkly-logo.png"
                             alt="Networkly"
                             className="h-10 object-contain dark:hidden"
                         />
                         <img
-                            src="/networkly-logo.png"
+                            src="/networkly-logo-dark.png"
                             alt="Networkly"
                             className="h-10 object-contain hidden dark:block invert"
                         />
