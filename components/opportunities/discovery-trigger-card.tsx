@@ -18,9 +18,11 @@ import {
 import { cn } from "@/lib/utils"
 import { useDiscoveryLayers } from "@/hooks/use-discovery-layers"
 import { LayerAccordion } from "@/components/discovery/layer-accordion"
+import { LiveOpportunityCard, type LiveOpportunity } from "@/components/discovery/live-opportunity-card"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { ScrollArea } from "@/components/ui/scroll-area"
 
 interface DiscoveryTriggerCardProps {
   /** Pre-fill the search input */
@@ -66,6 +68,7 @@ export function DiscoveryTriggerCard({
 }: DiscoveryTriggerCardProps) {
   const [query, setQuery] = useState(initialQuery)
   const [showSuggestions, setShowSuggestions] = useState(!initialQuery)
+  const [liveOpportunities, setLiveOpportunities] = useState<LiveOpportunity[]>([])
 
   const [isExpanded, setIsExpanded] = useState(!compact)
 
@@ -84,13 +87,31 @@ export function DiscoveryTriggerCard({
     clearState,
   } = useDiscoveryLayers({
     onOpportunityFound: (event) => {
-      if (onNewOpportunity && "id" in event && "title" in event) {
-        onNewOpportunity({
+      if ("id" in event && "title" in event) {
+        const opp: LiveOpportunity = {
           id: (event as { id: string }).id,
           title: (event as { title: string }).title,
-          organization: (event as { organization?: string }).organization || "",
-          type: (event as { type?: string }).type || "",
+          organization: (event as { organization?: string }).organization,
+          category: (event as { category?: string }).category,
+          opportunityType: (event as { opportunityType?: string }).opportunityType,
+          url: (event as { url?: string }).url,
+          locationType: (event as { locationType?: string }).locationType,
+          confidence: (event as { confidence?: number }).confidence,
+        }
+        // Add to live opportunities (prevent duplicates)
+        setLiveOpportunities(prev => {
+          if (prev.some(o => o.id === opp.id)) return prev
+          return [...prev, opp]
         })
+        // Also call parent callback
+        if (onNewOpportunity) {
+          onNewOpportunity({
+            id: opp.id,
+            title: opp.title,
+            organization: opp.organization || "",
+            type: opp.opportunityType || "",
+          })
+        }
       }
     },
     onComplete: (count) => {
@@ -110,6 +131,7 @@ export function DiscoveryTriggerCard({
 
   const handleStartDiscovery = useCallback(() => {
     if (query.trim().length < 2) return
+    setLiveOpportunities([]) // Clear previous opportunities
     startDiscovery(query, personalizedEnabled ? { isPersonalized: true, userProfileId } : undefined)
     setShowSuggestions(false)
   }, [query, startDiscovery, personalizedEnabled, userProfileId])
@@ -123,6 +145,7 @@ export function DiscoveryTriggerCard({
 
   const handleSuggestionClick = (suggestion: string) => {
     setQuery(suggestion)
+    setLiveOpportunities([]) // Clear previous opportunities
     startDiscovery(suggestion, personalizedEnabled ? { isPersonalized: true, userProfileId } : undefined)
     setShowSuggestions(false)
   }
@@ -131,10 +154,17 @@ export function DiscoveryTriggerCard({
     clearState()
     setQuery("")
     setShowSuggestions(true)
+    setLiveOpportunities([]) // Clear opportunities on dismiss
     if (compact) {
       setIsExpanded(false)
     }
   }
+
+  const handleOpportunityClick = useCallback((opp: LiveOpportunity) => {
+    if (opp.url) {
+      window.open(opp.url, "_blank")
+    }
+  }, [])
 
   return (
     <div
@@ -342,12 +372,35 @@ export function DiscoveryTriggerCard({
                   initial={{ opacity: 0, height: 0 }}
                   animate={{ opacity: 1, height: "auto" }}
                   exit={{ opacity: 0, height: 0 }}
+                  className="space-y-3"
                 >
                   <LayerAccordion
                     state={state}
                     onToggleLayer={toggleLayerExpanded}
-                    className="max-h-[300px] overflow-y-auto"
+                    className="max-h-[200px] overflow-y-auto"
                   />
+
+                  {/* Live streaming opportunities */}
+                  {liveOpportunities.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Sparkles className="h-3 w-3 text-primary animate-pulse" />
+                        <span>{liveOpportunities.length} found so far</span>
+                      </div>
+                      <ScrollArea className="max-h-[200px]">
+                        <div className="space-y-2 pr-2">
+                          {liveOpportunities.map((opp, index) => (
+                            <LiveOpportunityCard
+                              key={opp.id}
+                              opportunity={opp}
+                              onClick={handleOpportunityClick}
+                              index={index}
+                            />
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </div>
+                  )}
                 </motion.div>
               )}
 
@@ -363,7 +416,7 @@ export function DiscoveryTriggerCard({
                     <div className="flex items-center gap-2">
                       <Sparkles className="h-4 w-4 text-green-500" />
                       <span className="text-sm font-medium">
-                        {state.foundCount} new {state.foundCount === 1 ? "opportunity" : "opportunities"} added
+                        {liveOpportunities.length || state.foundCount} new {(liveOpportunities.length || state.foundCount) === 1 ? "opportunity" : "opportunities"} added
                       </span>
                     </div>
                     <Button
@@ -379,6 +432,22 @@ export function DiscoveryTriggerCard({
                       <ArrowRight className="h-3 w-3 ml-1" />
                     </Button>
                   </div>
+
+                  {/* Show found opportunities after completion */}
+                  {liveOpportunities.length > 0 && (
+                    <ScrollArea className="max-h-[250px]">
+                      <div className="space-y-2 pr-2">
+                        {liveOpportunities.map((opp, index) => (
+                          <LiveOpportunityCard
+                            key={opp.id}
+                            opportunity={opp}
+                            onClick={handleOpportunityClick}
+                            index={index}
+                          />
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
