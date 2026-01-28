@@ -124,32 +124,66 @@ export class GeminiProvider {
         throw new Error('GOOGLE_VERTEX_PROJECT is required when useVertexAI is true')
       }
 
+      // Detect serverless environment
+      const isServerless = !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME)
+
       // Check for JSON credentials in env var (for Vercel deployment)
-      let credentials = vertexConfig?.credentials
+      let credentials: { client_email: string; private_key: string } | undefined = vertexConfig?.credentials
+
       if (!credentials && process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
         try {
-          const parsed = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON)
+          const jsonStr = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON
+          console.log('[GeminiProvider] Found GOOGLE_APPLICATION_CREDENTIALS_JSON, length:', jsonStr.length)
+
+          const parsed = JSON.parse(jsonStr)
+
+          if (!parsed.client_email || !parsed.private_key) {
+            throw new Error('Missing client_email or private_key in credentials JSON')
+          }
+
           credentials = {
             client_email: parsed.client_email,
             private_key: parsed.private_key,
           }
+          console.log('[GeminiProvider] Successfully parsed credentials for:', parsed.client_email)
         } catch (error) {
           console.error('[GeminiProvider] Failed to parse GOOGLE_APPLICATION_CREDENTIALS_JSON:', error)
+          if (isServerless) {
+            throw new Error(`Failed to parse GOOGLE_APPLICATION_CREDENTIALS_JSON: ${error}`)
+          }
         }
       }
 
-      this.googleProvider = createVertex({
-        project,
-        location,
-        googleAuthOptions: credentials ? {
-          credentials,
-        } : {
-          // Use Application Default Credentials (ADC)
-          // This works with: gcloud auth application-default login
-          // Or GOOGLE_APPLICATION_CREDENTIALS env var pointing to JSON file
-          keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-        },
-      })
+      // Build googleAuthOptions
+      if (credentials) {
+        // Use credentials directly (for Vercel/serverless)
+        console.log('[GeminiProvider] Using direct credentials for:', credentials.client_email)
+        this.googleProvider = createVertex({
+          project,
+          location,
+          googleAuthOptions: { credentials },
+        })
+      } else if (!isServerless && process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+        // Use file path for local development only
+        console.log('[GeminiProvider] Using keyFilename:', process.env.GOOGLE_APPLICATION_CREDENTIALS)
+        this.googleProvider = createVertex({
+          project,
+          location,
+          googleAuthOptions: { keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS },
+        })
+      } else if (isServerless) {
+        // Fail fast on serverless without credentials
+        throw new Error(
+          'Vertex AI credentials not found. Set GOOGLE_APPLICATION_CREDENTIALS_JSON environment variable with the service account JSON content.'
+        )
+      } else {
+        // Local development fallback - try Application Default Credentials
+        console.log('[GeminiProvider] Using Application Default Credentials (gcloud auth)')
+        this.googleProvider = createVertex({
+          project,
+          location,
+        })
+      }
 
       logger.info('GeminiProvider', `Initialized with Vertex AI (${project}, ${location})`)
     } else {
