@@ -13,20 +13,28 @@ vi.mock('@/lib/supabase/server', () => ({
   })
 }))
 
-vi.mock('@/lib/ai', () => ({
-  getAIManager: vi.fn().mockReturnValue({
-    stream: vi.fn().mockImplementation(async function* () {
-       // Simulate immediate streaming
-       yield { content: 'Hello' }
-       yield { content: ' ' }
-       yield { content: 'World' }
-    }),
-    getProviderStatuses: vi.fn().mockReturnValue([])
+vi.mock('@/lib/ai/google-model-manager', () => {
+  const mockStream = vi.fn().mockResolvedValue({
+    fullStream: (async function* () {
+      yield { type: 'text-delta', text: 'Hello' }
+      yield { type: 'text-delta', text: ' ' }
+      yield { type: 'text-delta', text: 'World' }
+    })()
   })
-}))
+
+  return {
+    GoogleModelManager: vi.fn(() => ({
+      stream: mockStream
+    })),
+    googleAI: {
+      stream: mockStream
+    }
+  }
+})
 
 vi.mock('@/lib/ai/tools', () => ({
   AI_TOOLS: [],
+  TOOLS: {},
   executeTool: vi.fn()
 }))
 

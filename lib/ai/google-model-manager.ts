@@ -1,21 +1,6 @@
 import { createVertex } from '@ai-sdk/google-vertex'
-import { generateText, streamText, type ModelMessage, type Tool } from 'ai'
+import { generateText, streamText, type ModelMessage, type Tool, type LanguageModel } from 'ai'
 import { logger } from './utils/logger'
-
-const GOOGLE_CONFIG = {
-    project: process.env.GOOGLE_VERTEX_PROJECT!,
-    location: process.env.GOOGLE_VERTEX_LOCATION || 'us-central1',
-    modelId: 'gemini-2.5-flash',
-}
-
-if (!GOOGLE_CONFIG.project) {
-    throw new Error('Missing GOOGLE_VERTEX_PROJECT environment variable')
-}
-
-const vertexProvider = createVertex({
-    project: GOOGLE_CONFIG.project,
-    location: GOOGLE_CONFIG.location,
-})
 
 export type Role = 'system' | 'user' | 'assistant' | 'tool'
 
@@ -31,11 +16,55 @@ export interface Message {
     name?: string
 }
 
-export class GoogleModelManager {
-    private model = vertexProvider(GOOGLE_CONFIG.modelId)
+export interface GoogleModelConfig {
+    project?: string
+    location?: string
+    credentialsJson?: string
+    modelId?: string
+}
 
-    constructor() {
-        logger.info('GoogleModelManager', `Initialized strict model: ${GOOGLE_CONFIG.modelId}`)
+export class GoogleModelManager {
+    private model: LanguageModel
+    private modelId: string
+
+    constructor(config?: GoogleModelConfig) {
+        // Load config from params or env
+        const project = config?.project || process.env.GOOGLE_VERTEX_PROJECT
+        const location = config?.location || process.env.GOOGLE_VERTEX_LOCATION || 'us-central1'
+        const credentialsJson = config?.credentialsJson || process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON
+
+        this.modelId = config?.modelId || 'gemini-2.5-flash'
+
+        // Priority 1: Vertex AI
+        if (project) {
+            let googleAuthOptions: { credentials?: any, keyFilename?: string } | undefined = undefined;
+
+            if (credentialsJson) {
+                try {
+                    const parsed = JSON.parse(credentialsJson)
+                    googleAuthOptions = { credentials: {
+                        client_email: parsed.client_email,
+                        private_key: parsed.private_key,
+                        project_id: project
+                    }}
+                } catch (error) {
+                    throw new Error(`Failed to parse GOOGLE_APPLICATION_CREDENTIALS_JSON: ${String(error)}`)
+                }
+            }
+
+            const vertexProvider = createVertex({
+                project,
+                location,
+                googleAuthOptions,
+            })
+
+            this.model = vertexProvider(this.modelId)
+            logger.info('GoogleModelManager', `Initialized with Vertex AI (${project}, ${location})`)
+
+        }
+        else {
+            throw new Error('Missing Google Cloud configuration. Please set GOOGLE_VERTEX_PROJECT for Vertex AI.')
+        }
     }
 
     async complete(options: {
@@ -111,12 +140,12 @@ export class GoogleModelManager {
                     const contentParts = []
                     
                     if (msg.content) {
-                        contentParts.push({ type: 'text', text: msg.content })
+                        contentParts.push({ type: 'text' as const, text: msg.content })
                     }
                     
                     for (const tc of msg.toolCalls) {
                         contentParts.push({
-                            type: 'tool-call',
+                            type: 'tool-call' as const,
                             toolCallId: tc.id || tc.toolCallId || 'unknown',
                             toolName: tc.function.name,
                             args: typeof tc.function.arguments === 'string'
@@ -132,7 +161,7 @@ export class GoogleModelManager {
 
             if (msg.role === 'tool') {
                 const toolContent = [{
-                    type: 'tool-result',
+                    type: 'tool-result' as const,
                     toolCallId: msg.toolCallId || 'unknown',
                     toolName: msg.name || 'unknown',
                     output: { type: 'json', value: JSON.parse(msg.content || '{}') },

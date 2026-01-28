@@ -9,6 +9,10 @@ process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY =
   process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || "test-publishable-key"
 process.env.SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY || "test-secret-key"
 
+// Mock Google Vertex AI env vars to prevent instantiation errors
+process.env.GOOGLE_VERTEX_PROJECT = process.env.GOOGLE_VERTEX_PROJECT || "test-project"
+process.env.GOOGLE_VERTEX_LOCATION = process.env.GOOGLE_VERTEX_LOCATION || "us-central1"
+
 // Mock Next.js navigation
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
