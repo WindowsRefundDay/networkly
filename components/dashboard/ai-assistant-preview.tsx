@@ -39,7 +39,7 @@ export function AIAssistantPreview() {
             onChange={(e) => setInput(e.target.value)}
             className="bg-card"
           />
-          <Button size="icon" className="shrink-0">
+          <Button size="icon" className="shrink-0" aria-label="Send message">
             <Send className="h-4 w-4" />
           </Button>
         </div>
