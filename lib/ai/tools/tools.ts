@@ -53,7 +53,7 @@ export const get_user_profile = tool({
     try {
       const context = experimental_context as ToolContext
       const supabase = (context.supabaseClient || await createClient()) as SupabaseClient<Database>
-      
+
       // Get user and profile data in parallel
       const [
         { data: user, error: userError },
@@ -107,7 +107,7 @@ export const get_extracurriculars = tool({
     try {
       const context = experimental_context as ToolContext
       const supabase = await createClient()
-      
+
       // Check if user exists
       const { data: user, error: userError } = await supabase
         .from('users')
@@ -159,7 +159,7 @@ export const get_saved_opportunities = tool({
     try {
       const context = experimental_context as ToolContext
       const supabase = await createClient()
-      
+
       // Check if user exists
       const { data: user, error: userError } = await supabase
         .from('users')
@@ -230,7 +230,7 @@ export const get_projects = tool({
     try {
       const context = experimental_context as ToolContext
       const supabase = await createClient()
-      
+
       // Check if user exists
       const { data: user, error: userError } = await supabase
         .from('users')
@@ -284,7 +284,7 @@ export const get_goals = tool({
     try {
       const context = experimental_context as ToolContext
       const supabase = await createClient()
-      
+
       // Check if user exists
       const { data: user, error: userError } = await supabase
         .from('users')
@@ -449,7 +449,7 @@ export const smart_search_opportunities = tool({
       const userSkills = (user.skills || []) as string[]
       const preferredTypes = (userProfile?.preferred_opportunity_types || []) as string[]
       const academicStrengths = (userProfile?.academic_strengths || []) as string[]
-      
+
       // Combine all terms for matching
       const allTerms = [
         ...query.toLowerCase().split(' ').filter(t => t.length > 2),
@@ -501,9 +501,9 @@ export const smart_search_opportunities = tool({
         const matchReasons: string[] = []
 
         // Check skill matches
-        const oppSkills = Array.isArray(opp.skills) ? opp.skills : []
+        const oppSkills = (Array.isArray(opp.skills) ? opp.skills : []) as string[]
         const oppSkillsLower = oppSkills.map((s: string) => s.toLowerCase())
-        const skillMatches = userSkills.filter((s: string) => 
+        const skillMatches = userSkills.filter((s: string) =>
           oppSkillsLower.some((os: string) => os.includes(s.toLowerCase()) || s.toLowerCase().includes(os))
         )
         if (skillMatches.length > 0) {
@@ -514,7 +514,7 @@ export const smart_search_opportunities = tool({
         // Check interest matches
         const titleLower = opp.title.toLowerCase()
         const descLower = (opp.description || '').toLowerCase()
-        const interestMatches = userInterests.filter((i: string) => 
+        const interestMatches = userInterests.filter((i: string) =>
           titleLower.includes(i.toLowerCase()) || descLower.includes(i.toLowerCase())
         )
         if (interestMatches.length > 0) {
@@ -523,7 +523,7 @@ export const smart_search_opportunities = tool({
         }
 
         // Location match
-        const isRemote = opp.location_type === 'Remote' || opp.location_type === 'online'
+        const isRemote = opp.location_type === 'Online'
         if (isRemote) {
           score += 5
           matchReasons.push('Remote-friendly')
@@ -562,7 +562,7 @@ export const smart_search_opportunities = tool({
             id: o.id,
             title: o.title,
             organization: o.company,
-            location: o.location_type === 'Remote' || o.location_type === 'online' ? 'Remote' : o.location,
+            location: o.location_type === 'Online' ? 'Remote' : o.location,
             type: o.type,
             category: o.category,
             deadline: o.deadline ? new Date(o.deadline).toLocaleDateString() : null,
@@ -595,7 +595,7 @@ export const filter_by_deadline = tool({
   execute: async (input, { experimental_context }) => {
     try {
       const context = experimental_context as ToolContext
-      const supabase = await createClient()
+      const supabase = (await createClient()) as unknown as SupabaseClient<Database>
       const { days, category, type, limit = 10 } = input
 
       const now = new Date()
@@ -631,7 +631,7 @@ export const filter_by_deadline = tool({
           count: opportunities?.length || 0,
           timeframe: `next ${days} days`,
           opportunities: (opportunities || []).map(o => {
-            const daysUntil = o.deadline 
+            const daysUntil = o.deadline
               ? Math.ceil((new Date(o.deadline).getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
               : null
 
@@ -639,7 +639,7 @@ export const filter_by_deadline = tool({
               id: o.id,
               title: o.title,
               organization: o.company,
-              location: o.location_type === 'Remote' || o.location_type === 'online' ? 'Remote' : o.location,
+              location: o.location_type === 'Online' ? 'Remote' : o.location,
               type: o.type,
               category: o.category,
               deadline: o.deadline ? new Date(o.deadline).toLocaleDateString() : null,
@@ -675,8 +675,8 @@ export const bookmark_opportunity = tool({
   execute: async (input, { experimental_context }) => {
     try {
       const context = experimental_context as ToolContext
-      const supabase = await createClient()
-      
+      const supabase = (await createClient()) as unknown as SupabaseClient<Database>
+
       // Check if user exists
       const { data: user, error: userError } = await supabase
         .from('users')

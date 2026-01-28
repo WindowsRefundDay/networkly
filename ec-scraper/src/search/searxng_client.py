@@ -245,7 +245,7 @@ class SearXNGClient:
         categories: Optional[List[str]] = None,
         engines: Optional[List[str]] = None,
         excluded_engines: Optional[List[str]] = None,
-        max_results: int = 20,
+        max_results: int = 30,
         expand_query: bool = False,
     ) -> List[SearchResult]:
         """

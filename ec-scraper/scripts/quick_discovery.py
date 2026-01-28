@@ -345,8 +345,7 @@ async def main(
         })
         emit_event("search", {"query": search_query})
         try:
-            # Reduced search results for speed optimization
-            max_results = 10 if user_profile else 8
+            max_results = 20 if user_profile else 15
             results = await search_client.search(search_query, max_results=max_results)
             emit_event("layer_progress", {
                 "layer": "web_search",
@@ -811,8 +810,9 @@ async def main(
                 return {"error": str(e)[:100], "url": crawl_result.url}
     
     # Run extractions with early-stop: process in batches, stop once target reached
-    TARGET_OPPORTUNITIES = 7  # Stop once we have this many
-    BATCH_SIZE = 4  # Process this many URLs at a time
+    # INCREASED: Was 7, now 25 to find more opportunities per query
+    TARGET_OPPORTUNITIES = 25  # Stop once we have this many
+    BATCH_SIZE = 8  # Process this many URLs at a time (doubled for throughput)
     
     success_count = 0
     failed_count = 0

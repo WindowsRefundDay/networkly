@@ -58,11 +58,28 @@ export default function OpportunitiesClient({ initialHighlightId }: Opportunitie
   const fetchPendingOpportunities = useDebouncedCallback(async () => {
     if (pendingOpportunityIds.current.size === 0) return
 
+    // Snapshot current IDs to fetch
     const idsToFetch = Array.from(pendingOpportunityIds.current)
-    pendingOpportunityIds.current.clear()
+    // Clear them from pending (we will add back missing ones)
+    pendingOpportunityIds.current = new Set()
 
     try {
       const newOpportunities = await getOpportunitiesByIds(idsToFetch)
+
+      // Identify which IDs were found
+      const foundIds = new Set(newOpportunities.map(o => o.id))
+
+      // Identify missing IDs (potential consistency lag)
+      const missingIds = idsToFetch.filter(id => !foundIds.has(id))
+
+      // Re-queue missing IDs for next attempt
+      if (missingIds.length > 0) {
+        console.log(`[OpportunitiesPage] ${missingIds.length} IDs not found yet, retrying...`)
+        missingIds.forEach(id => pendingOpportunityIds.current.add(id))
+        // Trigger another fetch if we have missing items (will debounced)
+        fetchPendingOpportunities()
+      }
+
       const mapped = newOpportunities.map(mapOpportunity)
 
       setOpportunities((prev) => {
@@ -83,6 +100,8 @@ export default function OpportunitiesClient({ initialHighlightId }: Opportunitie
       }
     } catch (error) {
       console.error("[OpportunitiesPage] Error fetching live opportunities:", error)
+      // On error, restore ALL IDs to pending to retry
+      idsToFetch.forEach(id => pendingOpportunityIds.current.add(id))
     }
   }, 1000)
 
@@ -365,54 +384,54 @@ export default function OpportunitiesClient({ initialHighlightId }: Opportunitie
           >
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
               <div className="space-y-1">
-              <h1 className="text-2xl font-bold text-foreground tracking-tight">Opportunities</h1>
-              <div className="text-muted-foreground text-sm flex items-center gap-2">
-                {isSearching ? (
-                  <>
-                    <motion.span
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                      className="inline-flex text-primary"
-                    >
-                      <Loader2 className="h-3.5 w-3.5" />
-                    </motion.span>
-                    <span>Searching...</span>
-                  </>
-                ) : (
-                  <span>Discover {filteredOpportunities.length} opportunities curated for you</span>
-                )}
+                <h1 className="text-2xl font-bold text-foreground tracking-tight">Opportunities</h1>
+                <div className="text-muted-foreground text-sm flex items-center gap-2">
+                  {isSearching ? (
+                    <>
+                      <motion.span
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        className="inline-flex text-primary"
+                      >
+                        <Loader2 className="h-3.5 w-3.5" />
+                      </motion.span>
+                      <span>Searching...</span>
+                    </>
+                  ) : (
+                    <span>Discover {filteredOpportunities.length} opportunities curated for you</span>
+                  )}
+                </div>
               </div>
-            </div>
 
-            <div className="flex items-center gap-3 w-full md:w-auto">
-              <div className="relative flex-1 md:w-80 group">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                <Input
-                  placeholder="Search opportunities..."
-                  value={searchQuery}
-                  onChange={(e) => handleSearchChange(e.target.value)}
-                  className="pl-10 h-10 bg-muted/50 border-border/50 focus:bg-background focus:border-primary/20 transition-all rounded-lg"
-                />
-                {searchQuery && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 hover:bg-background/50"
-                    onClick={() => handleSearchChange("")}
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </Button>
-                )}
+              <div className="flex items-center gap-3 w-full md:w-auto">
+                <div className="relative flex-1 md:w-80 group">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                  <Input
+                    placeholder="Search opportunities..."
+                    value={searchQuery}
+                    onChange={(e) => handleSearchChange(e.target.value)}
+                    className="pl-10 h-10 bg-muted/50 border-border/50 focus:bg-background focus:border-primary/20 transition-all rounded-lg"
+                  />
+                  {searchQuery && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 hover:bg-background/50"
+                      onClick={() => handleSearchChange("")}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
           </GlassCard>
 
           <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none mask-fade-right">
             {CATEGORIES.map((cat) => {
               const value = cat === "All" ? "all" : cat.toLowerCase()
               const isActive = typeFilter.toLowerCase() === value
-              
+
               return (
                 <button
                   key={cat}
@@ -571,14 +590,14 @@ export default function OpportunitiesClient({ initialHighlightId }: Opportunitie
 
         <AnimatePresence>
           {selectedOpportunity && (
-              <ExpandedOpportunityCard
-                key={selectedOpportunity.id}
-                opportunity={selectedOpportunity}
-                onClose={() => setSelectedOpportunity(null)}
-                onToggleSave={handleToggleSave}
-                status={statuses[selectedOpportunity.id]}
-                onStatusChange={(status) => handleStatusChange(selectedOpportunity.id, status)}
-              />
+            <ExpandedOpportunityCard
+              key={selectedOpportunity.id}
+              opportunity={selectedOpportunity}
+              onClose={() => setSelectedOpportunity(null)}
+              onToggleSave={handleToggleSave}
+              status={statuses[selectedOpportunity.id]}
+              onStatusChange={(status) => handleStatusChange(selectedOpportunity.id, status)}
+            />
 
           )}
         </AnimatePresence>

@@ -157,14 +157,14 @@ class SemanticFilter:
         return similarities.tolist()
 
     def _guide_penalty(self, title: str, snippet: str) -> float:
-        """Penalty for likely guide/article results based on text signals."""
+        """Reduced penalty for guide/article results."""
         text = f"{title} {snippet}".lower()
         penalty = 0.0
         if any(hint in text for hint in GUIDE_HINTS):
-            penalty += 0.05
+            penalty += 0.02
         if any(hint in text for hint in ["ultimate guide", "how to", "step-by-step", "tips for", "tips to"]):
-            penalty += 0.08
-        return min(penalty, 0.15)
+            penalty += 0.03
+        return min(penalty, 0.08)
 
     def _should_prefilter(self, url: str, title: str, snippet: str) -> bool:
         """Cheap filter to skip obvious listicles or guides before embeddings."""

@@ -13,11 +13,14 @@
 
 import type React from 'react'
 import { useState, useRef, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react'
+import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { GlassCard } from '@/components/ui/glass-card'
 import { Sparkles, Send, User, Save, RotateCcw, History, X } from 'lucide-react'
 import { useSupabaseUser } from '@/hooks/use-supabase-user'
+import { messageEntranceVariants, staggerContainerVariants, fadeInUpVariants, PREMIUM_EASE } from './animations'
 
 import { OpportunityGrid, type InlineOpportunity } from './opportunity-card-inline'
 import { SimpleLoading, DiscoveryLoading, TypingIndicator } from './simple-loading'
@@ -516,51 +519,78 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
   }
 
   return (
-    <div className="flex flex-col h-full bg-background rounded-2xl border border-border shadow-sm overflow-hidden">
-      <div className="flex-1 overflow-hidden bg-background">
+    <GlassCard variant="default" className="flex flex-col h-full overflow-hidden">
+      <div className="flex-1 overflow-hidden bg-background/50">
         <div className="h-full overflow-y-auto p-6" ref={scrollAreaRef}>
           {messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full min-h-[400px]">
-              <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-primary shadow-lg mb-8">
-                <Sparkles className="h-10 w-10 text-primary-foreground" />
+            <div className="relative flex flex-col items-center justify-center h-full min-h-[400px]">
+              <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
+                <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-secondary/10 rounded-full blur-3xl" />
               </div>
-              <h2 className="text-2xl font-bold text-foreground mb-3">
+              
+              <motion.div 
+                className="relative flex h-20 w-20 items-center justify-center rounded-2xl bg-primary shadow-lg mb-8"
+                animate={{ 
+                  boxShadow: [
+                    '0 10px 25px -5px rgba(0,0,0,0.1)',
+                    '0 20px 35px -5px rgba(0,0,0,0.2)',
+                    '0 10px 25px -5px rgba(0,0,0,0.1)'
+                  ] 
+                }}
+                transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+              >
+                <Sparkles className="h-10 w-10 text-primary-foreground" />
+              </motion.div>
+              <h2 className="relative text-2xl font-bold text-foreground mb-3">
                 How can I help you today?
               </h2>
-              <p className="text-base text-muted-foreground text-center max-w-lg mb-10">
+              <p className="relative text-base text-muted-foreground text-center max-w-lg mb-10">
                 I can find opportunities, help with applications, and give career advice — all personalized to your profile.
               </p>
 
-              <div className="w-full max-w-3xl space-y-4">
+              <motion.div 
+                className="relative w-full max-w-3xl space-y-4"
+                variants={staggerContainerVariants}
+                initial="hidden"
+                animate="visible"
+              >
                 <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider text-center mb-6">
                   Try asking
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {quickPrompts.map((prompt) => (
-                    <Button
-                      key={prompt}
-                      variant="outline"
-                      className="h-auto py-4 px-5 text-left justify-start bg-background hover:bg-muted border-2 border-border/50 hover:border-primary/50 transition-all duration-200 rounded-xl"
-                      onClick={() => handleQuickPrompt(prompt)}
-                      disabled={isLoading}
-                    >
-                      <div className="flex items-center gap-4 w-full">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                          <Sparkles className="h-5 w-5" />
+                    <motion.div key={prompt} variants={fadeInUpVariants}>
+                      <Button
+                        variant="outline"
+                        className="w-full h-auto py-4 px-5 text-left justify-start bg-background/80 backdrop-blur-sm hover:bg-muted border-2 border-border/50 hover:border-primary/50 transition-all duration-200 rounded-xl"
+                        onClick={() => handleQuickPrompt(prompt)}
+                        disabled={isLoading}
+                      >
+                        <div className="flex items-center gap-4 w-full">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                            <Sparkles className="h-5 w-5" />
+                          </div>
+                          <span className="text-base font-medium text-foreground line-clamp-2">
+                            {prompt}
+                          </span>
                         </div>
-                        <span className="text-base font-medium text-foreground line-clamp-2">
-                          {prompt}
-                        </span>
-                      </div>
-                    </Button>
+                      </Button>
+                    </motion.div>
                   ))}
                 </div>
-              </div>
+              </motion.div>
             </div>
           ) : (
             <div className="space-y-6 pb-4">
               {messages.map((message) => (
-                <div key={message.id} className={`flex gap-4 ${message.role === 'user' ? 'justify-end' : ''}`}>
+                <motion.div 
+                  key={message.id} 
+                  className={`flex gap-4 ${message.role === 'user' ? 'justify-end' : ''}`}
+                  variants={messageEntranceVariants}
+                  initial="hidden"
+                  animate="visible"
+                >
                   {message.role === 'assistant' && (
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary shadow-sm">
                       <Sparkles className="h-6 w-6 text-primary-foreground" />
@@ -570,7 +600,7 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
                     <div
                       className={`rounded-2xl px-5 py-4 ${message.role === 'user'
                           ? 'bg-primary text-primary-foreground shadow-sm'
-                          : 'bg-muted text-foreground border border-border/50'
+                          : 'backdrop-blur-sm bg-muted/80 text-foreground border border-border/30'
                         }`}
                     >
                       {message.content ? (
@@ -605,7 +635,7 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
                       </AvatarFallback>
                     </Avatar>
                   )}
-                </div>
+                </motion.div>
               ))}
 
               {pendingDiscoveryQuery && !isDiscovering && (
@@ -655,7 +685,7 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
         </div>
       </div>
 
-      <div className="flex-none border-t border-border p-5 bg-card rounded-b-2xl">
+      <div className="flex-none border-t border-border/30 p-5 backdrop-blur-md bg-card/80 rounded-b-2xl">
         <form onSubmit={handleSubmit} className="flex gap-3">
           <Input
             placeholder="Ask me anything about your career..."
@@ -664,12 +694,19 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((props, ref) => {
             disabled={isLoading || isDiscovering}
             className="flex-1 h-12 text-base"
           />
-          <Button type="submit" size="lg" disabled={isLoading || isDiscovering || !input.trim()} className="h-12 w-12">
+          <motion.button
+            type="submit"
+            disabled={isLoading || isDiscovering || !input.trim()}
+            className="h-12 w-12 inline-flex items-center justify-center rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            transition={{ duration: 0.15, ease: PREMIUM_EASE }}
+          >
             <Send className="h-5 w-5" />
-          </Button>
+          </motion.button>
         </form>
       </div>
-    </div>
+    </GlassCard>
   )
 })
 ChatInterface.displayName = 'ChatInterface'

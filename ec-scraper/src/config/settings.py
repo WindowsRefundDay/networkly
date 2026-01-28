@@ -34,26 +34,26 @@ class DiscoveryProfile:
 # Discovery profiles: quick (on-demand) vs daily (batch)
 QUICK_PROFILE = DiscoveryProfile(
     name="quick",
-    semantic_threshold=0.62,  # Balanced quality threshold (was too strict at 0.65)
-    max_crawl_urls=20,  # Reduced from 35 for speed
-    max_concurrent_crawls=8,  # Reduced from 10 to prevent overwhelming
-    max_concurrent_extractions=4,  # Reduced from 6 to avoid Vertex AI rate limits (4×30 RPM = 120 RPM max)
-    search_timeout=15.0,  # Reduced from 20s
-    crawl_timeout=15.0,  # Increased back to 15s for better content extraction
-    max_queries=8,  # Reduced from 10 for speed
-    description="On-demand quick search optimized for speed and quality",
+    semantic_threshold=0.48,
+    max_crawl_urls=50,
+    max_concurrent_crawls=12,
+    max_concurrent_extractions=6,
+    search_timeout=20.0,
+    crawl_timeout=20.0,
+    max_queries=15,
+    description="On-demand quick search optimized for MAXIMUM opportunity discovery",
 )
 
 DAILY_PROFILE = DiscoveryProfile(
     name="daily",
-    semantic_threshold=0.50,  # Broader - more results for daily indexing
-    max_crawl_urls=100,
-    max_concurrent_crawls=20,
-    max_concurrent_extractions=12,  # Higher concurrency for batch processing
+    semantic_threshold=0.42,
+    max_crawl_urls=150,
+    max_concurrent_crawls=25,
+    max_concurrent_extractions=15,
     search_timeout=30.0,
-    crawl_timeout=20.0,
-    max_queries=20,
-    description="Daily batch discovery with broader coverage",
+    crawl_timeout=25.0,
+    max_queries=30,
+    description="Daily batch discovery with MAXIMUM coverage",
 )
 
 
@@ -106,15 +106,15 @@ class Settings(BaseSettings):
     retry_base_delay: float = 0.5  # Reduced from 1.0
     retry_max_delay: float = 10.0  # Reduced from 30.0
 
-    # Semantic Filter Configuration (aggressive quality filtering)
-    default_semantic_threshold: float = 0.60  # Increased from 0.55 for higher quality
+    # Semantic Filter Configuration
+    default_semantic_threshold: float = 0.48
     semantic_category_bumps: dict = {
-        "competitions": 0.01,  # Reduced from 0.02
-        "internships": 0.01,  # Reduced from 0.02
-        "summer_programs": 0.02,  # Reduced from 0.03
-        "scholarships": 0.03,  # Reduced from 0.04
-        "research": 0.01,  # Reduced from 0.02
-        "volunteering": 0.01,  # Reduced from 0.02
+        "competitions": 0.0,
+        "internships": 0.0,
+        "summer_programs": 0.01,
+        "scholarships": 0.01,
+        "research": 0.0,
+        "volunteering": 0.0,
         "general": 0.0,
     }
 

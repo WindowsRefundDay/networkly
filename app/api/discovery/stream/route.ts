@@ -37,12 +37,43 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: `Scraper error: ${error}` }, { status: response.status });
         }
 
-        // Return the raw stream from the scraper directly to the client
-        return new NextResponse(response.body, {
+        // Create a new stream to pipe the response and log progress
+        const stream = new ReadableStream({
+            async start(controller) {
+                const reader = response.body?.getReader();
+                if (!reader) {
+                    controller.close();
+                    return;
+                }
+
+                try {
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) {
+                            console.log('[Discovery] Stream complete');
+                            controller.close();
+                            break;
+                        }
+                        // Log first chunk to verify start
+                        if (value) {
+                            // verbose logging for debugging
+                            // console.log(`[Discovery] Received chunk: ${value.length} bytes`);
+                            controller.enqueue(value);
+                        }
+                    }
+                } catch (err) {
+                    console.error('[Discovery] Stream error:', err);
+                    controller.error(err);
+                }
+            }
+        });
+
+        return new NextResponse(stream, {
             headers: {
                 "Content-Type": "text/event-stream",
                 "Cache-Control": "no-cache",
                 "Connection": "keep-alive",
+                "X-Accel-Buffering": "no", // Disable buffering for Nginx/Proxies
             },
         });
     } catch (error: any) {

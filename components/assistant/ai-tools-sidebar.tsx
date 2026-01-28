@@ -1,8 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
+import { GlassCard } from '@/components/ui/glass-card'
 import { 
   FileText, 
   Mail, 
@@ -18,6 +20,7 @@ import {
   Loader2,
 } from 'lucide-react'
 import { getSavedChatSession, deleteChatSession, type ChatSession } from '@/app/actions/chat'
+import { staggerContainerVariants, fadeInUpVariants, PREMIUM_EASE } from './animations'
 
 interface AIToolsSidebarProps {
   onToolClick?: (prompt: string) => void
@@ -74,14 +77,19 @@ export function AIToolsSidebar({ onToolClick, onLoadSession }: AIToolsSidebarPro
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <motion.div 
+      className="flex flex-col h-full"
+      variants={staggerContainerVariants}
+      initial="hidden"
+      animate="visible"
+    >
       {/* Data-Aware Tools */}
-      <div className="flex flex-col flex-1 min-h-0">
+      <motion.div className="flex flex-col flex-1 min-h-0" variants={fadeInUpVariants}>
         <h3 className="text-lg font-bold flex items-center gap-2 px-2 mb-3">
           <User className="h-5 w-5" />
           Your Data
         </h3>
-        <div className="flex flex-col flex-1 bg-card border border-border rounded-xl overflow-hidden shadow-sm">
+        <GlassCard variant="sidebar" className="flex flex-col flex-1 overflow-hidden">
           {dataTools.map((tool, index) => (
             <div key={tool.label} className="flex-1">
               <Button 
@@ -89,9 +97,13 @@ export function AIToolsSidebar({ onToolClick, onLoadSession }: AIToolsSidebarPro
                 className="w-full justify-start gap-4 h-full min-h-[64px] px-4 rounded-none hover:bg-muted/50 text-left"
                 onClick={() => handleToolClick(tool.prompt)}
               >
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <motion.div 
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"
+                  whileHover={{ scale: 1.05 }}
+                  transition={{ duration: 0.2, ease: PREMIUM_EASE }}
+                >
                   <tool.icon className="h-6 w-6" />
-                </div>
+                </motion.div>
                 <div className="flex-1 min-w-0 text-left">
                   <span className="font-semibold text-lg text-foreground block truncate">{tool.label}</span>
                   <p className="text-sm text-muted-foreground truncate">{tool.description}</p>
@@ -100,16 +112,16 @@ export function AIToolsSidebar({ onToolClick, onLoadSession }: AIToolsSidebarPro
               {index < dataTools.length - 1 && <Separator />}
             </div>
           ))}
-        </div>
-      </div>
+        </GlassCard>
+      </motion.div>
 
       {/* Saved Chat */}
-      <div className="mt-6 flex-none">
+      <motion.div className="mt-6 flex-none" variants={fadeInUpVariants}>
         <h3 className="text-lg font-bold flex items-center gap-2 px-2 mb-3">
           <History className="h-5 w-5" />
           Saved Chat
         </h3>
-        <div className="bg-card border border-border rounded-xl p-4 shadow-sm">
+        <GlassCard variant="sidebar" className="p-4">
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -156,13 +168,13 @@ export function AIToolsSidebar({ onToolClick, onLoadSession }: AIToolsSidebarPro
               <p className="text-base">No saved chats</p>
             </div>
           )}
-        </div>
-      </div>
+        </GlassCard>
+      </motion.div>
 
       {/* AI Tools */}
-      <div className="mt-6 flex-none">
+      <motion.div className="mt-6 flex-none" variants={fadeInUpVariants}>
         <h3 className="text-lg font-bold px-2 mb-3">AI Tools</h3>
-        <div className="flex flex-col bg-card border border-border rounded-xl overflow-hidden shadow-sm">
+        <GlassCard variant="sidebar" className="flex flex-col overflow-hidden">
           {aiTools.map((tool, index) => (
             <div key={tool.label} className="flex-1">
               <Button 
@@ -170,9 +182,13 @@ export function AIToolsSidebar({ onToolClick, onLoadSession }: AIToolsSidebarPro
                 className="w-full justify-start gap-4 h-full min-h-[64px] px-4 rounded-none hover:bg-muted/50 text-left"
                 onClick={() => handleToolClick(tool.prompt)}
               >
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+                <motion.div 
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                  whileHover={{ scale: 1.05 }}
+                  transition={{ duration: 0.2, ease: PREMIUM_EASE }}
+                >
                   <tool.icon className="h-6 w-6" />
-                </div>
+                </motion.div>
                 <div className="flex-1 min-w-0 text-left">
                   <span className="font-semibold text-lg text-foreground block truncate">{tool.label}</span>
                   <p className="text-sm text-muted-foreground truncate">{tool.description}</p>
@@ -181,8 +197,8 @@ export function AIToolsSidebar({ onToolClick, onLoadSession }: AIToolsSidebarPro
               {index < aiTools.length - 1 && <Separator />}
             </div>
           ))}
-        </div>
-      </div>
-    </div>
+        </GlassCard>
+      </motion.div>
+    </motion.div>
   )
 }

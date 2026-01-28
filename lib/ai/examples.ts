@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * AI Model Manager - Example Usage
  * 
@@ -160,7 +161,7 @@ async function customConfigExample() {
   })
 
   console.log(result.content)
-  
+
   // Don't forget to cleanup
   ai.shutdown()
 }
@@ -196,7 +197,7 @@ async function directProviderExample() {
 
   // Create OpenRouter provider
   const openrouter = createOpenRouterProvider(process.env.OPENROUTER_API_KEY!)
-  
+
   // Use a specific model
   const gptResult = await openrouter.complete({
     model: 'openai/gpt-4o-mini',
@@ -286,7 +287,7 @@ function modelDiscoveryExample() {
   // Get models by provider
   const geminiModels = ai.getProviderModels('gemini')
   const openrouterModels = ai.getProviderModels('openrouter')
-  
+
   console.log(`Gemini models: ${geminiModels.length}`)
   console.log(`OpenRouter models: ${openrouterModels.length}`)
 

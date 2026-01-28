@@ -10,10 +10,12 @@
  */
 
 import { useState, useEffect, useMemo, memo, type ReactNode } from 'react'
+import { motion } from 'framer-motion'
 import ReactMarkdown from 'react-markdown'
 import type { Components } from 'react-markdown'
 import { OpportunityCardInline, type InlineOpportunity } from './opportunity-card-inline'
 import { Loader2 } from 'lucide-react'
+import { fadeInVariants, PREMIUM_EASE } from './animations'
 
 interface MarkdownMessageProps {
   content: string
@@ -134,14 +136,19 @@ function EmbeddedCard({
   }
 
   return (
-    <div className="my-3">
+    <motion.div 
+      className="my-3"
+      variants={fadeInVariants}
+      initial="hidden"
+      animate="visible"
+    >
       <OpportunityCardInline
         opportunity={opportunity}
         onBookmark={onBookmark}
         isBookmarking={isBookmarking}
         isBookmarked={isBookmarked}
       />
-    </div>
+    </motion.div>
   )
 }
 
@@ -232,7 +239,7 @@ function MarkdownMessageComponent({
         href={href} 
         target="_blank" 
         rel="noopener noreferrer" 
-        className="text-primary underline underline-offset-2 hover:no-underline transition-all"
+        className="text-primary underline underline-offset-2 hover:text-primary/80 hover:no-underline transition-colors duration-200"
       >
         {children}
       </a>
@@ -251,14 +258,14 @@ function MarkdownMessageComponent({
     
     // Inline code
     code: ({ children }) => (
-      <code className="bg-muted/50 px-1.5 py-0.5 rounded text-sm font-mono">
+      <code className="bg-muted/80 backdrop-blur-sm px-1.5 py-0.5 rounded text-sm font-mono border border-border/30">
         {children}
       </code>
     ),
     
     // Code blocks
     pre: ({ children }) => (
-      <pre className="bg-muted/50 p-3 rounded-lg overflow-x-auto my-2 text-sm">
+      <pre className="bg-muted/80 backdrop-blur-sm p-3 rounded-lg overflow-x-auto my-2 text-sm border border-border/30">
         {children}
       </pre>
     ),

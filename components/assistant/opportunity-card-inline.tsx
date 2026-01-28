@@ -10,10 +10,12 @@
  */
 
 import { useRouter } from 'next/navigation'
+import { motion } from 'framer-motion'
 import { MapPin, Calendar, Building2, Bookmark, ExternalLink, Clock, CheckCircle2 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { messageEntranceVariants, staggerContainerVariants, cardHoverEffect, PREMIUM_EASE } from './animations'
 
 export interface InlineOpportunity {
   id: string
@@ -63,6 +65,27 @@ function UrgencyBadge({ urgency, daysLeft }: { urgency: 'urgent' | 'soon' | 'upc
 
   const { className, icon: Icon, label } = config[urgency]
 
+  // Add pulse animation for urgent items
+  if (urgency === 'urgent') {
+    return (
+      <motion.span 
+        className={cn('flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full border', className)}
+        animate={{ 
+          scale: [1, 1.02, 1],
+          opacity: [1, 0.9, 1],
+        }}
+        transition={{ 
+          duration: 2, 
+          repeat: Infinity, 
+          ease: 'easeInOut' 
+        }}
+      >
+        <Icon className="h-3 w-3" />
+        {label}
+      </motion.span>
+    )
+  }
+
   return (
     <span className={cn('flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full border', className)}>
       <Icon className="h-3 w-3" />
@@ -95,7 +118,11 @@ export function OpportunityCardInline({
   }
 
   return (
-    <div
+    <motion.div
+      variants={messageEntranceVariants}
+      initial="hidden"
+      animate="visible"
+      whileHover={cardHoverEffect}
       className={cn(
         'rounded-xl border border-border bg-card p-4 hover:border-primary/50 transition-all shadow-sm hover:shadow-md',
         className
@@ -231,7 +258,7 @@ export function OpportunityCardInline({
           Details
         </Button>
       </div>
-    </div>
+    </motion.div>
   )
 }
 
@@ -254,7 +281,12 @@ export function OpportunityGrid({
   if (opportunities.length === 0) return null
 
   return (
-    <div className="grid gap-3 mt-3">
+    <motion.div 
+      className="grid gap-3 mt-3"
+      variants={staggerContainerVariants}
+      initial="hidden"
+      animate="visible"
+    >
       {opportunities.map((opp) => (
         <OpportunityCardInline
           key={opp.id}
@@ -264,6 +296,6 @@ export function OpportunityGrid({
           isBookmarked={bookmarkedIds?.has(opp.id)}
         />
       ))}
-    </div>
+    </motion.div>
   )
 }

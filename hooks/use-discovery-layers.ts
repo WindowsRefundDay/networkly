@@ -582,14 +582,45 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
       processEvent({ type: 'complete', count: 0 } as DiscoveryEvent)
     }, CLIENT_TIMEOUT_MS)
 
-    es.onmessage = (event) => {
+    // List of all events emitted by app/routers/discovery.py
+    const EVENT_TYPES = [
+      'layer_start',
+      'layer_progress',
+      'layer_complete',
+      'plan',
+      'search',
+      'evaluating',
+      'extracting',
+      'opportunity_found',
+      'found',
+      'complete',
+      'error',
+      'message' // Default
+    ];
+
+    const handleEvent = (event: MessageEvent) => {
       try {
-        const data = JSON.parse(event.data) as DiscoveryEvent
-        processEvent(data)
+        if (!event.data || event.data === 'undefined') return;
+        const data = JSON.parse(event.data) as DiscoveryEvent;
+        // If the event has a type from the named event, ensure it's propagated
+        // (The backend sends { layer: ... } but not always type: 'layer_start' inside the JSON)
+        // We can rely on the processEvent switch to handle the shape, OR inject the type.
+
+        // Backend `layer_start` sends: { layer: '...', message: '...' }
+        // Frontend processEvent expects: { type: 'layer_start', layer: '...', ... }
+        if (event.type !== 'message' && !data.type) {
+          (data as any).type = event.type;
+        }
+
+        processEvent(data);
       } catch (e) {
-        console.error('[Discovery] Parse error:', e)
+        console.error('[Discovery] Parse error:', e);
       }
-    }
+    };
+
+    EVENT_TYPES.forEach(type => {
+      es.addEventListener(type, handleEvent);
+    });
 
     // Track retry attempts (reduced for faster failure)
     let retryCount = 0

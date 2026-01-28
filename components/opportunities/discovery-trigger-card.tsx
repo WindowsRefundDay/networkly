@@ -94,7 +94,10 @@ export function DiscoveryTriggerCard({
       }
     },
     onComplete: (count) => {
-      onComplete?.(count)
+      // Defer state update to avoid "Cannot update a component while rendering"
+      setTimeout(() => {
+        onComplete?.(count)
+      }, 0)
     },
     persistState: true,
   })
