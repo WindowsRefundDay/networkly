@@ -1,5 +1,4 @@
 import { createVertex } from '@ai-sdk/google-vertex'
-import { createGoogleGenerativeAI } from '@ai-sdk/google'
 import { generateText, streamText, type ModelMessage, type Tool, type LanguageModel } from 'ai'
 import { logger } from './utils/logger'
 
@@ -20,7 +19,6 @@ export interface Message {
 export interface GoogleModelConfig {
     project?: string
     location?: string
-    apiKey?: string
     credentialsJson?: string
     modelId?: string
 }
@@ -33,7 +31,6 @@ export class GoogleModelManager {
         // Load config from params or env
         const project = config?.project || process.env.GOOGLE_VERTEX_PROJECT
         const location = config?.location || process.env.GOOGLE_VERTEX_LOCATION || 'us-central1'
-        const apiKey = config?.apiKey || process.env.GOOGLE_API_KEY
         const credentialsJson = config?.credentialsJson || process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON
 
         this.modelId = config?.modelId || 'gemini-2.5-flash'
@@ -51,15 +48,9 @@ export class GoogleModelManager {
                         project_id: project
                     }}
                 } catch (error) {
-                    logger.error('GoogleModelManager', 'Failed to parse GOOGLE_APPLICATION_CREDENTIALS_JSON', { error: String(error) })
-                    // Fallback to ADC if JSON parsing fails? Or throw?
-                    // Better to log and let it try ADC or fail naturally, but maybe we should rely on ADC if parsing failed.
+                    throw new Error(`Failed to parse GOOGLE_APPLICATION_CREDENTIALS_JSON: ${String(error)}`)
                 }
             }
-
-            // If no JSON credentials provided or parsing failed, we don't set googleAuthOptions
-            // This allows createVertex to default to ADC (e.g. keyFilename from GOOGLE_APPLICATION_CREDENTIALS or gcloud auth)
-            // But wait, createVertex({ googleAuthOptions }) - if we pass undefined, it uses defaults.
 
             const vertexProvider = createVertex({
                 project,
@@ -71,16 +62,8 @@ export class GoogleModelManager {
             logger.info('GoogleModelManager', `Initialized with Vertex AI (${project}, ${location})`)
 
         }
-        // Priority 2: Google AI (Gemini API)
-        else if (apiKey) {
-            const googleProvider = createGoogleGenerativeAI({
-                apiKey,
-            })
-            this.model = googleProvider(this.modelId)
-            logger.info('GoogleModelManager', `Initialized with Google AI (API Key)`)
-        }
         else {
-            throw new Error('Missing Google Cloud configuration. Please set GOOGLE_VERTEX_PROJECT (for Vertex AI) or GOOGLE_API_KEY (for Gemini API).')
+            throw new Error('Missing Google Cloud configuration. Please set GOOGLE_VERTEX_PROJECT for Vertex AI.')
         }
     }
 
