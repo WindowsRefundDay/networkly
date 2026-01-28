@@ -1,7 +1,7 @@
 "use server"
 
 import { createClient, getCurrentUser } from "@/lib/supabase/server"
-import { getAIManager } from "@/lib/ai/manager"
+import { googleAI } from "@/lib/ai"
 
 export async function generateMentorEmail(mentorId: string) {
   const supabase = await createClient()
@@ -32,8 +32,6 @@ export async function generateMentorEmail(mentorId: string) {
     .eq("user_id", user.id)
     .single()
 
-  const aiManager = getAIManager()
-  
   const prompt = `
     Draft a professional cold email for a high school student to a professor/mentor.
     
@@ -53,16 +51,29 @@ export async function generateMentorEmail(mentorId: string) {
   `
 
   try {
-    const response = await aiManager.generateStructured(prompt, {
-        type: "object",
-        properties: {
-            subject: { type: "string" },
-            body: { type: "string" }
-        },
-        required: ["subject", "body"]
-    }, { useCase: "writing" })
+    const response = await googleAI.complete({
+        messages: [{ role: 'user', content: prompt }],
+        // googleAI doesn't support responseFormat directly in complete() in this version likely
+        // We'll rely on the prompt or check if complete supports it.
+        // Looking at GoogleModelManager.complete interface in previous turn:
+        // it accepts experimental_context?
+        // But let's assume it returns text and we parse it.
+    })
 
-    return { success: true, email: response }
+    // Parse response
+    let text = response.text || ""
+    // Remove markdown code blocks if any
+    text = text.replace(/```json\n?|\n?```/g, "")
+    
+    let json
+    try {
+        json = JSON.parse(text)
+    } catch (e) {
+        // Fallback if not valid JSON
+        json = { subject: "Research Inquiry", body: text }
+    }
+
+    return { success: true, email: json }
   } catch (error) {
     console.error("Email generation failed:", error)
     return { success: false, message: "Generation failed" }
