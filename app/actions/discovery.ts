@@ -1,9 +1,5 @@
 "use server";
 
-import { spawn } from "child_process";
-import path from "path";
-import fs from "fs";
-
 interface DiscoveryResult {
     success: boolean;
     message: string;
@@ -46,12 +42,12 @@ export async function triggerDiscovery(
                 "Content-Type": "application/json",
                 ...(API_TOKEN ? { "Authorization": `Bearer ${API_TOKEN}` } : {})
             },
-            body: JSON.stringify({ 
+            body: JSON.stringify({
                 query: sanitizedQuery,
-                limit: 10 
+                limit: 10
             }),
             // Set a reasonable timeout for serverless functions
-            signal: AbortSignal.timeout(60000) 
+            signal: AbortSignal.timeout(60000)
         });
 
         if (!response.ok) {
@@ -63,11 +59,11 @@ export async function triggerDiscovery(
         }
 
         const data = await response.json();
-        
+
         return {
             success: true,
-            message: data.count > 0 
-                ? `Found ${data.count} opportunities!` 
+            message: data.count > 0
+                ? `Found ${data.count} opportunities!`
                 : "Search complete. No new opportunities found.",
             newOpportunities: data.count,
         };
@@ -88,7 +84,7 @@ export async function triggerBatchDiscovery(
     options: BatchDiscoveryOptions = {}
 ): Promise<DiscoveryResult> {
     const SCRAPER_API_URL = process.env.SCRAPER_API_URL || "http://localhost:8080";
-    
+
     try {
         // Trigger the daily crawl endpoint as a proxy for batch discovery
         // Note: The main scraper's daily crawl might ignore options for now

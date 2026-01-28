@@ -1,26 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { spawn } from "child_process";
-import path from "path";
-import { readFileSync } from "fs";
-
-// Helper to load env vars from .env file
-function loadEnvFromFile(envPath: string): Record<string, string> {
-    try {
-        const content = readFileSync(envPath, "utf-8");
-        const env: Record<string, string> = {};
-        for (const line of content.split("\n")) {
-            const trimmed = line.trim();
-            if (trimmed && !trimmed.startsWith("#") && trimmed.includes("=")) {
-                const [key, ...valueParts] = trimmed.split("=");
-                const value = valueParts.join("=").replace(/^["']|["']$/g, "");
-                env[key.trim()] = value.trim();
-            }
-        }
-        return env;
-    } catch {
-        return {};
-    }
-}
 
 export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
