@@ -475,7 +475,7 @@ Wave 4 (After Wave 3) - Quality & Deploy:
 
 ---
 
-- [ ] 9. Add mentor cold-email template feature
+- [x] 9. Add mentor cold-email template feature
 
   **What to do**:
   - Create `components/mentors/email-template-modal.tsx`
@@ -521,7 +521,7 @@ Wave 4 (After Wave 3) - Quality & Deploy:
 
 ---
 
-- [ ] 10. Migrate legacy spawn() to fetch()
+- [x] 10. Migrate legacy spawn() to fetch()
 
   **What to do**:
   - Update `app/api/discovery/batch/route.ts` to use fetch() to SCRAPER_API_URL
@@ -569,7 +569,7 @@ Wave 4 (After Wave 3) - Quality & Deploy:
 
 ### Wave 4: Quality & Deploy
 
-- [ ] 11. Write tests for new features
+- [x] 11. Write tests for new features
 
   **What to do**:
   - Create test files for new server actions
@@ -613,7 +613,7 @@ Wave 4 (After Wave 3) - Quality & Deploy:
 
 ---
 
-- [ ] 12. Create deployment documentation
+- [x] 12. Create deployment documentation
 
   **What to do**:
   - Create `docs/DEPLOYMENT.md` with:
@@ -659,7 +659,7 @@ Wave 4 (After Wave 3) - Quality & Deploy:
 
 ---
 
-- [ ] 13. Final integration testing
+- [x] 13. Final integration testing
 
   **What to do**:
   - Start local scraper and frontend
