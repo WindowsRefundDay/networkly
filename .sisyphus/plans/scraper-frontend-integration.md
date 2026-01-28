@@ -289,7 +289,7 @@ Wave 4 (After Wave 3) - Quality & Deploy:
 
 ### Wave 2: Core UI Features
 
-- [ ] 4. Add AI Discovery to Events page
+- [x] 4. Add AI Discovery to Events page
 
   **What to do**:
   - Update `app/events/page.tsx` to use client component pattern
@@ -299,44 +299,7 @@ Wave 4 (After Wave 3) - Quality & Deploy:
   - Wire up `useDiscoveryLayers` hook for SSE events
   - Show discovered events in real-time feed
 
-  **Must NOT do**:
-  - Remove existing event registration logic
-  - Change event card design significantly
-  - Add new event types to database
-
-  **Recommended Agent Profile**:
-  - **Category**: `visual-engineering`
-    - Reason: Significant UI work with discovery visualization
-  - **Skills**: [`frontend-ui-ux`]
-    - `frontend-ui-ux`: Complex UI composition with SSE state
-
-  **Parallelization**:
-  - **Can Run In Parallel**: YES
-  - **Parallel Group**: Wave 2 (with Tasks 5, 6, 7)
-  - **Blocks**: Task 11
-  - **Blocked By**: Tasks 1, 2
-
-  **References**:
-  - `app/opportunities/opportunities-client.tsx` - Pattern to follow
-  - `components/opportunities/discovery-trigger-card.tsx` - Reuse or adapt
-  - `hooks/use-discovery-layers.ts` - SSE state management
-  - `app/events/page.tsx` - Current implementation
-
-  **Acceptance Criteria**:
-  - [ ] Events page shows discovery trigger card
-  - [ ] SSE streaming works: layer progress visible
-  - [ ] Filters work: Online/In-Person/All toggles filter results
-  - [ ] New events appear in real-time during discovery
-  - [ ] Using playwright browser: Navigate to `/events`, trigger discovery, verify progress UI
-
-  **Commit**: YES
-  - Message: `feat(events): add AI discovery with filters`
-  - Files: `app/events/*`, `app/actions/event-discovery.ts`
-  - Pre-commit: `npx tsc --noEmit`
-
----
-
-- [ ] 5. Add goal-discovery to Projects page
+- [x] 5. Add goal-discovery to Projects page
 
   **What to do**:
   - Add "Find Opportunities" button to `ProjectCard` component
@@ -381,7 +344,7 @@ Wave 4 (After Wave 3) - Quality & Deploy:
 
 ---
 
-- [ ] 6. Add Similar Opportunities component
+- [x] 6. Add Similar Opportunities component
 
   **What to do**:
   - Create `components/opportunities/similar-opportunities.tsx`
@@ -425,7 +388,7 @@ Wave 4 (After Wave 3) - Quality & Deploy:
 
 ---
 
-- [ ] 7. Add application status tracking
+- [x] 7. Add application status tracking
 
   **What to do**:
   - Add `status` field to opportunity local state: `'none' | 'interested' | 'applied' | 'dismissed'`
@@ -470,7 +433,7 @@ Wave 4 (After Wave 3) - Quality & Deploy:
 
 ### Wave 3: Enhanced Features
 
-- [ ] 8. Enhance Mentor search with filters
+- [x] 8. Enhance Mentor search with filters
 
   **What to do**:
   - Add institution filter dropdown to `/mentors` page

@@ -1,9 +1,6 @@
 {
-  "active_plan": "/Users/joelmanuel/Downloads/Networkly-Frontend/.sisyphus/plans/ec-finder-rebuild.md",
-  "started_at": "2026-01-25T21:18:00Z",
-  "session_ids": [
-    "ses_current",
-    "ses_408a281acffe2vzuMNsGoRSe8a"
-  ],
-  "plan_name": "ec-finder-rebuild"
+  "active_plan": "/Users/joelmanuel/Downloads/Networkly-Frontend/.sisyphus/plans/scraper-frontend-integration.md",
+  "started_at": "2026-01-28T04:58:48.658Z",
+  "session_ids": ["ses_3fd08125affe7FjbGrE8JwXuDy"],
+  "plan_name": "scraper-frontend-integration"
 }

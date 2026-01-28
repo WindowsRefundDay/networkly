@@ -28,6 +28,8 @@ import { Heart, Eye, MessageCircle, Lock, Globe, Users, MoreVertical, Pencil, Tr
 import Image from "next/image"
 import { type Project, PROJECT_CATEGORIES } from "@/lib/projects"
 
+import { ProjectDiscoveryModal } from "@/components/projects/project-discovery-modal"
+
 interface ProjectCardProps {
   project: Project
   isOwner?: boolean
@@ -40,6 +42,7 @@ interface ProjectCardProps {
 
 export function ProjectCard({ project, isOwner = false, onLike, onEdit, onDelete, onViewDetails, onOpenEditModal }: ProjectCardProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [showDiscoveryModal, setShowDiscoveryModal] = useState(false)
 
   const statusColors: Record<string, string> = {
     "In Progress": "bg-primary/10 text-primary",
@@ -219,6 +222,12 @@ export function ProjectCard({ project, isOwner = false, onLike, onEdit, onDelete
             </span>
           </div>
           <div className="flex gap-2">
+            {isOwner && (
+              <Button size="sm" variant="outline" className="h-8 px-2 gap-1 text-primary border-primary/20 hover:bg-primary/5" onClick={() => setShowDiscoveryModal(true)}>
+                <Sparkles className="h-3 w-3" />
+                <span className="text-xs">Find Opps</span>
+              </Button>
+            )}
             {primaryLink && (
               <Button size="sm" variant="ghost" className="h-8 px-2 gap-1" asChild>
                 <a href={primaryLink.url} target="_blank" rel="noopener noreferrer">
@@ -247,6 +256,13 @@ export function ProjectCard({ project, isOwner = false, onLike, onEdit, onDelete
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ProjectDiscoveryModal 
+        projectId={project.id}
+        projectTitle={project.title}
+        open={showDiscoveryModal}
+        onOpenChange={setShowDiscoveryModal}
+      />
     </>
   )
 }

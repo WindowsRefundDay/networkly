@@ -14,10 +14,18 @@ import {
   Trophy,
   Zap,
   Bookmark,
-  BookmarkCheck
+  BookmarkCheck,
+  MoreHorizontal
 } from "lucide-react"
 import type { Opportunity } from "@/types/opportunity"
 import { getTypeGradient, getMatchScoreColor, formatGradeLevels } from "@/types/opportunity"
+import { OpportunityStatus } from "@/app/actions/opportunity-status"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 interface OpportunityCardProps {
   opportunity: Opportunity
@@ -25,6 +33,26 @@ interface OpportunityCardProps {
   onSelect: (opportunity: Opportunity) => void
   onToggleSave: (e: React.MouseEvent, id: string) => void
   saving?: boolean
+  status?: OpportunityStatus
+  onStatusChange?: (status: OpportunityStatus | null) => void
+}
+
+const statusColors: Record<string, string> = {
+  interested: "bg-blue-500/10 text-blue-600 border-blue-200",
+  applied: "bg-green-500/10 text-green-600 border-green-200",
+  interviewing: "bg-purple-500/10 text-purple-600 border-purple-200",
+  rejected: "bg-red-500/10 text-red-600 border-red-200",
+  offer: "bg-amber-500/10 text-amber-600 border-amber-200",
+  dismissed: "bg-gray-500/10 text-gray-600 border-gray-200",
+}
+
+const statusLabels: Record<string, string> = {
+  interested: "Interested",
+  applied: "Applied",
+  interviewing: "Interviewing",
+  rejected: "Rejected",
+  offer: "Offer",
+  dismissed: "Dismissed",
 }
 
 const cardSpring = {
@@ -47,7 +75,9 @@ export function OpportunityCard({
   isSelected, 
   onSelect, 
   onToggleSave,
-  saving = false 
+  saving = false,
+  status,
+  onStatusChange
 }: OpportunityCardProps) {
   const hasDeadline = opportunity.deadline && opportunity.deadline !== "Rolling"
   const hasPrizes = opportunity.prizes && opportunity.prizes.length > 0
@@ -89,12 +119,18 @@ export function OpportunityCard({
             </div>
             
             <div className="absolute top-3 left-3 right-3 flex justify-between items-start z-10">
-              {opportunity.isExpired && (
-                <Badge variant="destructive" className="text-xs font-medium shadow-lg">
-                  Expired
-                </Badge>
-              )}
-              {!opportunity.isExpired && <div />}
+              <div className="flex gap-2">
+                {opportunity.isExpired && (
+                  <Badge variant="destructive" className="text-xs font-medium shadow-lg">
+                    Expired
+                  </Badge>
+                )}
+                {status && (
+                  <Badge variant="outline" className={`text-xs font-medium shadow-lg border ${statusColors[status]}`}>
+                    {statusLabels[status]}
+                  </Badge>
+                )}
+              </div>
               
               {hasPrizes && (
                 <Badge className="bg-amber-500/90 hover:bg-amber-500 text-white shadow-lg gap-1">
@@ -277,6 +313,40 @@ export function OpportunityCard({
                   <Bookmark className="h-4 w-4" />
                 )}
               </Button>
+
+              {onStatusChange && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      className="h-9 w-9 shrink-0 hover:bg-muted hover:border-muted-foreground/20"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onStatusChange("interested") }}>
+                      Mark as Interested
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onStatusChange("applied") }}>
+                      Mark as Applied
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onStatusChange("dismissed") }}>
+                      Dismiss
+                    </DropdownMenuItem>
+                    {status && (
+                      <DropdownMenuItem 
+                        onClick={(e) => { e.stopPropagation(); onStatusChange(null) }}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        Clear Status
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
           </div>
         </Card>

@@ -4,14 +4,36 @@ import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Search, Loader2, GraduationCap, Sparkles } from "lucide-react"
+import { Search, Loader2, GraduationCap, Sparkles, Filter } from "lucide-react"
 import { MentorCard } from "@/components/mentors/mentor-card"
 import { searchMentors, getSuggestedMentors, saveMentor, getSavedMentors, type Mentor } from "@/app/actions/mentors"
 import { useDebouncedCallback } from "@/hooks/use-debounced-callback"
 import { toast } from "sonner"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+
+const INSTITUTIONS = [
+  "All Institutions",
+  "MIT",
+  "Stanford University",
+  "Harvard University",
+  "UC Berkeley",
+  "Carnegie Mellon",
+  "Georgia Tech",
+  "Caltech",
+  "Cornell University",
+  "University of Washington",
+  "UIUC"
+]
 
 export default function MentorsPage() {
   const [query, setQuery] = useState("")
+  const [institution, setInstitution] = useState("All Institutions")
   const [mentors, setMentors] = useState<Mentor[]>([])
   const [savedMentors, setSavedMentors] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
@@ -36,8 +58,8 @@ export default function MentorsPage() {
     init()
   }, [])
 
-  const performSearch = useDebouncedCallback(async (searchQuery: string) => {
-    if (!searchQuery.trim()) {
+  const performSearch = useDebouncedCallback(async (searchQuery: string, inst: string) => {
+    if (!searchQuery.trim() && inst === "All Institutions") {
       setIsSearching(false)
       const suggestions = await getSuggestedMentors()
       setMentors(suggestions)
@@ -46,7 +68,9 @@ export default function MentorsPage() {
 
     setIsSearching(true)
     try {
-      const result = await searchMentors(searchQuery)
+      const result = await searchMentors(searchQuery, {
+        institution: inst === "All Institutions" ? undefined : inst
+      })
       setMentors(result.mentors)
     } catch (error) {
       console.error("Search failed:", error)
@@ -58,7 +82,12 @@ export default function MentorsPage() {
 
   const handleSearchChange = (value: string) => {
     setQuery(value)
-    performSearch(value)
+    performSearch(value, institution)
+  }
+
+  const handleInstitutionChange = (value: string) => {
+    setInstitution(value)
+    performSearch(query, value)
   }
 
   const handleSave = async (mentorId: string) => {
@@ -94,15 +123,31 @@ export default function MentorsPage() {
       </div>
 
       <div className="relative max-w-xl">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Search by research area, name, or university..."
-          value={query}
-          onChange={(e) => handleSearchChange(e.target.value)}
-          className="pl-10 h-12 text-base bg-muted/50 border-border/50 focus:bg-background"
-        />
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search by research area, name..."
+              value={query}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="pl-10 h-12 text-base bg-muted/50 border-border/50 focus:bg-background"
+            />
+          </div>
+          <Select value={institution} onValueChange={handleInstitutionChange}>
+            <SelectTrigger className="w-[180px] h-12 bg-muted/50 border-border/50">
+              <SelectValue placeholder="Institution" />
+            </SelectTrigger>
+            <SelectContent>
+              {INSTITUTIONS.map((inst) => (
+                <SelectItem key={inst} value={inst}>
+                  {inst}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         {isSearching && (
-          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+          <div className="absolute right-[200px] top-1/2 -translate-y-1/2">
             <Loader2 className="h-4 w-4 animate-spin text-primary" />
           </div>
         )}

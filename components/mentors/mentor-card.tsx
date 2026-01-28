@@ -4,8 +4,10 @@ import { Mentor } from "@/app/actions/mentors"
 import { GlassCard } from "@/components/ui/glass-card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Building2, Mail, ExternalLink, GraduationCap, MapPin, Bookmark } from "lucide-react"
+import { Building2, Mail, ExternalLink, GraduationCap, MapPin, Bookmark, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useState } from "react"
+import { EmailTemplateModal } from "@/components/mentors/email-template-modal"
 
 interface MentorCardProps {
   mentor: Mentor
@@ -14,7 +16,10 @@ interface MentorCardProps {
 }
 
 export function MentorCard({ mentor, onSave, isSaved = false }: MentorCardProps) {
+  const [showEmailModal, setShowEmailModal] = useState(false)
+
   return (
+    <>
     <GlassCard className="flex flex-col h-full hover:border-primary/50 transition-colors">
       <div className="flex justify-between items-start mb-4">
         <div className="flex gap-4">
@@ -78,11 +83,16 @@ export function MentorCard({ mentor, onSave, isSaved = false }: MentorCardProps)
         </Button>
         
         {mentor.email && (
-          <Button variant="ghost" size="icon" asChild>
-            <a href={`mailto:${mentor.email}`} title="Email Mentor">
-              <Mail className="h-4 w-4" />
-            </a>
-          </Button>
+          <div className="flex gap-1">
+            <Button variant="ghost" size="icon" onClick={() => setShowEmailModal(true)} title="Generate AI Draft">
+              <Sparkles className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" asChild>
+              <a href={`mailto:${mentor.email}`} title="Email Mentor">
+                <Mail className="h-4 w-4" />
+              </a>
+            </Button>
+          </div>
         )}
         
         {mentor.profileUrl && (
@@ -94,5 +104,13 @@ export function MentorCard({ mentor, onSave, isSaved = false }: MentorCardProps)
         )}
       </div>
     </GlassCard>
+
+    <EmailTemplateModal 
+      mentorId={mentor.id}
+      mentorName={mentor.name}
+      open={showEmailModal}
+      onOpenChange={setShowEmailModal}
+    />
+    </>
   )
 }

@@ -26,13 +26,25 @@ import {
   ArrowRight,
   type LucideIcon
 } from "lucide-react"
+import { SimilarOpportunities } from "@/components/opportunities/similar-opportunities"
 import type { Opportunity } from "@/types/opportunity"
 import { getTypeGradient, getMatchScoreColor, formatGradeLevels } from "@/types/opportunity"
+
+import { OpportunityStatus } from "@/app/actions/opportunity-status"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 interface ExpandedOpportunityCardProps {
   opportunity: Opportunity
   onClose: () => void
   onToggleSave: (id: string) => void
+  status?: OpportunityStatus
+  onStatusChange?: (status: OpportunityStatus | null) => void
 }
 
 const overlayVariants = {
@@ -105,7 +117,7 @@ function InfoBlock({ label, value, icon: Icon }: { label: string, value: string 
   )
 }
 
-export function ExpandedOpportunityCard({ opportunity, onClose, onToggleSave }: ExpandedOpportunityCardProps) {
+export function ExpandedOpportunityCard({ opportunity, onClose, onToggleSave, status, onStatusChange }: ExpandedOpportunityCardProps) {
   const hasDeadline = opportunity.deadline && opportunity.deadline !== "Rolling"
   const isFree = opportunity.cost?.toLowerCase() === "free" || !opportunity.cost
 
@@ -199,6 +211,21 @@ export function ExpandedOpportunityCard({ opportunity, onClose, onToggleSave }: 
                   Apply Now
                   <ArrowRight className="h-4 w-4" />
                 </Button>
+                {onStatusChange && (
+                  <Select value={status || ""} onValueChange={(val) => onStatusChange(val as OpportunityStatus)}>
+                    <SelectTrigger className="w-[140px] h-11 bg-background/50 border-border/50">
+                      <SelectValue placeholder="Set Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="interested">Interested</SelectItem>
+                      <SelectItem value="applied">Applied</SelectItem>
+                      <SelectItem value="interviewing">Interviewing</SelectItem>
+                      <SelectItem value="offer">Offer</SelectItem>
+                      <SelectItem value="rejected">Rejected</SelectItem>
+                      <SelectItem value="dismissed">Dismissed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
                 <div className="flex gap-2">
                   <Button 
                     variant="outline" 
@@ -380,6 +407,14 @@ export function ExpandedOpportunityCard({ opportunity, onClose, onToggleSave }: 
                     </a>
                   )}
                 </motion.div>
+              </div>
+
+              <div className="lg:col-span-3">
+                <SimilarOpportunities 
+                  opportunityId={opportunity.id} 
+                  onSelect={(opp) => window.open(opp.url || opp.applicationUrl || '', '_blank')}
+                  onToggleSave={onToggleSave}
+                />
               </div>
             </motion.div>
           </ScrollArea>

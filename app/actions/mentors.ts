@@ -42,6 +42,9 @@ export async function searchMentors(
     const url = new URL(`${SCRAPER_API_URL}/api/v1/mentors/search`)
     url.searchParams.set("query", query)
     if (options?.limit) url.searchParams.set("limit", options.limit.toString())
+    if (options?.institution && options.institution !== "all") {
+      url.searchParams.set("institution", options.institution)
+    }
 
     const response = await fetch(url.toString(), {
       headers: {

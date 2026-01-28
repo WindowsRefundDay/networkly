@@ -13,6 +13,7 @@ import { OpportunityList } from "@/components/opportunities/opportunity-list"
 import { ExpandedOpportunityCard } from "@/components/opportunities/expanded-opportunity-card"
 import { DiscoveryTriggerCard } from "@/components/opportunities/discovery-trigger-card"
 import { getOpportunities, searchOpportunities, getOpportunitiesByIds } from "@/app/actions/opportunities"
+import { getStatuses, updateStatus, type OpportunityStatus } from "@/app/actions/opportunity-status"
 import { getUserProfile } from "@/app/actions/user"
 import { useHasMounted } from "@/hooks/use-has-mounted"
 import { useDebouncedCallback } from "@/hooks/use-debounced-callback"
@@ -37,6 +38,7 @@ export default function OpportunitiesClient({ initialHighlightId }: Opportunitie
   const [searchQuery, setSearchQuery] = useState("")
   const [typeFilter, setTypeFilter] = useState("all")
   const [opportunities, setOpportunities] = useState<Opportunity[]>([])
+  const [statuses, setStatuses] = useState<Record<string, OpportunityStatus>>({})
   const [searchResults, setSearchResults] = useState<Opportunity[] | null>(null)
   const [selectedOpportunity, setSelectedOpportunity] = useState<Opportunity | null>(null)
   const [loading, setLoading] = useState(true)
@@ -142,9 +144,13 @@ export default function OpportunitiesClient({ initialHighlightId }: Opportunitie
   useEffect(() => {
     async function fetchOpportunities() {
       try {
-        const data = await getOpportunities()
+        const [data, statusMap] = await Promise.all([
+          getOpportunities(),
+          getStatuses()
+        ])
         const mapped = data.map(mapOpportunity)
         setOpportunities(mapped)
+        setStatuses(statusMap)
         setLoading(false)
 
         if (initialHighlightId && mapped.length > 0) {
@@ -232,6 +238,23 @@ export default function OpportunitiesClient({ initialHighlightId }: Opportunitie
     setTypeFilter(value)
     if (searchQuery.trim()) {
       performSearch(searchQuery, value)
+    }
+  }
+
+  const handleStatusChange = async (id: string, status: OpportunityStatus | null) => {
+    // Optimistic update
+    setStatuses(prev => {
+      const next = { ...prev }
+      if (status === null) delete next[id]
+      else next[id] = status
+      return next
+    })
+
+    try {
+      await updateStatus(id, status)
+    } catch (error) {
+      console.error("Failed to update status:", error)
+      // Revert on failure (could refetch)
     }
   }
 
@@ -548,12 +571,15 @@ export default function OpportunitiesClient({ initialHighlightId }: Opportunitie
 
         <AnimatePresence>
           {selectedOpportunity && (
-            <ExpandedOpportunityCard
-              key={selectedOpportunity.id}
-              opportunity={selectedOpportunity}
-              onClose={() => setSelectedOpportunity(null)}
-              onToggleSave={handleToggleSave}
-            />
+              <ExpandedOpportunityCard
+                key={selectedOpportunity.id}
+                opportunity={selectedOpportunity}
+                onClose={() => setSelectedOpportunity(null)}
+                onToggleSave={handleToggleSave}
+                status={statuses[selectedOpportunity.id]}
+                onStatusChange={(status) => handleStatusChange(selectedOpportunity.id, status)}
+              />
+
           )}
         </AnimatePresence>
       </motion.div>
