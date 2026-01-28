@@ -18,6 +18,7 @@ import {
 } from "lucide-react"
 import type { Opportunity } from "@/types/opportunity"
 import { getTypeGradient, getMatchScoreColor, formatGradeLevels } from "@/types/opportunity"
+import { getCompanyLogoUrl } from "@/lib/company-logo"
 
 interface OpportunityCardProps {
   opportunity: Opportunity
@@ -108,14 +109,14 @@ export function OpportunityCard({
           <div className="relative px-5 pb-5 -mt-10 z-20">
             <div className="flex justify-between items-end mb-4">
               <div className="rounded-xl border-4 border-card shadow-lg bg-card">
-                <Avatar className="h-14 w-14 rounded-lg">
+                <Avatar className="h-16 w-16 rounded-lg">
                   <AvatarImage 
-                    src={opportunity.logo || "/placeholder.svg"} 
+                    src={opportunity.logo || getCompanyLogoUrl(opportunity.company) || undefined} 
                     alt={opportunity.company} 
-                    className="object-cover" 
+                    className="object-cover [image-rendering:crisp-edges]" 
                   />
-                  <AvatarFallback className="rounded-lg text-base font-bold bg-gradient-to-br from-muted to-muted/50 text-muted-foreground">
-                    {opportunity.company[0]}
+                  <AvatarFallback className="rounded-lg text-lg font-bold bg-gradient-to-br from-primary/20 to-primary/10 text-primary">
+                    {opportunity.company[0].toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
               </div>

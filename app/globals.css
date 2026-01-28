@@ -114,12 +114,12 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  
+
   --glass-blur-sm: 8px;
   --glass-blur-md: 12px;
   --glass-blur-lg: 16px;
   --glass-blur-xl: 24px;
-  
+
   --ease-premium: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out-quint: cubic-bezier(0.83, 0, 0.17, 1);
   --duration-fast: 200ms;
@@ -132,6 +132,47 @@
     @apply border-border outline-ring/50;
   }
   html, body {
-    @apply bg-background text-foreground transition-colors duration-500 ease-in-out;
+    @apply bg-background text-foreground transition-colors duration-500
+      ease-in-out;
+  }
+  button,
+  a,
+  [role="button"],
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"] {
+    cursor: pointer;
+  }
+  
+  /* Hide scrollbars while maintaining scroll functionality */
+  * {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+  }
+  
+  *::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+  }
+}
+
+@layer utilities {
+  .animate-blob {
+    animation: blob 7s infinite;
+  }
+  
+  .animation-delay-2000 {
+    animation-delay: 2s;
+  }
+}
+
+@keyframes blob {
+  0%, 100% {
+    transform: translate(0px, 0px) scale(1);
+  }
+  33% {
+    transform: translate(30px, -50px) scale(1.1);
+  }
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
   }
 }
