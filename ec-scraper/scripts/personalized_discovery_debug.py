@@ -533,13 +533,13 @@ async def main(user_id: str, search_query: str):
                     
                     log_debug(f"  ✅ Saved to database (ID: {opp_id})", "SUCCESS")
                     
-                    # Emit opportunity found event
+                    # Emit opportunity found event (camelCase for frontend compatibility)
                     emit_event("opportunity_found", {
                         "id": opp.id,
                         "title": opp.title,
                         "organization": opp.organization,
                         "category": opp.category.value,
-                        "type": opp.opportunity_type.value,
+                        "opportunityType": opp.opportunity_type.value,
                         "url": opp.url,
                         "deadline": opp.deadline.isoformat() if opp.deadline else None,
                         "start_date": opp.start_date.isoformat() if opp.start_date else None,
@@ -548,7 +548,7 @@ async def main(user_id: str, search_query: str):
                         "is_expired": opp.is_expired,
                         "next_cycle_expected": opp.next_cycle_expected.isoformat() if opp.next_cycle_expected else None,
                         "summary": opp.summary[:150] + "..." if len(opp.summary) > 150 else opp.summary,
-                        "location_type": opp.location_type.value,
+                        "locationType": opp.location_type.value,
                         "confidence": confidence,
                         "is_personalized": True,
                         "user_id": user_profile["user_id"],

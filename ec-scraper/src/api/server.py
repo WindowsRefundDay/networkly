@@ -703,10 +703,14 @@ async def discovery_stream(
             for opp in results:
                 if opp:
                     yield emit("opportunity_found", {
+                        "id": opp.id,
                         "title": opp.title,
                         "organization": opp.organization,
                         "url": opp.url,
                         "category": opp.category.value if opp.category else "Other",
+                        "opportunityType": opp.opportunity_type.value if opp.opportunity_type else "Other",
+                        "locationType": opp.location_type.value if opp.location_type else "Online",
+                        "confidence": opp.extraction_confidence,
                     })
 
             total_time = time.time() - start_time

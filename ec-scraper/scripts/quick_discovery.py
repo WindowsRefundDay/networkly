@@ -591,10 +591,14 @@ async def main(
                                 first_ec_time = time.time() - start_time
                             # Stream each opportunity found
                             emit_event("opportunity_found", {
+                                "id": opp.id,
                                 "title": opp.title,
                                 "organization": opp.organization,
                                 "url": opp.url,
                                 "category": opp.category.value if opp.category else "Other",
+                                "opportunityType": opp.opportunity_type.value if opp.opportunity_type else "Other",
+                                "locationType": opp.location_type.value if opp.location_type else "Online",
+                                "confidence": opp.extraction_confidence,
                                 "from_list_page": True,
                             })
                     
@@ -627,10 +631,14 @@ async def main(
                                     if first_ec_time is None:
                                         first_ec_time = time.time() - start_time
                                     emit_event("opportunity_found", {
+                                        "id": opp.id,
                                         "title": opp.title,
                                         "organization": opp.organization,
                                         "url": opp.url,
                                         "category": opp.category.value if opp.category else "Other",
+                                        "opportunityType": opp.opportunity_type.value if opp.opportunity_type else "Other",
+                                        "locationType": opp.location_type.value if opp.location_type else "Online",
+                                        "confidence": opp.extraction_confidence,
                                         "from_list_page": True,
                                     })
                             if saved_opps:
@@ -768,11 +776,11 @@ async def main(
                     "title": opp.title,
                     "organization": opp.organization,
                     "category": opp.category.value,
-                    "type": opp.opportunity_type.value,
+                    "opportunityType": opp.opportunity_type.value,
                     "url": opp.url,
                     "deadline": opp.deadline.isoformat() if opp.deadline else None,
                     "summary": opp.summary[:150] + "..." if len(opp.summary) > 150 else opp.summary,
-                    "location_type": opp.location_type.value,
+                    "locationType": opp.location_type.value,
                     "confidence": confidence,
                     "is_personalized": user_profile is not None,
                 })
