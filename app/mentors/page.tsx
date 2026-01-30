@@ -117,8 +117,8 @@ export default function MentorsPage() {
       <GlassCard variant="compact" className="p-6 sticky top-4 z-40">
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-1">
-            <h1 className="text-2xl font-bold tracking-tight">Find Mentors</h1>
-            <p className="text-muted-foreground">
+            <h1 className="type-h2">Find Mentors</h1>
+            <p className="type-muted">
               Connect with professors and researchers in your field of interest.
             </p>
           </div>

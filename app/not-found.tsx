@@ -1,27 +1,22 @@
-import Image from "next/image"
-
-import NotFoundDark from "@/404black.png"
-import NotFoundLight from "@/404white.png"
+import Link from "next/link"
+import { GlassCard } from "@/components/ui/glass-card"
+import { Button } from "@/components/ui/button"
 
 export default function NotFound() {
-    return (
-        <main className="flex min-h-svh items-center justify-center bg-background p-6">
-            <div className="flex w-full max-w-xl items-center justify-center">
-                <Image
-                    src={NotFoundDark}
-                    alt="Page not found"
-                    priority
-                    className="block h-auto w-full dark:hidden"
-                    sizes="(min-width: 1024px) 720px, 100vw"
-                />
-                <Image
-                    src={NotFoundLight}
-                    alt="Page not found"
-                    priority
-                    className="hidden h-auto w-full dark:block"
-                    sizes="(min-width: 1024px) 720px, 100vw"
-                />
-            </div>
-        </main>
-    )
+  return (
+    <main className="flex min-h-svh items-center justify-center bg-background p-6">
+      <GlassCard className="w-full max-w-md p-8 text-center space-y-6">
+        <div className="space-y-2">
+            <h1 className="text-6xl font-bold bg-gradient-to-r from-primary to-primary/50 bg-clip-text text-transparent">404</h1>
+            <h2 className="type-h2">Page not found</h2>
+        </div>
+        <p className="type-muted">
+          Sorry, we couldn&apos;t find the page you&apos;re looking for. It might have been moved or doesn&apos;t exist.
+        </p>
+        <Button asChild>
+            <Link href="/dashboard">Return Home</Link>
+        </Button>
+      </GlassCard>
+    </main>
+  )
 }

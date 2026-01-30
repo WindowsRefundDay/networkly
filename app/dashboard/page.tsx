@@ -26,8 +26,8 @@ export default async function DashboardPage() {
       return (
         <div className="space-y-6 container mx-auto px-4 sm:px-6 max-w-7xl py-6">
           <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
-            <h2 className="text-xl font-semibold text-destructive">Failed to set up account</h2>
-            <p className="text-muted-foreground text-center max-w-xs">
+            <h2 className="type-h4 text-destructive">Failed to set up account</h2>
+            <p className="type-muted text-center max-w-xs">
               Please try refreshing the page or contact support.
             </p>
           </div>

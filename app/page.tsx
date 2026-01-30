@@ -19,7 +19,7 @@ export default function Home() {
       <div className="flex gap-4">
         <a
           href="/dashboard"
-          className="inline-flex h-12 items-center justify-center rounded-md bg-primary px-10 text-base font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className="inline-flex h-12 items-center justify-center rounded-md glass-button px-10 type-small shadow transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         >
           Go to Dashboard
         </a>
@@ -27,7 +27,7 @@ export default function Home() {
 
       {/* Build version */}
       <div className="fixed bottom-4 right-4">
-        <code className="text-xs text-muted-foreground font-mono">
+        <code className="type-muted text-xs font-mono">
           Networkly build 0.0.1 @1/26/26 THIS IS A TEST BUILD AND WONT REPRESENT THE FINAL PRODUCT
         </code>
       </div>

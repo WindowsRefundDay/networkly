@@ -127,11 +127,68 @@
   --duration-slow: 700ms;
 }
 
+@layer components {
+  .glass-panel {
+    @apply bg-background/40 backdrop-blur-md border border-border/20 shadow-lg shadow-black/5;
+  }
+  .glass-panel-hero {
+    @apply bg-background/30 backdrop-blur-lg border border-border/10 shadow-lg shadow-black/5;
+  }
+  .glass-panel-sidebar {
+    @apply bg-background/60 backdrop-blur-xl border-r border-border/25;
+  }
+  .glass-button {
+    @apply bg-primary text-primary-foreground hover:bg-primary/90 shadow-md transition-all duration-300;
+  }
+  .glass-button-secondary {
+    @apply bg-background/50 hover:bg-background/70 border border-border/30 backdrop-blur-sm transition-all duration-300;
+  }
+}
+
+@layer utilities {
+  .type-h1 {
+    @apply text-4xl font-bold tracking-tight lg:text-5xl scroll-m-20;
+  }
+  .type-h2 {
+    @apply text-3xl font-semibold tracking-tight scroll-m-20 first:mt-0;
+  }
+  .type-h3 {
+    @apply text-2xl font-semibold tracking-tight scroll-m-20;
+  }
+  .type-h4 {
+    @apply text-xl font-semibold tracking-tight scroll-m-20;
+  }
+  .type-body {
+    @apply text-base leading-7;
+  }
+  .type-lead {
+    @apply text-xl text-muted-foreground;
+  }
+  .type-small {
+    @apply text-sm font-medium leading-none;
+  }
+  .type-muted {
+    @apply text-sm text-muted-foreground;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
   html, body {
     @apply bg-background text-foreground transition-colors duration-500 ease-in-out;
+  }
+  h1 {
+    @apply text-4xl font-bold tracking-tight lg:text-5xl scroll-m-20;
+  }
+  h2 {
+    @apply text-3xl font-semibold tracking-tight scroll-m-20 first:mt-0;
+  }
+  h3 {
+    @apply text-2xl font-semibold tracking-tight scroll-m-20;
+  }
+  h4 {
+    @apply text-xl font-semibold tracking-tight scroll-m-20;
   }
 }

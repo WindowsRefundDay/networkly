@@ -101,10 +101,10 @@ export default function SignupPage() {
                             </motion.div>
 
                             <div className="space-y-2">
-                                <h1 className="text-2xl font-semibold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+                                <h1 className="type-h3 bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
                                     Welcome to Networkly! 🎉
                                 </h1>
-                                <p className="text-sm text-muted-foreground">
+                                <p className="type-muted">
                                     Your professional network journey begins now
                                 </p>
                             </div>
@@ -189,8 +189,8 @@ export default function SignupPage() {
                             className="h-10 object-contain hidden dark:block"
                         />
                     </div>
-                    <h1 className="text-2xl font-semibold">Create your account</h1>
-                    <p className="text-sm text-muted-foreground">Start building your network</p>
+                    <h1 className="type-h3">Create your account</h1>
+                    <p className="type-muted">Start building your network</p>
                 </div>
 
                 <form onSubmit={handleSignup} className="space-y-4">

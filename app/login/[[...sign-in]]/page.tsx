@@ -91,8 +91,8 @@ export default function LoginPage() {
                             className="h-10 object-contain hidden dark:block invert"
                         />
                     </div>
-                    <h1 className="text-2xl font-semibold">Welcome back</h1>
-                    <p className="text-sm text-muted-foreground">Sign in to your account</p>
+                    <h1 className="type-h3">Welcome back</h1>
+                    <p className="type-muted">Sign in to your account</p>
                 </div>
 
                 <form onSubmit={handleLogin} className="space-y-4">

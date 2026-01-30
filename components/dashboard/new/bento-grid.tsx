@@ -82,7 +82,7 @@ export const BentoItem = ({ className, children, colSpan, variant = 'default' }:
   const mdClass = mdSpans[colSpan?.md || 6] || "md:col-span-6" 
   const lgClass = lgSpans[colSpan?.lg || 12] || "lg:col-span-12"
 
-  const defaultStyles = "rounded-xl backdrop-blur-md bg-background/40 border border-border/20 shadow-lg shadow-black/5 overflow-hidden transition-all duration-300"
+  const defaultStyles = "glass-panel rounded-xl overflow-hidden transition-all duration-300"
   const ghostStyles = "bg-transparent shadow-none border-none p-0 overflow-visible"
 
   return (

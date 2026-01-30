@@ -21,20 +21,20 @@ export function GlassCard({
   hover = false,
 }: GlassCardProps) {
   const variants = {
-    default: 'backdrop-blur-md bg-background/40 border-border/20',
-    hero: 'backdrop-blur-lg bg-background/30 border-border/10',
-    sidebar: 'backdrop-blur-xl bg-background/60 border-border/25',
-    compact: 'backdrop-blur-sm bg-background/50 border-border/30',
+    default: 'glass-panel',
+    hero: 'glass-panel-hero',
+    sidebar: 'glass-panel-sidebar',
+    compact: 'glass-panel backdrop-blur-sm bg-background/50 border-border/30',
   }
 
   const glowStyles = glow
     ? 'shadow-[0_0_20px_rgba(var(--primary-rgb),0.3)]'
-    : 'shadow-lg shadow-black/5'
+    : ''
 
   return (
     <motion.div
       className={cn(
-        'rounded-xl border transition-all duration-300',
+        'rounded-xl transition-all duration-300',
         variants[variant],
         glowStyles,
         'will-change-[backdrop-filter,transform]',
