@@ -38,12 +38,15 @@ export function GlassCard({
         variants[variant],
         glowStyles,
         'will-change-[backdrop-filter,transform]',
+        'focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
         className
       )}
       whileHover={hover ? { scale: 1.01, y: -2 } : undefined}
       transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+      // Ensure it can receive focus if it has an onClick or similar, but for now just styling
+      // If the user adds tabIndex, this will look correct.
     >
-      <div className="relative overflow-hidden rounded-xl">
+      <div className="relative overflow-hidden rounded-xl h-full">
         <div className="absolute inset-0 opacity-[0.02] mix-blend-overlay pointer-events-none">
           <svg className="w-full h-full">
             <filter id="noise">
@@ -58,7 +61,7 @@ export function GlassCard({
           </svg>
         </div>
 
-        <div className="relative z-10">{children}</div>
+        <div className="relative z-10 h-full">{children}</div>
       </div>
     </motion.div>
   )

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Search, Plus, Sparkles, Users, FolderOpen, Loader2, Filter } from "lucide-react"
+import { BentoGrid, BentoItem } from "@/components/dashboard/new/bento-grid"
 import { ProjectCard } from "@/components/projects/project-card"
 import { ProjectDetailModal } from "@/components/projects/project-detail-modal"
 import { CreateProjectModal } from "@/components/projects/create-project-modal"
@@ -229,8 +230,8 @@ export default function ProjectsPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-4">
-        <div className="lg:col-span-3 space-y-6">
+      <BentoGrid>
+        <BentoItem colSpan={{ lg: 9 }} variant="ghost">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList>
               <TabsTrigger value="my-projects">My Projects ({myProjects.length})</TabsTrigger>
@@ -313,12 +314,12 @@ export default function ProjectsPage() {
               )}
             </TabsContent>
           </Tabs>
-        </div>
+        </BentoItem>
 
-        <div>
+        <BentoItem colSpan={{ lg: 3 }} variant="ghost">
           <ProjectUpdatesFeed />
-        </div>
-      </div>
+        </BentoItem>
+      </BentoGrid>
 
       <ProjectDetailModal
         project={selectedProject}

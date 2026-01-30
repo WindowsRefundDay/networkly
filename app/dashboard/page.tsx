@@ -7,6 +7,7 @@ import { OpportunitySpotlight } from "@/components/dashboard/new/opportunity-spo
 import { getDashboardData } from "@/app/actions/dashboard"
 import { redirect } from "next/navigation"
 import { ensureUserRecord } from "@/app/actions/user"
+import { GlassCard } from "@/components/ui/glass-card"
 
 export default async function DashboardPage() {
   let data = await getDashboardData()
@@ -58,19 +59,15 @@ export default async function DashboardPage() {
         </BentoItem>
 
         {/* Quick Actions & Stats - Top Right Split */}
-        <BentoItem colSpan={{ md: 2, lg: 4 }} className="min-h-[300px] bg-background border-0 shadow-none hover:shadow-none hover:border-0">
+        <BentoItem colSpan={{ md: 2, lg: 4 }} variant="ghost" className="min-h-[300px]">
           <div className="grid grid-rows-2 h-full gap-6">
-            <div className="bg-card rounded-xl border border-border/50 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-               <QuickActionsWidget />
-            </div>
-            <div className="bg-card rounded-xl border border-border/50 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-               <StatsWidget stats={extendedStats} />
-            </div>
+             <QuickActionsWidget />
+             <StatsWidget stats={extendedStats} />
           </div>
         </BentoItem>
 
         {/* Opportunity Spotlight - Middle Full Width */}
-        <BentoItem colSpan={{ md: 6, lg: 12 }} className="min-h-[250px] bg-card/50">
+        <BentoItem colSpan={{ md: 6, lg: 12 }} className="min-h-[250px]">
            <OpportunitySpotlight opportunity={data.spotlightOpportunity} />
         </BentoItem>
 
@@ -80,7 +77,7 @@ export default async function DashboardPage() {
         </BentoItem>
 
         {/* Applications - Bottom Right */}
-        <BentoItem colSpan={{ md: 3, lg: 4 }} className="min-h-[400px] flex items-center justify-center bg-card/50">
+        <BentoItem colSpan={{ md: 3, lg: 4 }} className="min-h-[400px] flex items-center justify-center">
            <p className="text-muted-foreground">Application Tracker Coming Soon</p>
         </BentoItem>
       </BentoGrid>

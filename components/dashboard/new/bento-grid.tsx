@@ -29,9 +29,10 @@ interface BentoItemProps {
     md?: number
     lg?: number
   }
+  variant?: 'default' | 'ghost'
 }
 
-export const BentoItem = ({ className, children, colSpan }: BentoItemProps) => {
+export const BentoItem = ({ className, children, colSpan, variant = 'default' }: BentoItemProps) => {
   const baseSpans: Record<number, string> = {
     1: "col-span-1",
     2: "col-span-2",
@@ -81,6 +82,9 @@ export const BentoItem = ({ className, children, colSpan }: BentoItemProps) => {
   const mdClass = mdSpans[colSpan?.md || 6] || "md:col-span-6" 
   const lgClass = lgSpans[colSpan?.lg || 12] || "lg:col-span-12"
 
+  const defaultStyles = "rounded-xl backdrop-blur-md bg-background/40 border border-border/20 shadow-lg shadow-black/5 overflow-hidden transition-all duration-300"
+  const ghostStyles = "bg-transparent shadow-none border-none p-0 overflow-visible"
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -90,8 +94,7 @@ export const BentoItem = ({ className, children, colSpan }: BentoItemProps) => {
         smClass,
         mdClass,
         lgClass,
-        "rounded-xl backdrop-blur-md bg-background/40 border border-border/20 shadow-lg shadow-black/5 overflow-hidden",
-        "transition-all duration-300",
+        variant === 'ghost' ? ghostStyles : defaultStyles,
         className
       )}
     >

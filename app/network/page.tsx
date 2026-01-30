@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Search, Sparkles, SlidersHorizontal } from "lucide-react"
+import { BentoGrid, BentoItem } from "@/components/dashboard/new/bento-grid"
 import { ConnectionCard } from "@/components/network/connection-card"
 import { MessagesPanel } from "@/components/network/messages-panel"
 import { NetworkStats } from "@/components/network/network-stats"
@@ -86,10 +87,12 @@ export default function NetworkPage() {
         </div>
       </div>
 
-      <NetworkStats />
+      <BentoGrid>
+        <BentoItem colSpan={{ lg: 12 }} variant="ghost">
+          <NetworkStats />
+        </BentoItem>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-6">
+        <BentoItem colSpan={{ lg: 8 }} variant="ghost">
           <Tabs defaultValue="all">
             <TabsList>
               <TabsTrigger value="all">All ({connections.length})</TabsTrigger>
@@ -125,12 +128,12 @@ export default function NetworkPage() {
               ))}
             </TabsContent>
           </Tabs>
-        </div>
+        </BentoItem>
 
-        <div>
+        <BentoItem colSpan={{ lg: 4 }} variant="ghost">
           <MessagesPanel />
-        </div>
-      </div>
+        </BentoItem>
+      </BentoGrid>
     </div>
   )
 }

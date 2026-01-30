@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/client"
 import { ensureUserRecord } from "@/app/actions/user"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { GlassCard } from "@/components/ui/glass-card"
 
 export default function SignupPage() {
     const [name, setName] = useState("")
@@ -83,88 +84,90 @@ export default function SignupPage() {
         return (
             <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
                 <motion.div
-                    className="w-full max-w-sm space-y-6 rounded-xl border border-border bg-card p-8 shadow-lg"
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] }}
+                    className="w-full max-w-sm"
                 >
-                    <div className="space-y-4 text-center">
-                        <motion.div
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-                            className="mx-auto w-16 h-16 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center"
-                        >
-                            <CheckCircle2 className="w-8 h-8 text-white" />
-                        </motion.div>
-
-                        <div className="space-y-2">
-                            <h1 className="text-2xl font-semibold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-                                Welcome to Networkly! 🎉
-                            </h1>
-                            <p className="text-sm text-muted-foreground">
-                                Your professional network journey begins now
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="space-y-4">
-                        <motion.div
-                            className="rounded-lg border border-border/50 bg-muted/30 p-4 space-y-3"
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.3 }}
-                        >
-                            <div className="flex items-start gap-3">
-                                <Mail className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
-                                <div className="space-y-1">
-                                    <p className="text-sm font-medium">Check your inbox</p>
-                                    <p className="text-xs text-muted-foreground">
-                                        We've sent a verification link to <span className="font-mono bg-muted px-1 rounded">{email}</span>
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-start gap-3">
-                                <Sparkles className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
-                                <div className="space-y-1">
-                                    <p className="text-sm font-medium">What's next?</p>
-                                    <p className="text-xs text-muted-foreground">
-                                        After verifying, sign in to unlock AI-powered networking, opportunity discovery, and career insights
-                                    </p>
-                                </div>
-                            </div>
-                        </motion.div>
-
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ delay: 0.4 }}
-                            className="space-y-3"
-                        >
-                            <Button
-                                onClick={() => router.push(`/login?redirect=${encodeURIComponent(redirect)}`)}
-                                className="w-full relative overflow-hidden group"
-                                size="lg"
+                    <GlassCard variant="hero" className="space-y-6 p-8">
+                        <div className="space-y-4 text-center">
+                            <motion.div
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+                                className="mx-auto w-16 h-16 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center"
                             >
-                                <span className="relative z-10 flex items-center justify-center gap-2">
-                                    Sign In to Get Started
-                                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                                </span>
-                                <div className="absolute inset-0 bg-gradient-to-r from-primary to-primary/80 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            </Button>
+                                <CheckCircle2 className="w-8 h-8 text-white" />
+                            </motion.div>
 
-                            <p className="text-center text-xs text-muted-foreground">
-                                Can't find the email? Check your spam folder or
-                                <button
-                                    onClick={() => setSignupSuccess(false)}
-                                    className="text-primary hover:underline ml-1"
+                            <div className="space-y-2">
+                                <h1 className="text-2xl font-semibold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+                                    Welcome to Networkly! 🎉
+                                </h1>
+                                <p className="text-sm text-muted-foreground">
+                                    Your professional network journey begins now
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <motion.div
+                                className="rounded-lg border border-border/50 bg-muted/30 p-4 space-y-3"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.3 }}
+                            >
+                                <div className="flex items-start gap-3">
+                                    <Mail className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+                                    <div className="space-y-1">
+                                        <p className="text-sm font-medium">Check your inbox</p>
+                                        <p className="text-xs text-muted-foreground">
+                                            We&apos;ve sent a verification link to <span className="font-mono bg-muted px-1 rounded">{email}</span>
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-start gap-3">
+                                    <Sparkles className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+                                    <div className="space-y-1">
+                                        <p className="text-sm font-medium">What&apos;s next?</p>
+                                        <p className="text-xs text-muted-foreground">
+                                            After verifying, sign in to unlock AI-powered networking, opportunity discovery, and career insights
+                                        </p>
+                                    </div>
+                                </div>
+                            </motion.div>
+
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ delay: 0.4 }}
+                                className="space-y-3"
+                            >
+                                <Button
+                                    onClick={() => router.push(`/login?redirect=${encodeURIComponent(redirect)}`)}
+                                    className="w-full relative overflow-hidden group"
+                                    size="lg"
                                 >
-                                    try again
-                                </button>
-                            </p>
-                        </motion.div>
-                    </div>
+                                    <span className="relative z-10 flex items-center justify-center gap-2">
+                                        Sign In to Get Started
+                                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                    </span>
+                                    <div className="absolute inset-0 bg-gradient-to-r from-primary to-primary/80 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                </Button>
+
+                                <p className="text-center text-xs text-muted-foreground">
+                                    Can&apos;t find the email? Check your spam folder or
+                                    <button
+                                        onClick={() => setSignupSuccess(false)}
+                                        className="text-primary hover:underline ml-1"
+                                    >
+                                        try again
+                                    </button>
+                                </p>
+                            </motion.div>
+                        </div>
+                    </GlassCard>
                 </motion.div>
             </div>
         )
@@ -172,7 +175,7 @@ export default function SignupPage() {
 
     return (
         <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
-            <div className="w-full max-w-sm space-y-6 rounded-xl border border-border bg-card p-6 shadow-lg">
+            <GlassCard variant="hero" className="w-full max-w-sm space-y-6 p-6 md:p-8">
                 <div className="space-y-4 text-center">
                     <div className="flex justify-center">
                         <img
@@ -282,7 +285,7 @@ export default function SignupPage() {
                         Sign in
                     </a>
                 </p>
-            </div>
+            </GlassCard>
         </div>
     )
 }

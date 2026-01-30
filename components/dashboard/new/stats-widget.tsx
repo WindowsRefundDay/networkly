@@ -1,5 +1,6 @@
 "use client"
 
+import { GlassCard } from "@/components/ui/glass-card"
 import { Line, LineChart, ResponsiveContainer } from "recharts"
 import { ArrowUpRight, ArrowDownRight, Activity } from "lucide-react"
 
@@ -25,38 +26,40 @@ export function StatsWidget({ stats }: StatsWidgetProps) {
   const searchAppearancesData = stats.sparklineData?.searchAppearances || []
 
   return (
-    <div className="h-full flex flex-col justify-between p-6">
-      <div className="flex items-center gap-2 mb-6">
-        <Activity className="w-5 h-5 text-primary" />
-        <h3 className="font-semibold text-foreground">Weekly Activity</h3>
+    <GlassCard className="h-full">
+      <div className="h-full flex flex-col justify-between p-6">
+        <div className="flex items-center gap-2 mb-6">
+          <Activity className="w-5 h-5 text-primary" />
+          <h3 className="font-semibold text-foreground">Weekly Activity</h3>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full" role="img" aria-label="Activity Statistics">
+          <StatItem
+            label="Profile Views"
+            value={stats.profileViews}
+            trend={stats.viewsTrend}
+            data={profileViewsData}
+            color="hsl(var(--primary))"
+          />
+
+          <StatItem
+            label="New Connections"
+            value={stats.networkGrowth}
+            trend={stats.growthTrend}
+            data={networkGrowthData}
+            color="#10b981"
+          />
+
+          <StatItem
+            label="Search Hits"
+            value={stats.searchAppearances}
+            trend={stats.searchTrend}
+            data={searchAppearancesData}
+            color="#3b82f6"
+          />
+        </div>
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
-        <StatItem
-          label="Profile Views"
-          value={stats.profileViews}
-          trend={stats.viewsTrend}
-          data={profileViewsData}
-          color="hsl(var(--primary))"
-        />
-
-        <StatItem
-          label="New Connections"
-          value={stats.networkGrowth}
-          trend={stats.growthTrend}
-          data={networkGrowthData}
-          color="#10b981"
-        />
-
-        <StatItem
-          label="Search Hits"
-          value={stats.searchAppearances}
-          trend={stats.searchTrend}
-          data={searchAppearancesData}
-          color="#3b82f6"
-        />
-      </div>
-    </div>
+    </GlassCard>
   )
 }
 
@@ -78,7 +81,7 @@ function StatItem({ label, value, trend, data, color }: any) {
       </div>
 
       {hasData && (
-        <div className="h-[50px] mt-4 w-full">
+        <div className="h-[50px] mt-4 w-full" aria-hidden="true">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data}>
               <Line

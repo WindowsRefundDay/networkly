@@ -1,10 +1,64 @@
 $ bun --bun next dev
    ▲ Next.js 16.0.10 (Turbopack)
    - Local:         http://localhost:3000
-   - Network:       http://192.168.1.121:3000
+   - Network:       http://192.168.0.2:3000
    - Environments: .env.local, .env
 
  ✓ Starting...
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+[baseline-browser-mapping] The data in this module is over two months old.  To ensure accurate Baseline data, please update: `npm i baseline-browser-mapping@latest -D`
  ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
- ✓ Ready in 1737ms
-[?25h
+ ✓ Ready in 1885ms
+ ○ Compiling /login/[[...sign-in]] ...
+[bun] Warning: async_hooks.createHook is not implemented in Bun. Hooks can still be created but will never be called.
+[bun] Warning: async_hooks.createHook is not implemented in Bun. Hooks can still be created but will never be called.
+[bun] Warning: async_hooks.executionAsyncId/triggerAsyncId are not implemented in Bun. It will return 0 every time.
+ GET /login 200 in 8.1s (compile: 7.4s, proxy.ts: 153ms, render: 628ms)
+ ⨯ ./app/signup/[[...sign-up]]/page.tsx:169:33
+Parsing ecmascript source code failed
+[0m [90m 167 |[39m                             [33m<[39m[33m/[39m[33mp[39m[33m>[39m
+ [90m 168 |[39m                         [33m<[39m[33m/[39m[33mmotion[39m[33m.[39mdiv[33m>[39m
+[31m[1m>[22m[39m[90m 169 |[39m                     [33m<[39m[33m/[39m[33mGlassCard[39m[33m>[39m
+ [90m     |[39m                                 [31m[1m^[22m[39m
+[31m[1m>[22m[39m[90m 170 |[39m                 [33m<[39m[33m/[39m[33mmotion[39m[33m.[39mdiv[33m>[39m
+ [90m     |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+ [90m 171 |[39m             [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 172 |[39m         )
+ [90m 173 |[39m     }[0m
+
+Expected '</', got 'jsx text (
+                )'
+
+
+ GET /signup 500 in 3.1s (compile: 2.6s, proxy.ts: 10ms, render: 513ms)
+[bun] Warning: async_hooks.createHook is not implemented in Bun. Hooks can still be created but will never be called.
+ GET /login 200 in 600ms (compile: 13ms, proxy.ts: 7ms, render: 580ms)
+ ⨯ ./app/signup/[[...sign-up]]/page.tsx:169:33
+Parsing ecmascript source code failed
+[0m [90m 167 |[39m                             [33m<[39m[33m/[39m[33mp[39m[33m>[39m
+ [90m 168 |[39m                         [33m<[39m[33m/[39m[33mmotion[39m[33m.[39mdiv[33m>[39m
+[31m[1m>[22m[39m[90m 169 |[39m                     [33m<[39m[33m/[39m[33mGlassCard[39m[33m>[39m
+ [90m     |[39m                                 [31m[1m^[22m[39m
+[31m[1m>[22m[39m[90m 170 |[39m                 [33m<[39m[33m/[39m[33mmotion[39m[33m.[39mdiv[33m>[39m
+ [90m     |[39m [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m
+ [90m 171 |[39m             [33m<[39m[33m/[39m[33mdiv[39m[33m>[39m
+ [90m 172 |[39m         )
+ [90m 173 |[39m     }[0m
+
+Expected '</', got 'jsx text (
+                )'
+
+
+ GET /signup 500 in 108ms (compile: 31ms, proxy.ts: 5ms, render: 72ms)
+ ✓ Compiled in 650ms
+[bun] Warning: async_hooks.createHook is not implemented in Bun. Hooks can still be created but will never be called.
+ GET /login 200 in 491ms (compile: 13ms, proxy.ts: 10ms, render: 468ms)
+[bun] Warning: async_hooks.createHook is not implemented in Bun. Hooks can still be created but will never be called.
+ GET /signup 200 in 1453ms (compile: 945ms, proxy.ts: 6ms, render: 502ms)
+ GET / 200 in 2.2s (compile: 1805ms, proxy.ts: 7ms, render: 420ms)
+ GET /login?t=1769749828347&redirect=%2Fknown_bugs.md 200 in 281ms (compile: 14ms, proxy.ts: 11ms, render: 257ms)
+[bun] Warning: async_hooks.createHook is not implemented in Bun. Hooks can still be created but will never be called.

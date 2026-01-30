@@ -226,7 +226,7 @@ export function EditProjectModal({ project, open, onOpenChange, onSave }: EditPr
               {tags.map((tag) => (
                 <Badge key={tag} variant="secondary" className="gap-1">
                   {tag}
-                  <button onClick={() => setTags(tags.filter((t) => t !== tag))}>
+                  <button onClick={() => setTags(tags.filter((t) => t !== tag))} aria-label={`Remove tag ${tag}`}>
                     <X className="h-3 w-3" />
                   </button>
                 </Badge>
@@ -247,7 +247,7 @@ export function EditProjectModal({ project, open, onOpenChange, onSave }: EditPr
               {lookingFor.map((role) => (
                 <Badge key={role} variant="outline" className="gap-1 border-rose-500/30 text-rose-500">
                   {role}
-                  <button onClick={() => setLookingFor(lookingFor.filter((r) => r !== role))}>
+                  <button onClick={() => setLookingFor(lookingFor.filter((r) => r !== role))} aria-label={`Remove role ${role}`}>
                     <X className="h-3 w-3" />
                   </button>
                 </Badge>
@@ -291,6 +291,7 @@ export function EditProjectModal({ project, open, onOpenChange, onSave }: EditPr
                   size="icon"
                   className="h-8 w-8 shrink-0"
                   onClick={() => handleRemoveLink(index)}
+                  aria-label="Remove link"
                 >
                   <X className="h-4 w-4" />
                 </Button>
