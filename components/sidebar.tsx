@@ -65,11 +65,11 @@ export function Sidebar({ isCollapsed = false, toggleCollapse }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-border/50 bg-card/80 backdrop-blur-xl transition-all duration-300",
+        "fixed left-0 top-0 z-40 flex h-screen flex-col glass-panel-sidebar transition-all duration-300",
         isCollapsed ? "w-[80px]" : "w-64"
       )}
     >
-      <div className={cn("flex h-16 items-center border-b border-border px-6", isCollapsed ? "justify-center px-0" : "gap-2")}>
+      <div className={cn("flex h-16 items-center border-b border-border/25 px-6", isCollapsed ? "justify-center px-0" : "gap-2")}>
         {!isCollapsed ? (
           <Image
             src={logoSrc}

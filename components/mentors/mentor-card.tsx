@@ -84,11 +84,11 @@ export function MentorCard({ mentor, onSave, isSaved = false }: MentorCardProps)
         
         {mentor.email && (
           <div className="flex gap-1">
-            <Button variant="ghost" size="icon" onClick={() => setShowEmailModal(true)} title="Generate AI Draft">
+            <Button variant="ghost" size="icon" onClick={() => setShowEmailModal(true)} title="Generate AI Draft" aria-label="Generate AI Draft">
               <Sparkles className="h-4 w-4" />
             </Button>
             <Button variant="ghost" size="icon" asChild>
-              <a href={`mailto:${mentor.email}`} title="Email Mentor">
+              <a href={`mailto:${mentor.email}`} title="Email Mentor" aria-label="Email Mentor">
                 <Mail className="h-4 w-4" />
               </a>
             </Button>
@@ -97,7 +97,7 @@ export function MentorCard({ mentor, onSave, isSaved = false }: MentorCardProps)
         
         {mentor.profileUrl && (
           <Button variant="ghost" size="icon" asChild>
-            <a href={mentor.profileUrl} target="_blank" rel="noopener noreferrer" title="View Profile">
+            <a href={mentor.profileUrl} target="_blank" rel="noopener noreferrer" title="View Profile" aria-label="View Profile">
               <ExternalLink className="h-4 w-4" />
             </a>
           </Button>

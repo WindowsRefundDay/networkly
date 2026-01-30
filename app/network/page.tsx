@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Search, Sparkles, SlidersHorizontal } from "lucide-react"
+import { BentoGrid, BentoItem } from "@/components/dashboard/new/bento-grid"
 import { ConnectionCard } from "@/components/network/connection-card"
 import { MessagesPanel } from "@/components/network/messages-panel"
 import { NetworkStats } from "@/components/network/network-stats"
@@ -66,8 +67,8 @@ export default function NetworkPage() {
     <div className="space-y-6 container mx-auto px-4 sm:px-6 max-w-7xl py-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">My Network</h1>
-          <p className="text-muted-foreground">Grow your professional connections with AI-powered suggestions</p>
+          <h1 className="type-h2">My Network</h1>
+          <p className="type-muted">Grow your professional connections with AI-powered suggestions</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="relative flex-1 sm:w-72">
@@ -86,10 +87,12 @@ export default function NetworkPage() {
         </div>
       </div>
 
-      <NetworkStats />
+      <BentoGrid>
+        <BentoItem colSpan={{ lg: 12 }} variant="ghost">
+          <NetworkStats />
+        </BentoItem>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-6">
+        <BentoItem colSpan={{ lg: 8 }} variant="ghost">
           <Tabs defaultValue="all">
             <TabsList>
               <TabsTrigger value="all">All ({connections.length})</TabsTrigger>
@@ -125,12 +128,12 @@ export default function NetworkPage() {
               ))}
             </TabsContent>
           </Tabs>
-        </div>
+        </BentoItem>
 
-        <div>
+        <BentoItem colSpan={{ lg: 4 }} variant="ghost">
           <MessagesPanel />
-        </div>
-      </div>
+        </BentoItem>
+      </BentoGrid>
     </div>
   )
 }

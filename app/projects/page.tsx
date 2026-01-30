@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Search, Plus, Sparkles, Users, FolderOpen, Loader2, Filter } from "lucide-react"
+import { BentoGrid, BentoItem } from "@/components/dashboard/new/bento-grid"
 import { ProjectCard } from "@/components/projects/project-card"
 import { ProjectDetailModal } from "@/components/projects/project-detail-modal"
 import { CreateProjectModal } from "@/components/projects/create-project-modal"
@@ -174,8 +175,8 @@ export default function ProjectsPage() {
         <div className="rounded-full bg-muted p-4 mb-4">
           <Icon className="h-8 w-8 text-muted-foreground" />
         </div>
-        <h3 className="text-lg font-medium text-foreground mb-1">{config.title}</h3>
-        <p className="text-sm text-muted-foreground max-w-sm">{config.description}</p>
+        <h3 className="type-h4 mb-1">{config.title}</h3>
+        <p className="type-muted max-w-sm">{config.description}</p>
         {config.action}
       </div>
     )
@@ -195,8 +196,8 @@ export default function ProjectsPage() {
     <div className="space-y-6 container mx-auto px-4 sm:px-6 max-w-7xl py-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Project Showcase</h1>
-          <p className="text-muted-foreground">Share your work and find collaborators</p>
+          <h1 className="type-h2">Project Showcase</h1>
+          <p className="type-muted">Share your work and find collaborators</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="relative flex-1 sm:w-64">
@@ -229,8 +230,8 @@ export default function ProjectsPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-4">
-        <div className="lg:col-span-3 space-y-6">
+      <BentoGrid>
+        <BentoItem colSpan={{ lg: 9 }} variant="ghost">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList>
               <TabsTrigger value="my-projects">My Projects ({myProjects.length})</TabsTrigger>
@@ -313,12 +314,12 @@ export default function ProjectsPage() {
               )}
             </TabsContent>
           </Tabs>
-        </div>
+        </BentoItem>
 
-        <div>
+        <BentoItem colSpan={{ lg: 3 }} variant="ghost">
           <ProjectUpdatesFeed />
-        </div>
-      </div>
+        </BentoItem>
+      </BentoGrid>
 
       <ProjectDetailModal
         project={selectedProject}

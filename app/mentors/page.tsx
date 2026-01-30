@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { GlassCard } from "@/components/ui/glass-card"
 import { Search, Loader2, GraduationCap, Sparkles, Filter } from "lucide-react"
 import { MentorCard } from "@/components/mentors/mentor-card"
 import { searchMentors, getSuggestedMentors, saveMentor, getSavedMentors, type Mentor } from "@/app/actions/mentors"
@@ -113,45 +114,47 @@ export default function MentorsPage() {
 
   return (
     <div className="container mx-auto px-4 sm:px-6 max-w-7xl py-8 space-y-8">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="space-y-1">
-          <h1 className="text-3xl font-bold tracking-tight">Find Mentors</h1>
-          <p className="text-muted-foreground">
-            Connect with professors and researchers in your field of interest.
-          </p>
-        </div>
-      </div>
+      <GlassCard variant="compact" className="p-6 sticky top-4 z-40">
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-1">
+            <h1 className="type-h2">Find Mentors</h1>
+            <p className="type-muted">
+              Connect with professors and researchers in your field of interest.
+            </p>
+          </div>
 
-      <div className="relative max-w-xl">
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search by research area, name..."
-              value={query}
-              onChange={(e) => handleSearchChange(e.target.value)}
-              className="pl-10 h-12 text-base bg-muted/50 border-border/50 focus:bg-background"
-            />
+          <div className="relative max-w-xl">
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search by research area, name..."
+                  value={query}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  className="pl-10 h-10 text-base bg-muted/50 border-border/50 focus:bg-background focus:border-primary/20 transition-all"
+                />
+              </div>
+              <Select value={institution} onValueChange={handleInstitutionChange}>
+                <SelectTrigger className="w-[180px] h-10 bg-muted/50 border-border/50">
+                  <SelectValue placeholder="Institution" />
+                </SelectTrigger>
+                <SelectContent>
+                  {INSTITUTIONS.map((inst) => (
+                    <SelectItem key={inst} value={inst}>
+                      {inst}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {isSearching && (
+              <div className="absolute right-[200px] top-1/2 -translate-y-1/2">
+                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+              </div>
+            )}
           </div>
-          <Select value={institution} onValueChange={handleInstitutionChange}>
-            <SelectTrigger className="w-[180px] h-12 bg-muted/50 border-border/50">
-              <SelectValue placeholder="Institution" />
-            </SelectTrigger>
-            <SelectContent>
-              {INSTITUTIONS.map((inst) => (
-                <SelectItem key={inst} value={inst}>
-                  {inst}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
-        {isSearching && (
-          <div className="absolute right-[200px] top-1/2 -translate-y-1/2">
-            <Loader2 className="h-4 w-4 animate-spin text-primary" />
-          </div>
-        )}
-      </div>
+      </GlassCard>
 
       {loading ? (
         <div className="flex items-center justify-center py-20">

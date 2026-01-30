@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client"
 import { ensureUserRecord } from "@/app/actions/user"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { GlassCard } from "@/components/ui/glass-card"
 
 export default function LoginPage() {
     const [email, setEmail] = useState("")
@@ -76,7 +77,7 @@ export default function LoginPage() {
 
     return (
         <div className="flex min-h-svh w-full items-center justify-center p-6 md:p-10">
-            <div className="w-full max-w-sm space-y-6 rounded-xl border border-border bg-card p-6 shadow-lg">
+            <GlassCard variant="hero" className="w-full max-w-sm space-y-6 p-6 md:p-8">
                 <div className="space-y-4 text-center">
                     <div className="flex justify-center">
                         <img
@@ -90,8 +91,8 @@ export default function LoginPage() {
                             className="h-10 object-contain hidden dark:block invert"
                         />
                     </div>
-                    <h1 className="text-2xl font-semibold">Welcome back</h1>
-                    <p className="text-sm text-muted-foreground">Sign in to your account</p>
+                    <h1 className="type-h3">Welcome back</h1>
+                    <p className="type-muted">Sign in to your account</p>
                 </div>
 
                 <form onSubmit={handleLogin} className="space-y-4">
@@ -173,7 +174,7 @@ export default function LoginPage() {
                         Sign up
                     </a>
                 </p>
-            </div>
+            </GlassCard>
         </div>
     )
 }

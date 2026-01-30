@@ -51,7 +51,7 @@ export function ConnectionCard({ connection, onConnect, onMessage }: ConnectionC
               </div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0">
+                  <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" aria-label="Actions">
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
