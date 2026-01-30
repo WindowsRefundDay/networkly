@@ -111,6 +111,13 @@ class OpportunityCard(BaseModel):
     contact_email: Optional[str] = None
     application_url: Optional[str] = None
 
+    # New Fields (Added 2026-01-28)
+    difficulty_level: str = "intermediate"
+    commitment_level: str = "variable"
+    verification_status: str = "ai_extracted"
+    is_high_cost: bool = False
+    selectivity: str = "open"
+
     # Metadata
     date_discovered: datetime = Field(default_factory=datetime.utcnow)
     date_updated: datetime = Field(default_factory=datetime.utcnow)
@@ -209,6 +216,13 @@ class ExtractionResponse(BaseModel):
     contact_email: Optional[str] = Field(default=None, description="Contact email")
     application_url: Optional[str] = Field(default=None, description="Application URL")
     
+    # New Fields (Added 2026-01-28)
+    difficulty_level: Optional[str] = Field(default="intermediate", description="Difficulty level: 'beginner', 'intermediate', 'advanced'")
+    commitment_level: Optional[str] = Field(default="variable", description="Time commitment: 'one-day', 'weekly', 'multi-week', 'months'")
+    verification_status: Optional[str] = Field(default="ai_extracted", description="Verification: 'ai_extracted', 'lightly_verified', 'fully_verified'")
+    is_high_cost: Optional[bool] = Field(default=False, description="True if program cost exceeds $80")
+    selectivity: Optional[str] = Field(default="open", description="Selectivity: 'open', 'competitive', 'highly_selective'")
+
     # Metadata
     confidence: float = Field(default=0.5, ge=0.0, le=1.0, description="Extraction confidence score")
     recheck_days: int = Field(default=14, description="Days until recheck needed")

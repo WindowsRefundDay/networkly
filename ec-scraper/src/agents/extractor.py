@@ -516,6 +516,32 @@ class ExtractorAgent:
             raw_content=truncated_content,
         )
 
+    def _parse_cost(self, cost_str: Optional[str]) -> tuple[Optional[str], bool]:
+        """Parse cost string and determine if high cost."""
+        if not cost_str:
+            return None, False
+        
+        cost_lower = cost_str.lower().strip()
+        
+        # Free programs
+        if any(free in cost_lower for free in ["free", "no cost", "no fee", "$0"]):
+            return cost_str, False
+        
+        # Unknown/TBD
+        if any(unknown in cost_lower for unknown in ["tbd", "varies", "unknown", "contact"]):
+            return cost_str, False
+        
+        # Extract numeric value
+        match = re.search(r'\$?\s*([\d,]+(?:\.\d{2})?)', cost_str.replace(',', ''))
+        if match:
+            try:
+                value = float(match.group(1))
+                return cost_str, value > 80
+            except ValueError:
+                pass
+        
+        return cost_str, False
+
     def _build_opportunity_card(
         self,
         data: dict,
@@ -554,6 +580,9 @@ class ExtractorAgent:
         deadline = self._parse_date(data.get("deadline"))
         start_date = self._parse_date(data.get("start_date"))
         end_date = self._parse_date(data.get("end_date"))
+
+        # Parse Cost
+        cost_str, is_high_cost = self._parse_cost(data.get("cost"))
 
         # Parse timing type
         timing_type_str = data.get("timing_type") or "one-time"
@@ -620,7 +649,7 @@ class ExtractorAgent:
             deadline=deadline,
             start_date=start_date,
             end_date=end_date,
-            cost=data.get("cost"),
+            cost=cost_str,
             time_commitment=data.get("time_commitment"),
             requirements=data.get("requirements"),
             prizes=data.get("prizes"),
@@ -631,6 +660,12 @@ class ExtractorAgent:
             timing_type=timing_type,
             is_expired=is_expired,
             next_cycle_expected=next_cycle_expected,
+            # New Fields
+            difficulty_level=data.get("difficulty_level", "intermediate"),
+            commitment_level=data.get("commitment_level", "variable"),
+            verification_status=data.get("verification_status", "ai_extracted"),
+            is_high_cost=is_high_cost,
+            selectivity=data.get("selectivity", "open")
         )
 
     def _parse_date(self, date_str: Optional[str]) -> Optional[datetime]:

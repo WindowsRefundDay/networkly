@@ -161,6 +161,42 @@ class HybridCrawler:
 
         return markdown.strip()
 
+    def _extract_meta(self, html: str) -> dict:
+        """Extract meta signals before AI processing."""
+        try:
+            from bs4 import BeautifulSoup
+            import json
+            soup = BeautifulSoup(html, 'html.parser')
+            
+            # OpenGraph tags
+            og_title = soup.find("meta", property="og:title")
+            og_desc = soup.find("meta", property="og:description")
+            
+            # Standard meta
+            meta_desc = soup.find("meta", attrs={"name": "description"})
+            
+            # H1 headings
+            h1_tags = [h.get_text(strip=True) for h in soup.find_all("h1")][:3]
+            
+            # JSON-LD structured data
+            json_ld = []
+            for script in soup.find_all("script", type="application/ld+json"):
+                try:
+                    data = json.loads(script.string or "{}")
+                    json_ld.append(data)
+                except json.JSONDecodeError:
+                    pass
+            
+            return {
+                "og_title": og_title.get("content") if og_title else None,
+                "og_description": og_desc.get("content") if og_desc else None,
+                "meta_description": meta_desc.get("content") if meta_desc else None,
+                "h1_tags": h1_tags,
+                "json_ld": json_ld[:2],
+            }
+        except Exception:
+            return {"og_title": None, "og_description": None, "meta_description": None, "h1_tags": [], "json_ld": []}
+
     async def crawl_batch(
         self,
         urls: List[str],

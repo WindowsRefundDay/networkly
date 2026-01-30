@@ -76,10 +76,10 @@ class Settings(BaseSettings):
 
     # Gemini Model Configuration
     # Main model: Used for discovery, planning, and complex reasoning tasks
-    gemini_pro_model: str = "gemini-2.5-pro-002"
+    gemini_pro_model: str = "gemini-2.5-pro"
     # Fast model: Used for extraction, matching, profiling (when use_fast_model=True)
     # Falls back to gemini_pro_model if unavailable
-    gemini_flash_model: str = "gemini-2.5-flash-002"
+    gemini_flash_model: str = "gemini-2.5-flash"
 
     # Embedding Configuration - text-embedding-004 for vectorization
     # Available models: text-embedding-004 (stable), gemini-embedding-001
