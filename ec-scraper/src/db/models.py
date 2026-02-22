@@ -1,0 +1,279 @@
+"""Pydantic models for Opportunity Cards and related data structures."""
+
+from datetime import datetime
+from enum import Enum
+from typing import List, Optional
+from uuid import uuid4
+
+from pydantic import BaseModel, Field, HttpUrl
+
+
+class OpportunityTiming(str, Enum):
+    """Timing pattern for opportunities."""
+    
+    ONE_TIME = "one-time"       # Single event, won't recur
+    ANNUAL = "annual"           # Happens every year (e.g., Science Olympiad)
+    RECURRING = "recurring"     # Regular schedule (monthly, quarterly)
+    ROLLING = "rolling"         # Rolling admissions, no fixed deadline
+    ONGOING = "ongoing"         # Always open (e.g., volunteer positions)
+    SEASONAL = "seasonal"       # Seasonal pattern (summer programs)
+
+
+class OpportunityCategory(str, Enum):
+    """Categories for opportunities."""
+
+    STEM = "STEM"
+    ARTS = "Arts"
+    BUSINESS = "Business"
+    LEADERSHIP = "Leadership"
+    COMMUNITY_SERVICE = "Community Service"
+    SPORTS = "Sports"
+    HUMANITIES = "Humanities"
+    LANGUAGE = "Language"
+    MUSIC = "Music"
+    DEBATE = "Debate"
+    OTHER = "Other"
+
+
+class OpportunityType(str, Enum):
+    """Types of opportunities."""
+
+    COMPETITION = "Competition"
+    INTERNSHIP = "Internship"
+    SUMMER_PROGRAM = "Summer Program"
+    CAMP = "Camp"
+    VOLUNTEER = "Volunteer"
+    RESEARCH = "Research"
+    CLUB = "Club"
+    SCHOLARSHIP = "Scholarship"
+    COURSE = "Course"
+    WORKSHOP = "Workshop"
+    CONFERENCE = "Conference"
+    OTHER = "Other"
+
+
+class ContentType(str, Enum):
+    """High-level content type classification."""
+
+    OPPORTUNITY = "opportunity"
+    GUIDE = "guide"
+    ARTICLE = "article"
+
+
+class LocationType(str, Enum):
+    """Location types for activities."""
+
+    IN_PERSON = "In-Person"
+    ONLINE = "Online"
+    HYBRID = "Hybrid"
+
+
+class OpportunityCard(BaseModel):
+    """Schema for an opportunity card."""
+
+    # Identifiers
+    id: str = Field(default_factory=lambda: str(uuid4()))
+    url: str
+    source_url: Optional[str] = None
+
+    # Main Content
+    title: str
+    summary: str
+    organization: Optional[str] = None
+
+    # Classification
+    content_type: ContentType = ContentType.OPPORTUNITY
+    category: OpportunityCategory = OpportunityCategory.OTHER
+    suggested_category: Optional[str] = None  # AI-suggested category when 'Other' is used
+    opportunity_type: OpportunityType = OpportunityType.OTHER
+    tags: List[str] = Field(default_factory=list)
+
+    # Eligibility
+    grade_levels: List[int] = Field(default_factory=list)
+    location_type: LocationType = LocationType.ONLINE
+    location: Optional[str] = None
+
+    # Dates & Logistics
+    deadline: Optional[datetime] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    cost: Optional[str] = None
+    time_commitment: Optional[str] = None
+    
+    # Timing Classification
+    timing_type: OpportunityTiming = OpportunityTiming.ONE_TIME
+    is_expired: bool = False  # True if deadline/end_date is in the past
+    next_cycle_expected: Optional[datetime] = None  # For annual/recurring opportunities
+
+    # Additional Details
+    requirements: Optional[str] = None
+    prizes: Optional[str] = None
+    contact_email: Optional[str] = None
+    application_url: Optional[str] = None
+
+    # New Fields (Added 2026-01-28)
+    difficulty_level: str = "intermediate"
+    commitment_level: str = "variable"
+    verification_status: str = "ai_extracted"
+    is_high_cost: bool = False
+    selectivity: str = "open"
+
+    # Metadata
+    date_discovered: datetime = Field(default_factory=datetime.utcnow)
+    date_updated: datetime = Field(default_factory=datetime.utcnow)
+    extraction_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    
+    # AI-determined recheck interval (in days)
+    # AI decides based on opportunity type: job=7, scholarship=30, event=3, etc.
+    recheck_days: int = Field(default=14)
+
+    def to_embedding_text(self) -> str:
+        """Generate text for embedding creation."""
+        parts = [
+            self.title,
+            self.summary,
+            self.category.value,
+            self.opportunity_type.value,
+            " ".join(self.tags),
+        ]
+        if self.organization:
+            parts.append(self.organization)
+        if self.requirements:
+            parts.append(self.requirements)
+        return " ".join(filter(None, parts))
+
+
+class PendingURL(BaseModel):
+    """A URL pending scraping."""
+
+    id: str = Field(default_factory=lambda: str(uuid4()))
+    url: str
+    source: str  # Where we discovered this URL
+    discovered_at: datetime = Field(default_factory=datetime.utcnow)
+    priority: int = Field(default=0, ge=0, le=10)
+    attempts: int = Field(default=0)
+    last_attempt: Optional[datetime] = None
+    status: str = Field(default="pending")  # pending, processing, completed, failed
+
+
+class ExtractionResult(BaseModel):
+    """Result from the extraction agent."""
+
+    success: bool
+    opportunity_card: Optional[OpportunityCard] = None
+    error: Optional[str] = None
+    raw_content: Optional[str] = None
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    # Additional opportunities extracted from list/aggregator pages
+    list_opportunities: Optional[List[OpportunityCard]] = None
+
+
+class ExtractionResponse(BaseModel):
+    """Schema for LLM extraction response - used with Gemini structured output."""
+    
+    # Validation flag
+    valid: bool = Field(description="Whether this is a valid opportunity")
+    reason: Optional[str] = Field(default=None, description="Reason for rejection if valid=false")
+    
+    # Main content (only required when valid=true)
+    title: Optional[str] = Field(default=None, description="Name of the opportunity")
+    summary: Optional[str] = Field(default=None, description="2-3 sentence description")
+    organization: Optional[str] = Field(default=None, description="Hosting organization")
+    
+    # Classification
+    content_type: Optional[str] = Field(
+        default="opportunity",
+        description="Content type: opportunity (real program/application page), guide (how-to/advice), or article (news/blog)"
+    )
+    category: Optional[str] = Field(default=None, description="Category: STEM, Arts, Business, Leadership, Community Service, Sports, Humanities, Language, Music, Debate, or Other")
+    suggested_category: Optional[str] = Field(default=None, description="If category is 'Other', suggest a new category name (e.g., 'Entrepreneurship', 'Environmental', 'Healthcare')")
+    opportunity_type: Optional[str] = Field(default=None, description="Type: Competition, Internship, Summer Program, Camp, Volunteer, Research, Club, Scholarship, Course, Workshop, Conference, or Other")
+    tags: Optional[List[str]] = Field(default=None, description="Relevant tags")
+    
+    # Eligibility
+    grade_levels: Optional[List[int]] = Field(default=None, description="Eligible grades (9-12)")
+    location_type: Optional[str] = Field(default=None, description="In-Person, Online, or Hybrid")
+    location: Optional[str] = Field(default=None, description="City/state if in-person")
+    
+    # Dates (ISO format strings)
+    deadline: Optional[str] = Field(default=None, description="Application deadline in YYYY-MM-DD format")
+    start_date: Optional[str] = Field(default=None, description="Start date in YYYY-MM-DD format")
+    end_date: Optional[str] = Field(default=None, description="End date in YYYY-MM-DD format")
+    
+    # Timing Classification
+    timing_type: Optional[str] = Field(
+        default="one-time",
+        description="Timing pattern: 'one-time' (single event), 'annual' (yearly like Science Olympiad), 'recurring' (monthly/quarterly), 'rolling' (rolling admissions), 'ongoing' (always open), 'seasonal' (summer programs)"
+    )
+    appears_expired: Optional[bool] = Field(
+        default=False,
+        description="True if all dates mentioned appear to be in the past (e.g., 2025 deadlines when current year is 2026)"
+    )
+    
+    # Details
+    cost: Optional[str] = Field(default=None, description="Cost (e.g., 'Free', '$500')")
+    time_commitment: Optional[str] = Field(default=None, description="Time commitment (e.g., '10 hrs/week')")
+    requirements: Optional[str] = Field(default=None, description="Eligibility requirements")
+    prizes: Optional[str] = Field(default=None, description="Awards or prizes offered")
+    contact_email: Optional[str] = Field(default=None, description="Contact email")
+    application_url: Optional[str] = Field(default=None, description="Application URL")
+    
+    # New Fields (Added 2026-01-28)
+    difficulty_level: Optional[str] = Field(default="intermediate", description="Difficulty level: 'beginner', 'intermediate', 'advanced'")
+    commitment_level: Optional[str] = Field(default="variable", description="Time commitment: 'one-day', 'weekly', 'multi-week', 'months'")
+    verification_status: Optional[str] = Field(default="ai_extracted", description="Verification: 'ai_extracted', 'lightly_verified', 'fully_verified'")
+    is_high_cost: Optional[bool] = Field(default=False, description="True if program cost exceeds $80")
+    selectivity: Optional[str] = Field(default="open", description="Selectivity: 'open', 'competitive', 'highly_selective'")
+
+    # Metadata
+    confidence: float = Field(default=0.5, ge=0.0, le=1.0, description="Extraction confidence score")
+    recheck_days: int = Field(default=14, description="Days until recheck needed")
+
+
+# ═══════════════════════════════════════════════════════════════════
+# JIT Summarization Models
+# ═══════════════════════════════════════════════════════════════════
+
+class SummarizeRequest(BaseModel):
+    """Request schema for /api/v1/summarize endpoint."""
+    opportunity_id: str = Field(description="UUID of opportunity to summarize")
+    url: str = Field(description="URL to fetch and summarize")
+    force_refresh: bool = Field(default=False, description="Force re-summarization even if cached")
+
+
+class OpportunitySummary(BaseModel):
+    """Structured summary output from Gemini."""
+    eligibility: str = Field(
+        description="Who can apply? (e.g., 'US high school students grades 9-12, no GPA requirement')"
+    )
+    value_prop: str = Field(
+        description="Why apply? Key benefits in 1-2 sentences (e.g., 'Free week-long AI workshop with MIT faculty, certificate + networking')"
+    )
+    difficulty_level: str = Field(
+        description="Competition difficulty: beginner (open to all), intermediate (requires some experience), advanced (highly selective)"
+    )
+    deadline_status: str = Field(
+        description="Time pressure: urgent (<7 days), soon (7-30 days), flexible (>30 days or rolling), expired (past deadline)"
+    )
+    one_sentence_summary: str = Field(
+        description="Ultra-concise summary in one sentence, max 20 words"
+    )
+    is_expired: bool = Field(
+        default=False,
+        description="True if page returns 404/403/timeout or content indicates expired opportunity"
+    )
+    extraction_confidence: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="Confidence score: 1.0 = high certainty, 0.0 = likely hallucinated"
+    )
+
+
+class SummarizeResponse(BaseModel):
+    """Response schema for /api/v1/summarize endpoint."""
+    success: bool
+    summary: Optional[OpportunitySummary] = None
+    error: Optional[str] = None
+    cached: bool = False
+    processing_time_ms: int = 0

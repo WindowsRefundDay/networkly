@@ -1,0 +1,38 @@
+services:
+  searxng:
+    image: searxng/searxng:latest
+    container_name: searxng
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./docker/searxng:/etc/searxng
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8080/
+      - SEARXNG_INSTANCE_NAME=Networkly
+    restart: unless-stopped
+
+  ec-scraper:
+    build:
+      context: ./ec-scraper
+      dockerfile: Dockerfile
+    container_name: ec-scraper
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - SEARXNG_URL=http://searxng:8080
+      - USE_VERTEX_AI=true
+      # Map other env vars from .env file or host environment
+      - GOOGLE_VERTEX_PROJECT=${GOOGLE_VERTEX_PROJECT}
+      - GOOGLE_VERTEX_LOCATION=${GOOGLE_VERTEX_LOCATION}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/credentials.json
+    volumes:
+      - type: bind
+        source: ${GOOGLE_APPLICATION_CREDENTIALS}
+        target: /app/credentials.json
+        read_only: true
+    env_file:
+      - ./ec-scraper/.env
+    depends_on:
+      - searxng
+    restart: unless-stopped
