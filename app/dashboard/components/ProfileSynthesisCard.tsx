@@ -40,8 +40,8 @@ export function ProfileSynthesisCard({ completionPercentage }: { completionPerce
                 <motion.div
                     className="absolute inset-2 rounded-full border border-blue-500/20"
                     animate={prefersReducedMotion
-                        ? { opacity: 0.2, scale: 1 }
-                        : { scale: [1, 1.08, 1], opacity: [0.35, 0.08, 0.35] }
+                        ? { opacity: 0.2 }
+                        : { opacity: [0.35, 0.12, 0.35] }
                     }
                     transition={prefersReducedMotion
                         ? { duration: 0 }

@@ -38,8 +38,8 @@ export function ActionDock() {
 
     return (
         <motion.nav
-            initial={prefersReducedMotion ? false : { y: 100, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
+            initial={prefersReducedMotion ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
             transition={prefersReducedMotion ? { duration: 0 } : { ...DASHBOARD_SPRING, delay: 0.42 }}
             style={{ willChange: "transform, opacity" }}
             className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-3 rounded-[2rem] border border-zinc-800/80 bg-zinc-950/80 backdrop-blur-2xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.5)]"

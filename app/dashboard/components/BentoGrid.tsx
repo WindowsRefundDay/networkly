@@ -9,7 +9,7 @@ export function BentoGrid({ children }: { children: React.ReactNode }) {
             variants={dashboardGridVariants}
             initial="hidden"
             animate="show"
-            className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 hover:[&>div]:transition-all w-full relative z-10"
+            className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 w-full relative z-10"
         >
             {children}
         </motion.div>

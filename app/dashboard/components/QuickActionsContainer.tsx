@@ -19,8 +19,8 @@ export function QuickActionsContainer() {
             {actions.map((action, i) => (
                 <motion.button
                     key={i}
-                    initial={prefersReducedMotion ? false : { opacity: 0, y: 18, scale: 0.98 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    initial={prefersReducedMotion ? false : { opacity: 0 }}
+                    animate={{ opacity: 1 }}
                     whileHover={prefersReducedMotion ? undefined : { scale: 1.02, y: -2 }}
                     whileTap={prefersReducedMotion ? undefined : { scale: 0.985 }}
                     transition={prefersReducedMotion ? { duration: 0 } : { ...DASHBOARD_FAST_SPRING, delay: i * 0.06 }}

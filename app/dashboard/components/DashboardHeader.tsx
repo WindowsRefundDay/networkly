@@ -12,8 +12,8 @@ export function DashboardHeader({ name }: { name: string }) {
     return (
         <header className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 gap-6 tracking-tight relative z-10 w-full">
             <motion.div
-                initial={prefersReducedMotion ? false : { opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={prefersReducedMotion ? false : { opacity: 0 }}
+                animate={{ opacity: 1 }}
                 transition={prefersReducedMotion ? { duration: 0 } : DASHBOARD_FAST_SPRING}
                 style={{ willChange: "transform, opacity" }}
             >
@@ -30,8 +30,8 @@ export function DashboardHeader({ name }: { name: string }) {
             </motion.div>
 
             <motion.div
-                initial={prefersReducedMotion ? false : { opacity: 0, scale: 0.94 }}
-                animate={{ opacity: 1, scale: 1 }}
+                initial={prefersReducedMotion ? false : { opacity: 0 }}
+                animate={{ opacity: 1 }}
                 transition={prefersReducedMotion ? { duration: 0 } : { ...DASHBOARD_FAST_SPRING, delay: 0.08 }}
                 style={{ willChange: "transform, opacity" }}
                 className="flex gap-4 items-center"

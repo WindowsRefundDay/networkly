@@ -46,8 +46,8 @@ export function WeeklyTelemetry({
                 {stats.map((stat, i) => (
                     <motion.div
                         key={i}
-                        initial={prefersReducedMotion ? false : { opacity: 0, y: 18 }}
-                        animate={{ opacity: 1, y: 0 }}
+                        initial={prefersReducedMotion ? false : { opacity: 0 }}
+                        animate={{ opacity: 1 }}
                         transition={prefersReducedMotion ? { duration: 0 } : { ...DASHBOARD_FAST_SPRING, delay: i * 0.07 }}
                         style={{ willChange: "transform, opacity" }}
                         className="group cursor-default bg-zinc-950/40 p-6 rounded-3xl border border-zinc-800/80 hover:border-zinc-700 hover:bg-zinc-900/50 transition-colors"

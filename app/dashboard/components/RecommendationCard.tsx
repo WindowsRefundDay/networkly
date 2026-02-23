@@ -52,7 +52,7 @@ export function RecommendationCard({
                 {isPendingRecommendation && (
                     <motion.span
                         className="flex h-2 w-2 rounded-full bg-blue-500"
-                        animate={prefersReducedMotion ? { opacity: 1 } : { opacity: [0.4, 1, 0.4], scale: [1, 1.18, 1] }}
+                        animate={prefersReducedMotion ? { opacity: 1 } : { opacity: [0.4, 1, 0.4] }}
                         transition={prefersReducedMotion ? { duration: 0 } : { duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
                     />
                 )}
@@ -63,13 +63,11 @@ export function RecommendationCard({
                     {items.map((item, index) => (
                         <motion.div
                             key={`${item.id}-${index}`}
-                            initial={prefersReducedMotion ? false : { opacity: 0, y: 22, scale: 0.98 }}
+                            initial={prefersReducedMotion ? false : { opacity: 0 }}
                             animate={{
                                 opacity: index === 0 ? 1 : 0.4,
-                                y: index === 0 ? 0 : 10,
-                                scale: index === 0 ? 1 : 0.98,
                             }}
-                            exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -10, scale: 0.98 }}
+                            exit={{ opacity: 0 }}
                             transition={prefersReducedMotion ? { duration: 0 } : DASHBOARD_SPRING}
                             style={{ willChange: "transform, opacity", top: index * 84 }}
                             className={`absolute top-0 left-0 w-full p-6 rounded-2xl border ${index === 0 ? 'border-zinc-800 bg-zinc-950/80 shadow-lg z-10' : 'border-zinc-900 bg-transparent z-0 pointer-events-none'} flex flex-col md:flex-row justify-between items-start md:items-center gap-6`}
@@ -99,7 +97,7 @@ export function RecommendationCard({
             {/* Action footer for the top item */}
             <motion.div
                 className="mt-32 pt-6 border-t border-zinc-900/50 flex justify-end"
-                initial={prefersReducedMotion ? false : { opacity: 0, y: 8 }}
+                initial={prefersReducedMotion ? false : { opacity: 0 }}
                 transition={prefersReducedMotion ? { duration: 0 } : DASHBOARD_FAST_SPRING}
                 animate={{ opacity: isPendingRecommendation ? 0.45 : 1 }}
             >
