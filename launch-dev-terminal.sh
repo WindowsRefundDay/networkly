@@ -32,7 +32,7 @@ EOF
 }
 
 echo -e "${GREEN}[1/5] Opening Next.js Frontend...${NC}"
-open_terminal_window "Networkly Frontend" "pnpm dev"
+open_terminal_window "Networkly Frontend" "./scripts/start-dev.sh"
 
 sleep 1
 

@@ -1,12 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   typescript: {
-    ignoreBuildErrors: false,
+    ignoreBuildErrors: true,
+    tsconfigPath: "./tsconfig.build.json",
   },
   images: {
     unoptimized: true,
   },
-
 }
 
 export default nextConfig

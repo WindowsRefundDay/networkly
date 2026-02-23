@@ -32,12 +32,15 @@
   "include": [
     "next-env.d.ts",
     ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts",
     "**/*.mts",
     "**/*.ts",
     "**/*.tsx"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    ".next/dev",
+    "backups",
+    "ec-scraper",
+    "logs"
   ]
 }

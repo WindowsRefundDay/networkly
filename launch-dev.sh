@@ -39,7 +39,7 @@ tmux new-session -d -s $SESSION_NAME -n "frontend"
 echo -e "${GREEN}[1/4] Starting Next.js Frontend (port 3000)${NC}"
 tmux send-keys -t $SESSION_NAME:0 "cd $PROJECT_ROOT" C-m
 tmux send-keys -t $SESSION_NAME:0 "echo -e '\033[1;36m=== Next.js Frontend (http://localhost:3000) ===\033[0m'" C-m
-tmux send-keys -t $SESSION_NAME:0 "pnpm dev" C-m
+tmux send-keys -t $SESSION_NAME:0 "./scripts/start-dev.sh" C-m
 
 # Window 2: EC-Scraper Scheduled Discovery
 echo -e "${GREEN}[2/4] Starting Scheduled Discovery (runs every 24h)${NC}"
