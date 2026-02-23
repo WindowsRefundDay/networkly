@@ -4,13 +4,14 @@ import { NextRequest } from 'next/server'
 
 // Mock dependencies
 vi.mock('@/lib/supabase/server', () => ({
+  getCurrentUser: vi.fn().mockResolvedValue({ id: 'test-user-id' }),
   createClient: vi.fn().mockResolvedValue({
     auth: {
       getUser: vi.fn().mockResolvedValue({
-        data: { user: { id: 'test-user-id' } }
-      })
-    }
-  })
+        data: { user: { id: 'test-user-id' } },
+      }),
+    },
+  }),
 }))
 
 vi.mock('@/lib/ai/google-model-manager', () => {

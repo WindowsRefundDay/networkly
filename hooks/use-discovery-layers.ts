@@ -347,7 +347,7 @@ function reduceEvent(prev: DiscoveryState, event: DiscoveryEvent): DiscoveryStat
 }
 
 export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): UseDiscoveryLayersReturn {
-  const { onOpportunityFound, onComplete, existingIds, existingTitles } = options
+  const { onOpportunityFound, onComplete, existingTitles } = options
 
   // Refs for callbacks to avoid stale closures
   const onOpportunityFoundRef = useRef(onOpportunityFound)
@@ -358,6 +358,7 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
   useEffect(() => { existingTitlesRef.current = existingTitles }, [existingTitles])
 
   const [state, setState] = useState<DiscoveryState | null>(null)
+  const stateRef = useRef<DiscoveryState | null>(null)
   const eventSourceRef = useRef<EventSource | null>(null)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -376,6 +377,10 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
       timeoutRef.current = null
     }
   }, [])
+
+  useEffect(() => {
+    stateRef.current = state
+  }, [state])
 
   useEffect(() => () => cleanup(), [cleanup])
 
@@ -396,11 +401,8 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
       }
     } else if (event.type === 'complete' || event.type === 'done') {
       queueMicrotask(() => {
-        setState((currentState) => {
-          const count = currentState?.foundCount ?? 0
-          setTimeout(() => onCompleteRef.current?.(count), 0)
-          return currentState
-        })
+        const count = stateRef.current?.foundCount ?? 0
+        onCompleteRef.current?.(count)
       })
     }
   }, [])
@@ -461,7 +463,7 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
             locationType: result.locationType || '',
             opportunityType: result.opportunityType || '',
             match_reasons: ['Database match'],
-          } as unknown as DiscoveryEvent)
+          } as DiscoveryEvent)
         }
       })
       .catch((err) => {
@@ -490,13 +492,14 @@ export function useDiscoveryLayers(options: UseDiscoveryLayersOptions = {}): Use
         if (!event.data || event.data === 'undefined') return
         const data = JSON.parse(event.data) as DiscoveryEvent
         if (event.type !== 'message' && !data.type) {
-          (data as any).type = event.type
+          data.type = event.type as DiscoveryEvent['type']
         }
 
         // Deduplicate opportunity_found
         if (data.type === 'opportunity_found') {
-          const id = (data as any).id
-          const title = (data as any).title
+          const opportunityData = data as DiscoveryEvent & { id?: string; title?: string }
+          const id = opportunityData.id
+          const title = opportunityData.title
           if (id && seenIdsRef.has(id)) return
           if (title && title.trim() !== '') {
             const titleKey = title.trim().toLowerCase()

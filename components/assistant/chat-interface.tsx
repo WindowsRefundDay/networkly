@@ -16,51 +16,20 @@ import type React from 'react'
 import { useState, useRef, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
-  Sparkles, Send, User, Square, Plus, MessageSquare, Trash2,
-  PanelLeftClose, PanelLeft, Copy, Check, RefreshCw, X
+  Sparkles, Send, Square, Plus, MessageSquare, Trash2,
+  PanelLeftClose, PanelLeft, X
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useSupabaseUser } from '@/hooks/use-supabase-user'
-import { messageEntranceVariants, staggerContainerVariants, fadeInUpVariants } from './animations'
-
-import { OpportunityGrid, type InlineOpportunity } from './opportunity-card-inline'
-import { DiscoveryLoading, TypingIndicator } from './simple-loading'
+import { staggerContainerVariants, fadeInUpVariants } from './animations'
+import type { InlineOpportunity } from './opportunity-card-inline'
+import { DiscoveryLoading } from './simple-loading'
 import { WebDiscoveryConfirm } from './action-buttons'
-import { MarkdownMessage } from './markdown-message'
 import type { ChatSession } from '@/app/actions/chat'
 import { useInlineDiscovery } from '@/hooks/use-inline-discovery'
-
-// ─── Types ──────────────────────────────────────────────────────
-interface ChatMessage {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-  timestamp: number
-  opportunities?: InlineOpportunity[]
-  opportunityCache?: Record<string, InlineOpportunity>
-  isStreaming?: boolean
-  toolStatus?: string
-  discoveryPrompt?: { query: string }
-}
-
-interface Conversation {
-  id: string
-  title: string
-  messages: ChatMessage[]
-  createdAt: number
-  updatedAt: number
-}
-
-interface StreamEvent {
-  type: 'text-delta' | 'tool-status' | 'opportunities' | 'trigger_discovery' | 'error'
-  textDelta?: string
-  status?: string
-  opportunities?: InlineOpportunity[]
-  query?: string
-  error?: string
-}
+import type { ChatMessage, Conversation, StreamEvent } from './chat-types'
+import { ChatMessageList } from './chat-message-list'
 
 export interface ChatInterfaceRef {
   sendMessage: (text: string) => void
@@ -786,107 +755,21 @@ export const ChatInterface = forwardRef<ChatInterfaceRef>((_, ref) => {
             </div>
           ) : (
             /* ── Message list ── */
-            <div className="max-w-3xl mx-auto py-4 space-y-1">
-              {messages.map((message, idx) => {
-                const isUser = message.role === 'user'
-                const isLast = message.role === 'assistant' && idx === messages.length - 1
-
-                return (
-                  <motion.div
-                    key={message.id}
-                    className={cn('group flex gap-3 px-4 py-3', isUser ? 'justify-end' : 'justify-start')}
-                    variants={messageEntranceVariants}
-                    initial="hidden"
-                    animate="visible"
-                  >
-                    {/* Assistant avatar */}
-                    {!isUser && (
-                      <div className="shrink-0 mt-0.5">
-                        <div className="h-8 w-8 rounded-xl bg-primary flex items-center justify-center shadow-sm">
-                          <Sparkles className="h-4 w-4 text-primary-foreground" />
-                        </div>
-                      </div>
-                    )}
-
-                    <div className={cn(
-                      'flex flex-col min-w-0',
-                      isUser ? 'max-w-[75%] items-end' : 'max-w-[85%]'
-                    )}>
-                      {/* Bubble */}
-                      <div className={cn(
-                        'rounded-2xl px-4 py-3 text-sm break-words',
-                        isUser
-                          ? 'bg-primary text-primary-foreground rounded-br-md shadow-sm'
-                          : 'backdrop-blur-sm bg-muted/60 text-foreground border border-border/30 rounded-bl-md'
-                      )}>
-                        {message.content ? (
-                          isUser ? (
-                            <p className="whitespace-pre-wrap">{message.content}</p>
-                          ) : (
-                            <MarkdownMessage
-                              content={message.content}
-                              opportunityCache={globalOpportunityCache}
-                              onBookmark={handleBookmark}
-                              bookmarkingId={bookmarkingId || undefined}
-                              bookmarkedIds={bookmarkedIds}
-                            />
-                          )
-                        ) : message.isStreaming ? (
-                          <TypingIndicator />
-                        ) : null}
-                      </div>
-
-                      {/* Opportunities grid */}
-                      {message.opportunities && message.opportunities.length > 0 && (
-                        <div className="mt-3 w-full relative z-10">
-                          <OpportunityGrid
-                            opportunities={filterOpportunitiesForGrid(message)}
-                            onBookmark={handleBookmark}
-                            bookmarkingId={bookmarkingId || undefined}
-                            bookmarkedIds={bookmarkedIds}
-                          />
-                        </div>
-                      )}
-
-                      {/* Timestamp + actions */}
-                      <div className={cn('flex items-center gap-1.5 mt-1 px-1', isUser ? 'flex-row-reverse' : 'flex-row')}>
-                        <span className="text-[10px] text-muted-foreground/40">{formatTime(message.timestamp)}</span>
-
-                        {message.content && !message.isStreaming && (
-                          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button
-                              onClick={() => copyMessage(message.id, message.content)}
-                              className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground/50 hover:text-foreground"
-                              title="Copy message"
-                            >
-                              {copiedMsgId === message.id ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                            </button>
-                            {!isUser && isLast && (
-                              <button
-                                onClick={regenerate}
-                                className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground/50 hover:text-foreground"
-                                title="Regenerate response"
-                              >
-                                <RefreshCw className="h-3 w-3" />
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* User avatar */}
-                    {isUser && (
-                      <div className="shrink-0 mt-0.5">
-                        <Avatar className="h-8 w-8 shadow-sm">
-                          <AvatarImage src={userAvatar} alt={userName} />
-                          <AvatarFallback><User className="h-4 w-4" /></AvatarFallback>
-                        </Avatar>
-                      </div>
-                    )}
-                  </motion.div>
-                )
-              })}
+            <div>
+              <ChatMessageList
+                messages={messages}
+                globalOpportunityCache={globalOpportunityCache}
+                bookmarkedIds={bookmarkedIds}
+                bookmarkingId={bookmarkingId}
+                copiedMsgId={copiedMsgId}
+                userAvatar={userAvatar}
+                userName={userName}
+                onBookmark={handleBookmark}
+                onCopyMessage={copyMessage}
+                onRegenerate={regenerate}
+                getGridOpportunities={filterOpportunitiesForGrid}
+                formatTime={formatTime}
+              />
 
               {/* Tool status indicator */}
               {toolStatus && (
