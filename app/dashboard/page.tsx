@@ -3,6 +3,7 @@ import { ensureUserRecord } from "@/app/actions/user"
 import { redirect } from "next/navigation"
 
 // Next.js Server Component
+import { DashboardMotionShell } from "./components/DashboardMotionShell"
 import { DashboardHeader } from "./components/DashboardHeader"
 import { BentoGrid, BentoItem } from "./components/BentoGrid"
 import { GlobalNetworkCard } from "./components/GlobalNetworkCard"
@@ -47,53 +48,55 @@ export default async function DashboardPage() {
       {/* Absolute Solid Background base */}
       <div className="fixed inset-0 bg-[#060608] z-0 pointer-events-none" />
 
-      {/* Grid Layout Container */}
-      <div className="relative z-10 p-6 md:p-8 lg:p-10 max-w-[1400px] mx-auto flex flex-col pt-8 lg:pt-16">
+      <DashboardMotionShell>
+        {/* Grid Layout Container */}
+        <div className="relative z-10 p-6 md:p-8 lg:p-10 max-w-[1400px] mx-auto flex flex-col pt-8 lg:pt-16">
 
-        {/* Isolated Client Header */}
-        <DashboardHeader name={data.user.name} />
+          {/* Isolated Client Header */}
+          <DashboardHeader name={data.user.name} />
 
-        {/* Bento Grid layout Engine */}
-        <BentoGrid>
+          {/* Bento Grid layout Engine */}
+          <BentoGrid>
 
-          {/* ROW 1: Hero Metrics & Profile */}
-          <BentoItem colSpan="lg:col-span-8">
-            <GlobalNetworkCard
-              newMatches={metrics.newMatches}
-              secureMessages={metrics.secureMessages}
-              pendingRequests={metrics.pendingRequests}
-            />
-          </BentoItem>
+            {/* ROW 1: Hero Metrics & Profile */}
+            <BentoItem colSpan="lg:col-span-8">
+              <GlobalNetworkCard
+                newMatches={metrics.newMatches}
+                secureMessages={metrics.secureMessages}
+                pendingRequests={metrics.pendingRequests}
+              />
+            </BentoItem>
 
-          <BentoItem colSpan="lg:col-span-4" className="items-center text-center">
-            <ProfileSynthesisCard completionPercentage={metrics.completionPercentage} />
-          </BentoItem>
+            <BentoItem colSpan="lg:col-span-4" className="items-center text-center">
+              <ProfileSynthesisCard completionPercentage={metrics.completionPercentage} />
+            </BentoItem>
 
-          {/* ROW 2: Algorithmic Curation & Quick Actions */}
-          <BentoItem colSpan="lg:col-span-8">
-            <RecommendationCard recommendation={data.recommendation} />
-          </BentoItem>
+            {/* ROW 2: Algorithmic Curation & Quick Actions */}
+            <BentoItem colSpan="lg:col-span-8">
+              <RecommendationCard recommendation={data.recommendation} />
+            </BentoItem>
 
-          {/* Quick actions don't need a bento item wrap directly, we wrap them so they stagger internally or match height */}
-          <div className="lg:col-span-4 w-full h-full relative z-10">
-            <QuickActionsContainer />
-          </div>
+            {/* Quick actions don't need a bento item wrap directly, we wrap them so they stagger internally or match height */}
+            <div className="lg:col-span-4 w-full h-full relative z-10">
+              <QuickActionsContainer />
+            </div>
 
-          {/* ROW 3: Telemetry */}
-          <BentoItem colSpan="lg:col-span-12">
-            <WeeklyTelemetry
-              profileViews7d={data.weeklyTelemetry.profileViews7d}
-              newConnections7d={data.weeklyTelemetry.newConnections7d}
-              searchAppearancesTotal={data.user.searchAppearancesTotal}
-            />
-          </BentoItem>
+            {/* ROW 3: Telemetry */}
+            <BentoItem colSpan="lg:col-span-12">
+              <WeeklyTelemetry
+                profileViews7d={data.weeklyTelemetry.profileViews7d}
+                newConnections7d={data.weeklyTelemetry.newConnections7d}
+                searchAppearancesTotal={data.user.searchAppearancesTotal}
+              />
+            </BentoItem>
 
-        </BentoGrid>
+          </BentoGrid>
 
-      </div>
+        </div>
 
-      {/* Floating Action Dock */}
-      <ActionDock />
+        {/* Floating Action Dock */}
+        <ActionDock />
+      </DashboardMotionShell>
 
     </div>
   )

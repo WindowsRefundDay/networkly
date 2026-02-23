@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import {
     Home,
@@ -15,32 +16,38 @@ import {
     Settings,
     Globe
 } from "lucide-react"
+import { useReducedMotion } from "@/hooks/use-reduced-motion"
+import { DASHBOARD_FAST_SPRING, DASHBOARD_SPRING } from "./motion-presets"
 
 const navItems = [
-    { label: "Home", icon: Home, active: true, href: "/dashboard" },
-    { label: "Profile", icon: ProfileIcon, active: false, href: "/dashboard/profile" },
-    { label: "Opportunities", icon: Globe, active: false, href: "/dashboard/opportunities" },
-    { label: "Projects", icon: FolderGit2, active: false, href: "/dashboard/projects" },
-    { label: "Network", icon: Network, active: false, href: "/dashboard/network" },
-    { label: "Mentors", icon: GraduationCap, active: false, href: "/dashboard/mentors" },
-    { label: "Events", icon: Calendar, active: false, href: "/dashboard/events" },
-    { label: "Analytics", icon: BarChart, active: false, href: "/dashboard/analytics" },
-    { label: "Settings", icon: Settings, active: false, href: "/dashboard/settings" },
+    { label: "Home", icon: Home, href: "/dashboard" },
+    { label: "Profile", icon: ProfileIcon, href: "/profile" },
+    { label: "Opportunities", icon: Globe, href: "/opportunities" },
+    { label: "Projects", icon: FolderGit2, href: "/projects" },
+    { label: "Network", icon: Network, href: "/network" },
+    { label: "Mentors", icon: GraduationCap, href: "/mentors" },
+    { label: "Events", icon: Calendar, href: "/events" },
+    { label: "Analytics", icon: BarChart, href: "/analytics" },
+    { label: "Settings", icon: Settings, href: "/settings" },
 ]
 
 export function ActionDock() {
+    const pathname = usePathname()
     const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
+    const prefersReducedMotion = useReducedMotion()
 
     return (
         <motion.nav
-            initial={{ y: 100, opacity: 0 }}
+            initial={prefersReducedMotion ? false : { y: 100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            transition={{ type: "spring", stiffness: 200, damping: 20, delay: 0.5 }}
+            transition={prefersReducedMotion ? { duration: 0 } : { ...DASHBOARD_SPRING, delay: 0.42 }}
+            style={{ willChange: "transform, opacity" }}
             className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-3 rounded-[2rem] border border-zinc-800/80 bg-zinc-950/80 backdrop-blur-2xl shadow-[0_20px_40px_-15px_rgba(0,0,0,0.5)]"
         >
             {navItems.map((item, i) => {
                 const isHovered = hoveredIndex === i
                 const isAdjacent = hoveredIndex !== null && Math.abs(hoveredIndex - i) === 1
+                const isActive = pathname === item.href
 
                 // Mac OS Dock Magnification logic
                 let scale = 1
@@ -56,17 +63,18 @@ export function ActionDock() {
                     >
                         <Link href={item.href}>
                             <motion.button
-                                animate={{ scale }}
-                                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                                animate={prefersReducedMotion ? undefined : { scale }}
+                                transition={prefersReducedMotion ? { duration: 0 } : DASHBOARD_FAST_SPRING}
+                                style={{ willChange: "transform" }}
                                 className={`flex items-center justify-center w-12 h-12 rounded-2xl transition-colors relative
-                  ${item.active
+                  ${isActive
                                         ? 'text-blue-500 bg-blue-500/10'
                                         : 'text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50'
                                     }`}
                             >
                                 <item.icon className="w-5 h-5 flex-shrink-0" strokeWidth={1.5} />
 
-                                {item.active && (
+                                {isActive && (
                                     <motion.div
                                         layoutId="activeIndicator"
                                         className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"
@@ -79,10 +87,10 @@ export function ActionDock() {
                         <AnimatePresence>
                             {isHovered && (
                                 <motion.div
-                                    initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                                    initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 10, scale: 0.92 }}
                                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                                    exit={{ opacity: 0, y: 5, scale: 0.9 }}
-                                    transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                                    exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 5, scale: 0.92 }}
+                                    transition={prefersReducedMotion ? { duration: 0 } : DASHBOARD_FAST_SPRING}
                                     className="absolute -top-14 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-[11px] font-medium text-zinc-100 pointer-events-none whitespace-nowrap shadow-xl"
                                 >
                                     {item.label}
@@ -102,24 +110,31 @@ export function ActionDock() {
                 onMouseEnter={() => setHoveredIndex(99)}
                 onMouseLeave={() => setHoveredIndex(null)}
             >
-                <motion.button
-                    animate={{ scale: hoveredIndex === 99 ? 1.15 : 1 }}
-                    transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                    className="relative flex items-center justify-center w-12 h-12 rounded-2xl bg-[#0F172A] border border-blue-500/30 hover:bg-blue-900/20 hover:border-blue-500/50 transition-colors ml-2 md:ml-0"
-                >
-                    <Bot className="w-5 h-5 text-blue-400 drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]" strokeWidth={1.5} />
-                </motion.button>
+                <Link href="/assistant">
+                    <motion.button
+                        animate={prefersReducedMotion ? undefined : { scale: hoveredIndex === 99 ? 1.15 : 1 }}
+                        transition={prefersReducedMotion ? { duration: 0 } : DASHBOARD_FAST_SPRING}
+                        style={{ willChange: "transform" }}
+                        className={`relative flex items-center justify-center w-12 h-12 rounded-2xl border transition-colors ml-2 md:ml-0
+                            ${pathname === '/assistant'
+                                ? 'bg-blue-500/20 border-blue-500/50'
+                                : 'bg-[#0F172A] border-blue-500/30 hover:bg-blue-900/20 hover:border-blue-500/50'
+                            }`}
+                    >
+                        <Bot className="w-5 h-5 text-blue-400 drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]" strokeWidth={1.5} />
+                    </motion.button>
+                </Link>
 
                 <AnimatePresence>
                     {hoveredIndex === 99 && (
                         <motion.div
-                            initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                            initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 10, scale: 0.92 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 5, scale: 0.9 }}
-                            transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                            exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 5, scale: 0.92 }}
+                            transition={prefersReducedMotion ? { duration: 0 } : DASHBOARD_FAST_SPRING}
                             className="absolute -top-14 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg bg-zinc-900 border border-blue-500/30 text-[11px] font-medium text-zinc-100 pointer-events-none whitespace-nowrap shadow-xl flex items-center gap-2"
                         >
-                            <span className="flex h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
+                            <span className="flex h-1.5 w-1.5 rounded-full bg-blue-500 motion-safe:animate-pulse" />
                             Agent Co-Pilot
                             <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-zinc-900 border-b border-r border-blue-500/30 rotate-45" />
                         </motion.div>

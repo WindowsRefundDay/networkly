@@ -2,8 +2,12 @@
 
 import { motion } from "framer-motion"
 import { Search, Terminal, BrainCircuit, ChevronRight } from "lucide-react"
+import { useReducedMotion } from "@/hooks/use-reduced-motion"
+import { DASHBOARD_FAST_SPRING } from "./motion-presets"
 
 export function QuickActionsContainer() {
+    const prefersReducedMotion = useReducedMotion()
+
     const actions = [
         { title: "Find Jobs", icon: Search, color: "text-slate-300", bg: "bg-zinc-900/50" },
         { title: "Add Project", icon: Terminal, color: "text-slate-300", bg: "bg-zinc-900/50" },
@@ -15,13 +19,16 @@ export function QuickActionsContainer() {
             {actions.map((action, i) => (
                 <motion.button
                     key={i}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                    initial={prefersReducedMotion ? false : { opacity: 0, y: 18, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    whileHover={prefersReducedMotion ? undefined : { scale: 1.02, y: -2 }}
+                    whileTap={prefersReducedMotion ? undefined : { scale: 0.985 }}
+                    transition={prefersReducedMotion ? { duration: 0 } : { ...DASHBOARD_FAST_SPRING, delay: i * 0.06 }}
+                    style={{ willChange: "transform, opacity" }}
                     className={`relative group p-5 rounded-[1.5rem] border ${action.border || 'border-zinc-800/80'} ${action.bg} backdrop-blur-md transition-colors overflow-hidden flex items-center gap-4 hover:bg-zinc-800/80`}
                 >
                     {/* Subtle hover gradient */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]" />
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:motion-safe:animate-[shimmer_1.5s_linear_infinite]" />
 
                     <div className="relative z-10 w-10 h-10 rounded-full bg-black/40 border border-zinc-700/50 flex flex-shrink-0 items-center justify-center shadow-inner">
                         <action.icon className={`w-5 h-5 ${action.color}`} strokeWidth={1.5} />

@@ -1,9 +1,11 @@
 'use client'
 
-import { motion, AnimatePresence } from "framer-motion"
-import { useState, useEffect } from "react"
+import { useMemo } from "react"
+import { AnimatePresence, motion } from "framer-motion"
 import { Globe, Zap, ArrowUpRight } from "lucide-react"
+import { useReducedMotion } from "@/hooks/use-reduced-motion"
 import type { DashboardRecommendation } from "@/lib/dashboard/telemetry-schema"
+import { DASHBOARD_FAST_SPRING, DASHBOARD_SPRING } from "./motion-presets"
 
 type RecommendationCardItem = {
     id: string
@@ -17,31 +19,25 @@ export function RecommendationCard({
 }: {
     recommendation: DashboardRecommendation | null
 }) {
-    const rawItems: RecommendationCardItem[] = recommendation
-        ? [{
-            id: recommendation.opportunityId,
-            title: recommendation.title,
-            location: `${recommendation.organization}${recommendation.location ? ` • ${recommendation.location}` : ""}`,
-            match: recommendation.topMatchProbability,
-        }]
-        : [{
-            id: "no-recommendation",
-            title: "No recommendation available yet",
-            location: "Telemetry worker is preparing your next best match",
-            match: 0,
-        }]
+    const prefersReducedMotion = useReducedMotion()
 
-    const [items, setItems] = useState(rawItems)
-    const [isProcessing, setIsProcessing] = useState(true)
-
-    // Simulate an AI "sorting" sequence on mount
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            setItems([...rawItems].sort((a, b) => b.match - a.match))
-            setIsProcessing(false)
-        }, 1500)
-        return () => clearTimeout(timer)
-    }, [recommendation?.opportunityId])
+    const rawItems = useMemo<RecommendationCardItem[]>(() => (
+        recommendation
+            ? [{
+                id: recommendation.opportunityId,
+                title: recommendation.title,
+                location: `${recommendation.organization}${recommendation.location ? ` • ${recommendation.location}` : ""}`,
+                match: recommendation.topMatchProbability,
+            }]
+            : [{
+                id: "no-recommendation",
+                title: "No recommendation available yet",
+                location: "Telemetry worker is preparing your next best match",
+                match: 0,
+            }]
+    ), [recommendation])
+    const items = useMemo(() => [...rawItems].sort((a, b) => b.match - a.match), [rawItems])
+    const isPendingRecommendation = recommendation === null
 
     return (
         <div className="flex flex-col h-full justify-between relative overflow-hidden group">
@@ -53,27 +49,30 @@ export function RecommendationCard({
                     <Zap className="w-3.5 h-3.5 text-blue-500" strokeWidth={2} />
                     Algorithmic Curation
                 </h3>
-                {isProcessing && (
-                    <span className="flex h-2 w-2 rounded-full bg-blue-500 animate-ping" />
+                {isPendingRecommendation && (
+                    <motion.span
+                        className="flex h-2 w-2 rounded-full bg-blue-500"
+                        animate={prefersReducedMotion ? { opacity: 1 } : { opacity: [0.4, 1, 0.4], scale: [1, 1.18, 1] }}
+                        transition={prefersReducedMotion ? { duration: 0 } : { duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+                    />
                 )}
             </div>
 
             <div className="flex-1 relative">
-                <AnimatePresence>
+                <AnimatePresence mode="wait" initial={false}>
                     {items.map((item, index) => (
                         <motion.div
-                            layoutId={item.id}
-                            key={item.id}
-                            initial={{ opacity: 0, x: -20 }}
+                            key={`${item.id}-${index}`}
+                            initial={prefersReducedMotion ? false : { opacity: 0, y: 22, scale: 0.98 }}
                             animate={{
                                 opacity: index === 0 ? 1 : 0.4,
-                                x: 0,
+                                y: index === 0 ? 0 : 10,
                                 scale: index === 0 ? 1 : 0.98,
-                                y: index * 80 // Stack them visually if needed, though here we just render them in flow
                             }}
-                            transition={{ type: "spring", stiffness: 200, damping: 20 }}
+                            exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -10, scale: 0.98 }}
+                            transition={prefersReducedMotion ? { duration: 0 } : DASHBOARD_SPRING}
+                            style={{ willChange: "transform, opacity", top: index * 84 }}
                             className={`absolute top-0 left-0 w-full p-6 rounded-2xl border ${index === 0 ? 'border-zinc-800 bg-zinc-950/80 shadow-lg z-10' : 'border-zinc-900 bg-transparent z-0 pointer-events-none'} flex flex-col md:flex-row justify-between items-start md:items-center gap-6`}
-                            style={{ top: index * 85 }} // Adjust vertical stacking
                         >
                             <div>
                                 <h4 className={`font-bold transition-colors ${index === 0 ? 'text-zinc-100 text-xl' : 'text-zinc-500 text-lg'}`}>
@@ -100,11 +99,13 @@ export function RecommendationCard({
             {/* Action footer for the top item */}
             <motion.div
                 className="mt-32 pt-6 border-t border-zinc-900/50 flex justify-end"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: isProcessing ? 0 : 1 }}
+                initial={prefersReducedMotion ? false : { opacity: 0, y: 8 }}
+                transition={prefersReducedMotion ? { duration: 0 } : DASHBOARD_FAST_SPRING}
+                animate={{ opacity: isPendingRecommendation ? 0.45 : 1 }}
             >
-                <button className="text-xs font-mono text-zinc-400 hover:text-blue-400 flex items-center gap-2 transition-colors group/btn">
-                    Review Top Match <ArrowUpRight className="w-3.5 h-3.5 transform group-hover/btn:translate-x-0.5 group-hover/btn:-translate-y-0.5 transition-transform" />
+                <button disabled={isPendingRecommendation} className="text-xs font-mono text-zinc-400 hover:text-blue-400 disabled:hover:text-zinc-400 disabled:cursor-not-allowed flex items-center gap-2 transition-colors group/btn">
+                    {isPendingRecommendation ? "Waiting For Top Match" : "Review Top Match"}
+                    <ArrowUpRight className="w-3.5 h-3.5 transform group-hover/btn:translate-x-0.5 group-hover/btn:-translate-y-0.5 transition-transform" />
                 </button>
             </motion.div>
         </div>

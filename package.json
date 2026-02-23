@@ -71,6 +71,8 @@
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^5.1.2",
     "baseline-browser-mapping": "^2.10.0",
+    "eslint": "^9.39.3",
+    "eslint-config-next": "^16.1.6",
     "jsdom": "^27.4.0",
     "postcss": "^8.5",
     "tailwindcss": "^4.1.9",

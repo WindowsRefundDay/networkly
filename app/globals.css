@@ -135,3 +135,12 @@
     @apply bg-background text-foreground transition-colors duration-500 ease-in-out;
   }
 }
+
+@keyframes shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
