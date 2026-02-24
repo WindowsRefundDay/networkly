@@ -1,6 +1,11 @@
-import { getDashboardData } from "@/app/actions/dashboard"
-import { ensureUserRecord } from "@/app/actions/user"
 import { redirect } from "next/navigation"
+
+import { getDashboardData } from "@/app/actions/dashboard"
+import { getSuggestedMentors, getSavedMentors } from "@/app/actions/mentors"
+import { getOpportunities } from "@/app/actions/opportunities"
+import { getStatuses } from "@/app/actions/opportunity-status"
+import { getMyProjects } from "@/app/actions/projects"
+import { ensureUserRecord } from "@/app/actions/user"
 
 // Next.js Server Component
 import { DashboardMotionShell } from "./components/DashboardMotionShell"
@@ -26,78 +31,138 @@ export default async function DashboardPage() {
     if (!data) {
       return (
         <div className="flex flex-col items-center justify-center min-h-[100dvh] space-y-4 bg-zinc-950">
-          <h2 className="text-xl font-mono text-red-500 bg-red-500/10 px-4 py-2 rounded-sm border border-red-500/20">SYSTEM ERROR: CONNECTION REFUSED</h2>
-          <p className="text-zinc-500 font-mono text-sm tracking-widest uppercase">
-            RETRYING HANDSHAKE...
+          <h2 className="text-xl text-zinc-100 px-4 py-2 rounded-sm border border-zinc-800/80 bg-zinc-900/60">
+            We could not load your dashboard yet.
+          </h2>
+          <p className="text-zinc-500 text-sm">
+            Please refresh in a moment.
           </p>
         </div>
       )
     }
   }
 
+  const [myProjects, opportunitiesResult, opportunityStatuses, suggestedMentors, savedMentors] = await Promise.all([
+    getMyProjects(),
+    getOpportunities({ page: 1, pageSize: 6 }),
+    getStatuses(),
+    getSuggestedMentors(),
+    getSavedMentors(),
+  ])
+
+  const completedProjects = myProjects.filter((project) => {
+    const normalized = project.status.toLowerCase()
+    return project.progress >= 100 || normalized.includes("complete") || normalized.includes("done")
+  }).length
+
+  const inProgressProjects = myProjects.filter((project) => {
+    const normalized = project.status.toLowerCase()
+    return (
+      (project.progress > 0 && project.progress < 100) ||
+      normalized.includes("progress") ||
+      normalized.includes("active") ||
+      normalized.includes("building")
+    )
+  }).length
+
+  const averageProjectProgress = myProjects.length
+    ? Math.round(
+        myProjects.reduce((sum, project) => sum + Math.min(100, Math.max(0, project.progress || 0)), 0) /
+          myProjects.length
+      )
+    : 0
+
+  const statusValues = Object.values(opportunityStatuses)
+  const opportunityStatusCounts = {
+    interested: statusValues.filter((status) => status === "interested").length,
+    applied: statusValues.filter((status) => status === "applied").length,
+  }
+
   const metrics = {
-    newMatches: data.monumentalMetrics.matches,
-    secureMessages: data.monumentalMetrics.unreadMessages,
-    pendingRequests: data.monumentalMetrics.pendingRequests,
+    projectCount: myProjects.length,
+    completedProjects,
+    inProgressProjects,
+    averageProjectProgress,
+    mentorSavedCount: savedMentors.length,
     completionPercentage: data.user.profileCompleteness,
   }
 
   return (
-    <div className="min-h-[100dvh] bg-zinc-950 text-zinc-300 font-sans selection:bg-blue-500/30 overflow-x-hidden relative pb-32">
+    <div className="min-h-[100dvh] bg-zinc-950 text-zinc-200 font-sans selection:bg-blue-500/20 overflow-x-hidden relative pb-32">
 
-      {/* Absolute Solid Background base */}
-      <div className="fixed inset-0 bg-[#060608] z-0 pointer-events-none" />
+      <div className="fixed inset-0 bg-[radial-gradient(circle_at_8%_12%,rgba(59,130,246,0.14),transparent_48%),radial-gradient(circle_at_82%_84%,rgba(59,130,246,0.1),transparent_46%),#09090b] z-0 pointer-events-none" />
 
       <DashboardMotionShell>
-        {/* Grid Layout Container */}
-        <div className="relative z-10 p-6 md:p-8 lg:p-10 max-w-[1400px] mx-auto flex flex-col pt-8 lg:pt-16">
+        <div className="relative z-10 p-4 md:p-8 lg:p-10 max-w-[1400px] mx-auto flex flex-col pt-8 lg:pt-16">
 
-          {/* Isolated Client Header */}
           <DashboardHeader name={data.user.name} />
 
-          {/* Bento Grid layout Engine */}
           <BentoGrid>
 
-            {/* ROW 1: Hero Metrics & Profile */}
-            <BentoItem colSpan="lg:col-span-8">
+            <BentoItem
+              colSpan="lg:col-span-8"
+              label="Projects"
+              description="What you are building right now."
+            >
               <GlobalNetworkCard
-                newMatches={metrics.newMatches}
-                secureMessages={metrics.secureMessages}
-                pendingRequests={metrics.pendingRequests}
+                projectCount={metrics.projectCount}
+                completedProjects={metrics.completedProjects}
+                inProgressProjects={metrics.inProgressProjects}
+                averageProjectProgress={metrics.averageProjectProgress}
+                recentProjects={myProjects.slice(0, 3)}
               />
             </BentoItem>
 
-            <BentoItem colSpan="lg:col-span-4" className="items-center text-center">
-              <ProfileSynthesisCard completionPercentage={metrics.completionPercentage} />
+            <BentoItem
+              colSpan="lg:col-span-4"
+              className="items-center text-center"
+              label="Mentors"
+              description="People who can help you level up."
+            >
+              <ProfileSynthesisCard
+                savedMentorCount={metrics.mentorSavedCount}
+                suggestedMentors={suggestedMentors.slice(0, 3)}
+              />
             </BentoItem>
 
-            {/* ROW 2: Algorithmic Curation & Quick Actions */}
-            <BentoItem colSpan="lg:col-span-8">
-              <RecommendationCard recommendation={data.recommendation} />
+            <BentoItem
+              colSpan="lg:col-span-8"
+              label="Opportunities"
+              description="Open programs and internships you can apply to."
+            >
+              <RecommendationCard
+                recommendation={data.recommendation}
+                opportunities={opportunitiesResult.opportunities.slice(0, 3)}
+                appliedCount={opportunityStatusCounts.applied}
+                interestedCount={opportunityStatusCounts.interested}
+              />
             </BentoItem>
 
-            {/* Quick actions don't need a bento item wrap directly, we wrap them so they stagger internally or match height */}
-            <div className="lg:col-span-4 w-full h-full relative z-10">
+            <BentoItem
+              colSpan="lg:col-span-4"
+              label="Quick Actions"
+              description="Jump to your most used pages."
+            >
               <QuickActionsContainer />
-            </div>
-
-            {/* ROW 3: Telemetry */}
-            <BentoItem colSpan="lg:col-span-12">
-              <WeeklyTelemetry
-                profileViews7d={data.weeklyTelemetry.profileViews7d}
-                newConnections7d={data.weeklyTelemetry.newConnections7d}
-                searchAppearancesTotal={data.user.searchAppearancesTotal}
-              />
             </BentoItem>
 
+            <BentoItem
+              colSpan="lg:col-span-12"
+              label="What To Do Next"
+              description="Simple next steps based on your current progress."
+            >
+              <WeeklyTelemetry
+                projectsInProgress={metrics.inProgressProjects}
+                opportunitiesApplied={opportunityStatusCounts.applied}
+                mentorsSaved={metrics.mentorSavedCount}
+                profileCompletion={metrics.completionPercentage}
+              />
+            </BentoItem>
           </BentoGrid>
-
         </div>
 
-        {/* Floating Action Dock */}
         <ActionDock />
       </DashboardMotionShell>
-
     </div>
   )
 }

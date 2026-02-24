@@ -3,13 +3,17 @@ import type { Transition, Variants } from "framer-motion"
 export const DASHBOARD_EASE: [number, number, number, number] = [0.22, 1, 0.36, 1]
 
 export const DASHBOARD_SPRING: Transition = {
-  duration: 0.42,
-  ease: DASHBOARD_EASE,
+  type: "spring",
+  stiffness: 100,
+  damping: 20,
+  mass: 0.9,
 }
 
 export const DASHBOARD_FAST_SPRING: Transition = {
-  duration: 0.28,
-  ease: DASHBOARD_EASE,
+  type: "spring",
+  stiffness: 140,
+  damping: 24,
+  mass: 0.75,
 }
 
 export const dashboardGridVariants: Variants = {

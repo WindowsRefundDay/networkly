@@ -1,111 +1,117 @@
 'use client'
 
-import { useMemo } from "react"
-import { AnimatePresence, motion } from "framer-motion"
-import { Globe, Zap, ArrowUpRight } from "lucide-react"
-import { useReducedMotion } from "@/hooks/use-reduced-motion"
+import Link from "next/link"
+import { ArrowUpRight, Briefcase, ClockClockwise } from "@phosphor-icons/react"
 import type { DashboardRecommendation } from "@/lib/dashboard/telemetry-schema"
-import { DASHBOARD_FAST_SPRING, DASHBOARD_SPRING } from "./motion-presets"
 
-type RecommendationCardItem = {
-    id: string
-    title: string
-    location: string
-    match: number
+type OpportunityPreview = {
+  id: string
+  title: string
+  company: string
+  deadline: string | null
+  matchScore: number
 }
 
 export function RecommendationCard({
-    recommendation
+  recommendation,
+  opportunities,
+  appliedCount,
+  interestedCount,
 }: {
-    recommendation: DashboardRecommendation | null
+  recommendation: DashboardRecommendation | null
+  opportunities: OpportunityPreview[]
+  appliedCount: number
+  interestedCount: number
 }) {
-    const prefersReducedMotion = useReducedMotion()
-
-    const rawItems = useMemo<RecommendationCardItem[]>(() => (
-        recommendation
-            ? [{
-                id: recommendation.opportunityId,
-                title: recommendation.title,
-                location: `${recommendation.organization}${recommendation.location ? ` • ${recommendation.location}` : ""}`,
-                match: recommendation.topMatchProbability,
-            }]
-            : [{
-                id: "no-recommendation",
-                title: "No recommendation available yet",
-                location: "Telemetry worker is preparing your next best match",
-                match: 0,
-            }]
-    ), [recommendation])
-    const items = useMemo(() => [...rawItems].sort((a, b) => b.match - a.match), [rawItems])
-    const isPendingRecommendation = recommendation === null
-
-    return (
-        <div className="flex flex-col h-full justify-between relative overflow-hidden group">
-            {/* Decorative gradient beam */}
-            <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-blue-500 to-transparent opacity-50" />
-
-            <div className="flex items-center justify-between mb-8">
-                <h3 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-3">
-                    <Zap className="w-3.5 h-3.5 text-blue-500" strokeWidth={2} />
-                    Algorithmic Curation
-                </h3>
-                {isPendingRecommendation && (
-                    <motion.span
-                        className="flex h-2 w-2 rounded-full bg-blue-500"
-                        animate={prefersReducedMotion ? { opacity: 1 } : { opacity: [0.4, 1, 0.4] }}
-                        transition={prefersReducedMotion ? { duration: 0 } : { duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
-                    />
-                )}
-            </div>
-
-            <div className="flex-1 relative">
-                <AnimatePresence mode="wait" initial={false}>
-                    {items.map((item, index) => (
-                        <motion.div
-                            key={`${item.id}-${index}`}
-                            initial={prefersReducedMotion ? false : { opacity: 0 }}
-                            animate={{
-                                opacity: index === 0 ? 1 : 0.4,
-                            }}
-                            exit={{ opacity: 0 }}
-                            transition={prefersReducedMotion ? { duration: 0 } : DASHBOARD_SPRING}
-                            style={{ willChange: "transform, opacity", top: index * 84 }}
-                            className={`absolute top-0 left-0 w-full p-6 rounded-2xl border ${index === 0 ? 'border-zinc-800 bg-zinc-950/80 shadow-lg z-10' : 'border-zinc-900 bg-transparent z-0 pointer-events-none'} flex flex-col md:flex-row justify-between items-start md:items-center gap-6`}
-                        >
-                            <div>
-                                <h4 className={`font-bold transition-colors ${index === 0 ? 'text-zinc-100 text-xl' : 'text-zinc-500 text-lg'}`}>
-                                    {item.title}
-                                </h4>
-                                <p className="text-zinc-500 text-xs flex items-center gap-2 mt-2 tracking-wide">
-                                    <Globe className="w-3.5 h-3.5" /> {item.location}
-                                </p>
-                            </div>
-
-                            <div className="flex flex-col items-end">
-                                <div className={`text-4xl font-black tabular-nums tracking-tighter ${index === 0 ? 'text-blue-500 drop-shadow-[0_0_12px_rgba(59,130,246,0.2)]' : 'text-zinc-700'}`}>
-                                    {item.match}%
-                                </div>
-                                <div className="text-[9px] text-zinc-500 font-mono tracking-widest uppercase mt-1">
-                                    Match Probability
-                                </div>
-                            </div>
-                        </motion.div>
-                    ))}
-                </AnimatePresence>
-            </div>
-
-            {/* Action footer for the top item */}
-            <motion.div
-                className="mt-32 pt-6 border-t border-zinc-900/50 flex justify-end"
-                initial={prefersReducedMotion ? false : { opacity: 0 }}
-                transition={prefersReducedMotion ? { duration: 0 } : DASHBOARD_FAST_SPRING}
-                animate={{ opacity: isPendingRecommendation ? 0.45 : 1 }}
-            >
-                <button disabled={isPendingRecommendation} className="text-xs font-mono text-zinc-400 hover:text-blue-400 disabled:hover:text-zinc-400 disabled:cursor-not-allowed flex items-center gap-2 transition-colors group/btn">
-                    {isPendingRecommendation ? "Waiting For Top Match" : "Review Top Match"}
-                    <ArrowUpRight className="w-3.5 h-3.5 transform group-hover/btn:translate-x-0.5 group-hover/btn:-translate-y-0.5 transition-transform" />
-                </button>
-            </motion.div>
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-start justify-between gap-4 mb-5">
+        <div>
+          <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500 mb-2">Top Pick</p>
+          <h3 className="text-xl font-semibold text-zinc-100 tracking-tight">
+            {recommendation?.title || "We are still finding your best matches"}
+          </h3>
+          <p className="text-sm text-zinc-500 mt-1">
+            {recommendation
+              ? `${recommendation.organization}${recommendation.location ? ` • ${recommendation.location}` : ""}`
+              : "Check back soon or explore opportunities now."}
+          </p>
         </div>
-    )
+        {recommendation ? (
+          <div
+            className="text-right"
+            style={{ fontFamily: "var(--font-dashboard-mono), monospace" }}
+          >
+            <p className="text-[10px] uppercase tracking-[0.14em] text-zinc-500">Fit Score</p>
+            <p className="text-3xl text-blue-400 font-semibold">{recommendation.topMatchProbability}%</p>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-zinc-800/70 pt-5">
+        <div className="rounded-xl border border-zinc-800/70 bg-zinc-950/60 p-4">
+          <p className="text-[10px] uppercase tracking-[0.14em] text-zinc-500 mb-1">Applied</p>
+          <p
+            className="text-2xl text-zinc-100 font-semibold"
+            style={{ fontFamily: "var(--font-dashboard-mono), monospace" }}
+          >
+            {appliedCount}
+          </p>
+        </div>
+        <div className="rounded-xl border border-zinc-800/70 bg-zinc-950/60 p-4">
+          <p className="text-[10px] uppercase tracking-[0.14em] text-zinc-500 mb-1">Interested</p>
+          <p
+            className="text-2xl text-zinc-100 font-semibold"
+            style={{ fontFamily: "var(--font-dashboard-mono), monospace" }}
+          >
+            {interestedCount}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-5 border-t border-zinc-800/70 pt-5">
+        <p className="text-[10px] uppercase tracking-[0.16em] text-zinc-500 mb-3">New Opportunities</p>
+        {opportunities.length === 0 ? (
+          <p className="text-sm text-zinc-500">No opportunities loaded yet. Try searching on the opportunities page.</p>
+        ) : (
+          <div className="space-y-3">
+            {opportunities.map((opportunity) => (
+              <div
+                key={opportunity.id}
+                className="rounded-xl border border-zinc-800/70 bg-zinc-900/35 p-4 flex items-start justify-between gap-4"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm text-zinc-100 font-medium truncate">{opportunity.title}</p>
+                  <p className="text-xs text-zinc-500 mt-0.5 truncate">{opportunity.company}</p>
+                  <div className="mt-2 flex items-center gap-3 text-[11px] text-zinc-400">
+                    <span className="inline-flex items-center gap-1">
+                      <Briefcase className="w-3.5 h-3.5" weight="duotone" />
+                      {Math.max(0, Math.min(100, opportunity.matchScore || 0))}% fit
+                    </span>
+                    {opportunity.deadline ? (
+                      <span className="inline-flex items-center gap-1">
+                        <ClockClockwise className="w-3.5 h-3.5" weight="duotone" />
+                        {opportunity.deadline}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="mt-auto pt-5 border-t border-zinc-800/70 flex justify-end">
+        <Link
+          href="/opportunities"
+          className="text-xs text-zinc-300 hover:text-blue-400 transition-colors inline-flex items-center gap-2 uppercase tracking-[0.14em]"
+          style={{ fontFamily: "var(--font-dashboard-mono), monospace" }}
+        >
+          View Opportunities
+          <ArrowUpRight className="w-3.5 h-3.5" />
+        </Link>
+      </div>
+    </div>
+  )
 }
